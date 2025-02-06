@@ -1,3 +1,4 @@
+<scrit type="text/javascript" src="./js/member_form.js"></scrit>
 <?php
     session_start();
 
