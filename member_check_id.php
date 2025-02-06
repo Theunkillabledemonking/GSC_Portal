@@ -1,6 +1,8 @@
 <h3>아이디 중복 체크</h3>
 <p>
 <?php
+    $id = isset($_GET['id']) ? $_GET['id'] : ''; // GET 형식
+
     if (!$id) {
         echo"<li>아이디를 입력해주세요</li>";
     } else {

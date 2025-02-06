@@ -11,8 +11,8 @@
 
     $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");
 
-    $sql = "insert into members (id, pass, name, email, role)";
-    $sql = "values ('$id', '$pass', '$name', '$email', '$role')";
+    $sql = "insert into members (id, pass, name, email, role) 
+            values ('$id', '$pass', '$name', '$email', '$role')";
 
     mysqli_query($con, $sql);
     mysqli_close($con);
