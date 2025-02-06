@@ -23,10 +23,6 @@
     mysqli_query($con, $sql);
     mysqli_close($con);
 
-    echo "
-        <script>
-            alert('회원가입이 완료되었습니다.');
-            location.href = 'http://210.101.236.159/gscconnect/index.php';
-        </script>
-        ";
+
+    header("Location: http://210.101.236.159/gscconnect/index.php");
     ?>

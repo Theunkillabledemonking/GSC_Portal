@@ -32,9 +32,8 @@
             $_SESSION["username"] = $row["name"];
             $_SESSION["role"] = $row["role"];
 
-            echo("<script>
-                    location.href = './index.php';
-                  </script>");
+            // PHP 리디렉션
+            header("Location: http://210.101.236.159/gscconnect/index.php");
         }
     }
     ?>
