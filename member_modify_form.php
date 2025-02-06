@@ -3,6 +3,10 @@
 <?php
     session_start();
 
+    $userid = isset($_SESSION['userid']) ? $_SESSION['userid'] : "";
+    $username = isset($_SESSION['username']) ? $_SESSION['username'] : "";
+    $role = isset($_SESSION['role']) ? $_SESSION['role'] : "";
+
     $con = mysqli_connect("localhost", "host", "gsc1234!@#$", "school_portal");
     $sql = "select * from members where id='$userid'";
     $result = mysqli_query($con, $sql);
