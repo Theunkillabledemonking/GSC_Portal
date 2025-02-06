@@ -36,7 +36,7 @@
             return;
         }
 
-        if (!document.member_form.pass.value !==
+        if (document.member_form.pass.value !==
             document.member_form.pass_confirm.value) {
             alert("비밀번호가 일치하지 않습니다. \n다시 입력해주세요");
             document.member_form.pass.focus();
@@ -77,6 +77,7 @@
             <div>아이디</div>
             <div>
                 <input type="text" name="id">
+                <button type="button" onclick="check_id()">중복 확인</button>
             </div>
         </div>
 
@@ -110,8 +111,8 @@
 
         <div class="bottom_line"></div>
         <div class="buttons">
-            <button type="button" onclick="check_input()"></button>&nbsp;
-            <button type="button" onclick="reset_form()"></button>
+            <button type="button" onclick="check_input()">확인</button>&nbsp;
+            <button type="button" onclick="reset_form()">초기화</button>
         </div>
     </form>
 </div>
