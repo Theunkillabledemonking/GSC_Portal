@@ -15,9 +15,5 @@
 
     mysqli_close($con);
 
-    echo "
-        <script>
-            location.href = 'index.php';
-        </script>
-    ";
+    header("location:index.php");
     ?>

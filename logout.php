@@ -4,8 +4,5 @@
     unset($_SESSION['username']);
     unset($_SESSION['role']);
 
-    echo("
-        <script>>
-            location.href='index.php';
-        </script>");
+    header("Location: index.php");
     ?>
