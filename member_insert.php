@@ -26,7 +26,7 @@
     echo "
         <script>
             alert('회원가입이 완료되었습니다.');
-            location.href = './index.php';
+            location.href = 'http://210.101.236.159/gscconnect/index.php';
         </script>
         ";
     ?>

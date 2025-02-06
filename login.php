@@ -2,7 +2,7 @@
     $id = $_POST["id"];
     $pass = $_POST["pass"];
 
-    $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal;");
+    $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");
     $sql = "select * from users where id ='id'";
     $result = mysqli_query($con, $sql);
 
@@ -33,8 +33,9 @@
             $_SESSION["role"] = $row["role"];
 
             echo("<script>
-                    location.href = 'index.php';
+                    location.href = './index.php';
                   </script>");
         }
     }
     ?>
+
