@@ -22,7 +22,7 @@
 <head>
     <meta charset="UTF-8">
     <title>회원 정보 수정</title>
-    <script type="text/javascript" src="./js/member_modify.js"></script>
+    <script type="text/javascript" src="./js/member_form.js"></script>
 </head>
 <body>
 <section>
@@ -58,7 +58,7 @@
 
                 <!-- 수정 버튼 -->
                 <div class="button">
-                    <button type="submit">수정하기</button>
+                    <button type="submit" onclick="check_input()">수정하기</button>
                     <button type="button" onclick="reset_form()">초기화</button>
                 </div>
             </form>
