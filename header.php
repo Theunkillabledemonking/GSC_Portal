@@ -1,10 +1,10 @@
 <?php
     session_start();
-    if (!isset($_SESSION['userid'])) $userid = $_SESSION['userid'];
+    if (isset($_SESSION['userid'])) $userid = $_SESSION['userid'];
     else $user_id = "";
-    if (!isset($_SESSION['username'])) $username = $_SESSION['username'];
+    if (isset($_SESSION['username'])) $username = $_SESSION['username'];
     else $username = "";
-    if (!isset($_SESSION['role'])) $role = $_SESSION['role'];
+    if (isset($_SESSION['role'])) $role = $_SESSION['role'];
     else $role = "";
 ?>
 <div id="top">
@@ -31,7 +31,7 @@
             }
         ?>
         <?php
-            if ($role == "admin") {
+            if ($role === 1) {
                 ?>
         <li> | </li>
         <li><a href="admin.php">관리자 모드</a></li>
