@@ -19,7 +19,7 @@
             <!-- 로그인 버튼 영역 -->
             <div id="login_btn">
                 <!-- type="button"으로 설정 후 check_input()을 통해 폼 유효성 체크 수행 -->
-                <button type="button" onclick="check_input()"></button>
+                <button type="button" onclick="check_input()">로그인</button>
             </div>
         </form>
     </div> <!-- login_form -->
