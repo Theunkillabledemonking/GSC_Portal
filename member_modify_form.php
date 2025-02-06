@@ -1,5 +1,3 @@
-<script type="text/javascript" src="./js/member_modify.js"></script>
-
 <?php
     session_start();
 
@@ -7,7 +5,7 @@
     $username = isset($_SESSION['username']) ? $_SESSION['username'] : "";
     $role = isset($_SESSION['role']) ? $_SESSION['role'] : "";
 
-    $con = mysqli_connect("localhost", "host", "gsc1234!@#$", "school_portal");
+    $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");
     $sql = "select * from members where id='$userid'";
     $result = mysqli_query($con, $sql);
     $row = mysqli_fetch_array($result);

@@ -11,11 +11,12 @@
     <header>
         <?php include "header.php"?>
     </header>
-    <section>
-        <?php include "main.php"?>
-    </section>
-    <footer>
-        <?php include "footer.php"?>
-    </footer>
+<!--  나중에 구현 예정  -->
+<!--    <section>-->
+<!--        --><?php //include "main.php"?>
+<!--    </section>-->
+<!--    <footer>-->
+<!--        --><?php //include "footer.php"?>
+<!--    </footer>-->
 </body>
 </html>
