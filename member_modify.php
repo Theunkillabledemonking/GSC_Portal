@@ -1,15 +1,11 @@
 <?php
     $id = $_GET['id'];
-
     $pass = $_POST["pass"];
     $name = $_POST["name"];
-    $email1 = $_POST["email1"];
-    $email2 = $_POST["email2"];
-
-    $eamil = $email1."@".$email2;
+    $role = $_POST["role"];
 
     $con = mysqli_connect("localhost","root","gsc1234!@#$", "school_portal");
-    $sql = "update members set pass='$pass', name='$name', eamil='$eamil'";
+    $sql = "update members set pass='$pass', name='$name', role='$role' where id=$id";
     $sql.= " where id = '$id'";
     mysqli_query($con, $sql);
 

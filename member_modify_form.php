@@ -53,7 +53,13 @@
                 <!-- 권한 수정 -->
                 <div class="form">
                     <div>권한 수정</div>
-                    <div><input type="text" name="role" value="<?=$role?>"></div>
+                    <div>
+                        <select name="role">
+                            <option value="1" <?=$role == 1 ? "selected" : ""?>>관리자</option>
+                            <option value="2" <?=$role == 2 ? "selected" : ""?>>교수</option>
+                            <option value="3" <?=$role == 3 ? "selected" : ""?>>학생</option>
+                        </select>
+                    </div>
                 </div>
 
                 <!-- 수정 버튼 -->
