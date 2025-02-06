@@ -6,7 +6,7 @@
 
     $con = mysqli_connect("localhost","root","gsc1234!@#$", "school_portal");
     $sql = "update members set pass='$pass', name='$name', role='$role' where id=$id";
-    $sql.= " where id = '$id'";
+
     mysqli_query($con, $sql);
 
     mysqli_close($con);
