@@ -10,15 +10,22 @@
     $role = 3;
 
     $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");
+    if (!$con) {
+        die("Database connection failed: " . mysqli_connect_error());
+    }
 
     $sql = "insert into members (id, pass, name, email, role) 
             values ('$id', '$pass', '$name', '$email', '$role')";
+    if (!mysqli_query($con, $sql)) {
+        die("Error inserting data: " . mysqli_error($con));
+    }
 
     mysqli_query($con, $sql);
     mysqli_close($con);
 
     echo "
         <script>
+            alert('회원가입이 완료되었습니다.');
             location.href = 'index.php';
         </script>
         ";
