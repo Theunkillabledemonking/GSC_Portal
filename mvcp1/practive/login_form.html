@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>login</title>
+    <script src="login.js" defer></script> <!-- js 파일 분리 -->
+</head>
+<body>
+    <h1>로그인</h1>
+    
+    <!-- 로그인 폼 -->
+    <form action="login.php" method="post" id="loginForm">
+        <!-- 학번 입력 필드 -->
+        <label for="student_id">학번:</label>
+        <input type="text" name="student_id" id="student_id" required>
+        <br>
+
+        <!-- 비밀번호 입력 필드 -->
+        <label for="password">비밀번호:</label>
+        <input type="password" name="password" id="password">
+        <br>
+
+        <!-- 로그인 버튼 -->
+        <button type="submit">로그인</button>
+    </form>
+
+    <!-- 회원가입로 이동하는 링크-->
+    <br>
+    <a href="register_form.html">회원가입</a>
+</body>
+</html>
