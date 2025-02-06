@@ -12,10 +12,7 @@
 
     $pass = $row["pass"];
     $name = $row["name"];
-
-    $email = explode("@", $row["email"]);
-    $email1 = $email[0];
-    $email2 = $email[1];
+    $role = $row["role"];
 
     mysqli_close($con);
 ?>
@@ -52,19 +49,10 @@
                     <div><input type="password" name="pass_confirm" value="<?=$pass?>"></div>
                 </div>
 
-                <!-- 이름 -->
+                <!-- 권한 수정 -->
                 <div class="form">
-                    <div>이름</div>
-                    <div><input type="text" name="name" value="<?=$name?>"></div>
-                </div>
-
-                <!-- 이메일 -->
-                <div class="form">
-                    <div>이메일</div>
-                    <div>
-                        <input type="text" name="email1" value="<?=$email1?>"> @
-                        <input type="text" name="email2" value="<?=$email2?>">
-                    </div>
+                    <div>권한 수정</div>
+                    <div><input type="text" name="role" value="<?=$role?>"></div>
                 </div>
 
                 <!-- 수정 버튼 -->
