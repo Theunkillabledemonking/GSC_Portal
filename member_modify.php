@@ -31,7 +31,7 @@ echo "id 값 확인: $id<br>";
 if (mysqli_query($con, $sql)) {
     echo "업데이트 성공!<br>";
     // ※ 주의: header 전에 echo를 하면 'headers already sent' 경고가 뜰 수 있음
-    header("Location: index.php");
+    //header("Location: index.php");
     exit; // 헤더 후에는 exit 권장
 } else {
     echo "Error updating record: " . mysqli_error($con);
