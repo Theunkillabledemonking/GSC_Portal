@@ -2,8 +2,8 @@
     <div id="board_box">
         <h3 class="title">게시판 > 내용 보기</h3>
         <?php
-            $num = $_GET["num"];
-            $page = $_GET["page"];
+            $num = isset($_GET["num"]) ? intval($_GET["num"]) : 0;
+            $page = isset($_GET["page"]) ? intval($_GET["page"]) : 1;
 
             $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");
             $sql = "select * from board where num = $num";

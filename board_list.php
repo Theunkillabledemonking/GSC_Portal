@@ -67,7 +67,7 @@ $result = mysqli_query($con, $sql);
                 <li>
                     <span class="col1"><?=$number?></span> <!-- 게시물 번호 -->
                     <span class="col2">
-                        <a href="./board_view.php?num=<?=$num?>$page=<?=$page?>"><?=$subject?></a>
+                        <a href="./board_view.php?num=<?=$num?>&page=<?=$page?>"><?=$subject?></a>
                     </span> <!-- 제목 클릭 시 해당 글 보기 -->
                     <span class="col3"><?=$name?></span> <!-- 작성자 -->
                     <span class="col4"><?=$file_name?></span> <!-- 첨부 파일 여부 -->
