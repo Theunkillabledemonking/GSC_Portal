@@ -3,11 +3,11 @@
     session_start(); // 세션 시작
 
     // 세션에 저장된 사용자 ID와 이름 가져오기
-    isset($_SESSION['userid']) ? $_SESSION['userid'] : '';
+    if (isset($_SESSION['userid'])) $userid = $_SESSION['userid'];
+    else $userid = ''; // 로그인하지 않은 경우 빈 문자열로 생성
 
-
-    isset($_SESSION['username']) ? $_SESSION['username'] : '';
-    // 로그인한지 않은 경우 빈 문자열로 생성
+    if (isset($_SESSION['username'])) $username = $_SESSION['username'];
+    else $username = ''; // 로그인한지 않은 경우 빈 문자열로 생성
 
     // 로그인하지 않은 경우 게시물 작성 불가 -> 경고창을 뛰우고 이전 페이지로 이동
     if (!$userid) {
