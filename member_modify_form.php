@@ -41,7 +41,7 @@
     <div id="main_img_bar"></div>
     <div id="main_content">
         <div id="join_box">
-            <form name="member_form" method="post" action="member_modify_form.php?id=<?=$userid?>">
+            <form name="member_form" method="post" action="member_modify_form.php?id=<?= $userid ?>">
                 <h2>회원 정보 수정</h2>
 
                 <!-- 아이디 -->
