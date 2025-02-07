@@ -41,12 +41,12 @@
     // 파일이 업로드된 경우 처리 (에러가 없을 때만 실행)
     if ($upfile_name && !$upfile_error) {
         // 파일명을 '.' 기준으로 분리 (확장자 추출)
-        $file = explode('.', $upfile_name);
+        $file = explode(".", $upfile_name);
         $file_name = $file[0]; // 파일 이름
         $file_ext = $file[1]; // 확장자 (ex: jpg, png 등)
 
         // 새로운 파일명 생성 (현재 날짜 및 시간 기반)
-        $new_file_name = date("Y_m_d_H_i_s");
+        $new_file_name = date("Y_m_d_H_i_s") . "_" . uniqid();
         $copied_file_name = $new_file_name . "." . $file_ext; // 새로운 파일명 + 확장자
         // 파일이 저장될 전체 경로 지정
         $upload_file = $upload_dir.$copied_file_name;

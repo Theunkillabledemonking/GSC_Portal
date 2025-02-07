@@ -22,6 +22,7 @@ $start = ($page - 1) * $scale;
 $sql = "select * from board order by id desc limit $start, $scale";
 $result = mysqli_query($con, $sql);
 ?>
+
 <section>
     <div id="board_box">
         <h3>
@@ -29,12 +30,12 @@ $result = mysqli_query($con, $sql);
         </h3>
         <ul id="board_list">
             <li>
-                <span>번호</span>
-                <span>제목</span>
-                <span>글쓴이</span>
-                <span>첨부</span>
-                <span>등록일</span>
-                <span>조회</span>
+                <span class="col1">번호</span>
+                <span class="col2">제목</span>
+                <span class="col3">글쓴이</span>
+                <span class="col4">첨부파일</span>
+                <span class="col5">등록일</span>
+                <span class="col6">조회</span>
             </li>
             <?php
             // 게시글 번호 계산
@@ -51,12 +52,13 @@ $result = mysqli_query($con, $sql);
                     $regist_day = $row["regist_day"]; // 작성 날짜
                     $hit = $row["hit"]; //조회수
 
-                    // 첨부 파일이 있는 경우 썸네일 표시
-                    if ($row["file_name"])
-                        $file_image = "<img src='./img/file.git'>"; // 추후 이미지 썸네일
-                    else
-                        $file_image = "";
-
+                    // 첨부 파일 처리
+                    // 첨부 파일이 이미지인지 확인
+                    if (preg_match("/^image/", $row["file_type"])) {
+                        $file_name = "<img src='./data/{$row["file_type"]}' alt='첨부 이미지' style='width:50px;height:50px;'>";
+                    } else {
+                        $file_name = "<a href='./data/{$row['file_copied']}' download>다운로드</a>";
+                    }
             ?>
                 <li>
                     <span class="col1"><?=$number?></span> <!-- 게시물 번호 -->
