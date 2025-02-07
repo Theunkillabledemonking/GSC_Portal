@@ -1,3 +1,27 @@
+
+<?php
+session_start(); // 세션 시작
+// DB 연결
+$con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");
+
+$scale = 10; // 한 페이지당 표시할 글 개수
+// 현재 페이지 번호 가져오기 (GET)
+$page = isset($_GET['page']) ? $_GET['page'] : 1;
+
+// 1. 전체 게시글 수 계산
+$sql = "select count(*) from board";
+$result = mysqli_query($con, $sql);
+$row = mysqli_fetch_array($result);
+$total_records = $row[0];
+
+// 2. 전체 페이지 수 ($total_page) 계산
+$total_pages = ceil($total_records / $scale); // 전체 글 개수를 기준으로 페이지 수 계산
+
+// 3. 현재 페이지의 시작 데이터 계산
+$start = ($page - 1) * $scale;
+$sql = "select * from board order by id desc limit $start, $scale";
+$result = mysqli_query($con, $sql);
+?>
 <section>
     <div id="board_box">
         <h3>
@@ -13,38 +37,10 @@
                 <span>조회</span>
             </li>
             <?php
-                session_start(); // 세션 시작
+            // 게시글 번호 계산
+            $number = $total_records - $start;
 
-                // 현재 페이지 번호 가져오기 (GET)
-                if (isset($_GET["page"]))
-                    $page = $_GET["page"];
-                else
-                    $page = 1; // 기본값: 1페이지
-
-                $scale = 10; // 한 페이지당 표시할 글 개수
-
-                // 현재 페이지에서 가져올 게시글 시작 번호 계산 (OFFSET 역할)
-                $start = ($page - 1) * $scale;
-
-                // DB 연결
-                $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");
-                // 게시판 목록 가져오기 (최신 글이 위에 오도록 정렬)
-                $sql = "select * from board order by num desc limit $start, $scale";
-                $result = mysqli_query($con, $sql);
-                $total_records = mysqli_num_rows($result); // 전체 글 개수 가져오기
-
-
-
-                // 전체 페이지 수 ($total_page) 계산
-                if ($total_records % $scale === 0)
-                    $total_pages = floor($total_records / $scale);
-                else
-                    $total_pages = floor($total_records / $scale) + 1;
-
-                // 현재 페이지에서 표시할 첫 번째 게시글 번호 (최신 글이 높은 번호)
-                $number = $total_records - $start;
-
-                // 현재 페이지에서 출력할 게시글을 반복하여 가져오기
+            // 현재 페이지에서 출력할 게시글을 반복하여 가져오기
                 while ($row = mysqli_fetch_array($result)) {
 
                     // 데이터 가져오기
@@ -85,7 +81,7 @@
             // 이전 페이지 버튼
             if ($total_pages >= 2 && $page >= 2) {
                 $new_page = $page-1;
-                echo "<li><a href='message_box.php?mode=?mode&page=$new_page'><- 이전</a></li>";
+                echo "<li><a href='board_list.php?page=$new_page'><- 이전</a></li>";
             } else {
                 echo "<li>&nbsp</li>";
             }
@@ -95,14 +91,14 @@
                 if ($page === $i) {
                     echo "<li><b> $i </b></li>";
                 } else {
-                    echo "<li><a href='board_list.php?mode=?mode&page=$i'>$i</a></li>";
+                    echo "<li><a href='board_list.php?page=$i'>$i</a></li>";
                 }
             }
 
             // 다음 페이지 버튼
             if ($total_pages >= 2 && $page < $total_pages) {
                 $new_page = $page+1;
-                echo "<li><a href='board_list.php?mode=?mode&page=&new_page=$new_page'>다음 -></a></li>";
+                echo "<li><a href='board_list.php?page=$new_page'>다음 -></a></li>";
             } else {
                 echo "<li>&nbsp</li>";
             }
@@ -118,13 +114,11 @@
                 if (isset($_SESSION['userid']) && $_SESSION['userid']) { // 세션에서 검증
                 ?>
                         <button onclick="location.href='board_form.php'">글쓰기</button>
-
                 <?php
                     } else { // 로그인하지 않은 경우 메시지 출력
                 ?>
                         <a href="javascript:alert('로그인 후 이용해 주세요!')">
                             <button>글쓰기</button></a>
-
                 <?php
                     }
                 ?>
