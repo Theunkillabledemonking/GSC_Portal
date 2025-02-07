@@ -40,7 +40,7 @@
     <div id="menu_bar">
         <ul>
             <li><a href="index.php">HOME</a></li>
-            <li><a href="board_form.php">게시판 만들기</a></li>
+            <li><a href="board_list.php">게시판</a></li>
             <li><a href="index.php">사이트 완성</a></li>
         </ul>
     </div>

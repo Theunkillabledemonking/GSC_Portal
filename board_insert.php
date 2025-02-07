@@ -51,7 +51,7 @@
         // 파일이 저장될 전체 경로 지정
         $upload_file = $upload_dir.$copied_file_name;
 
-        // 파일 킉가 1MB를 초과하는 경우 업로드 차단
+        // 파일 크기가 1MB를 초과하는 경우 업로드 차단
         if ($upfile_size > 1000000) {
             echo ("
             <script>
