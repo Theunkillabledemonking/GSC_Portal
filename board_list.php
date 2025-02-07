@@ -21,14 +21,19 @@
                 else
                     $page = 1; // 기본값: 1페이지
 
+                $scale = 10; // 한 페이지당 표시할 글 개수
+
+                // 현재 페이지에서 가져올 게시글 시작 번호 계산 (OFFSET 역할)
+                $start = ($page - 1) * $scale;
+
                 // DB 연결
                 $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");
                 // 게시판 목록 가져오기 (최신 글이 위에 오도록 정렬)
-                $sql = "select * from board order by num desc";
+                $sql = "select * from board order by num desc limit $start, $scale";
                 $result = mysqli_query($con, $sql);
                 $total_records = mysqli_num_rows($result); // 전체 글 개수 가져오기
 
-                $scale = 10; // 한 페이지당 표시할 글 개수
+
 
                 // 전체 페이지 수 ($total_page) 계산
                 if ($total_records % $scale === 0)
@@ -36,16 +41,11 @@
                 else
                     $total_pages = floor($total_records / $scale) + 1;
 
-                // 현재 페이지에서 가져올 게시글 시작 번호 계산 (OFFSET 역할)
-                $start = ($page - 1) * $scale;
-
                 // 현재 페이지에서 표시할 첫 번째 게시글 번호 (최신 글이 높은 번호)
                 $number = $total_records - $start;
 
                 // 현재 페이지에서 출력할 게시글을 반복하여 가져오기
-                for ($i = $start; $i<$start+$scale && $i < $total_pages; $i++) {
-                    mysqli_data_seek($result, $i); // 레코드 포인터 이동
-                    $row = mysqli_fetch_array($result); // 해당 위치의 레코드 가져오기
+                while ($row = mysqli_fetch_array($result)) {
 
                     // 데이터 가져오기
                     $num = $row["num"]; // 글 번호
@@ -115,16 +115,16 @@
             <li>
                 <?php
                     // 로그인한 사용자만 글쓰기 가능
-                if (isset($_SESSION['user_id'])) { // 세션에서 검증
+                if (isset($_SESSION['userid']) && $_SESSION['userid']) { // 세션에서 검증
                 ?>
-                        <button onclick="location.href='board_list.php'">글쓰기</button>
+                        <button onclick="location.href='board_form.php'">글쓰기</button>
 
                 <?php
                     } else { // 로그인하지 않은 경우 메시지 출력
                 ?>
                         <a href="javascript:alert('로그인 후 이용해 주세요!')">
                             <button>글쓰기</button></a>
-                }
+
                 <?php
                     }
                 ?>
