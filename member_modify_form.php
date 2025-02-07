@@ -73,15 +73,8 @@
                         </select>
                     </div>
                 </div>
-
-                <!-- 수정 버튼 -->
-                <div class="button">
-                    <button type="button" onclick="check_input()">수정하기</button>
-                    <button type="button" onclick="reset_form()">초기화</button>
-                </div>
-            </form>
-            <form name="member_form" method="post" action="member_modify.php?id=<?=$userid?>">
-                <button type="button" onclick="check_input()">수정하기</button>
+                <!-- 버튼 -->
+            <button type="button" onclick="check_input()">수정하기</button>
                 <button type="button" onclick="reset_form()">초기화</button>
             </form>
         </div>
