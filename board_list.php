@@ -66,7 +66,7 @@ $result = mysqli_query($con, $sql);
                         <a href="./board_view.php?num=<?=$num?>$page=<?=$page?>"><?=$subject?></a>
                     </span> <!-- 제목 클릭 시 해당 글 보기 -->
                     <span class="col3"><?=$name?></span> <!-- 작성자 -->
-                    <span class="col4"><?=$file_image?></span> <!-- 첨부 파일 여부 -->
+                    <span class="col4"><?=$file_name?></span> <!-- 첨부 파일 여부 -->
                     <span class="col5"><?=$regist_day?></span> <!-- 등록일 -->
                     <span class="col6"><?=$hit?></span> <!-- 조회수 -->
                 </li>
