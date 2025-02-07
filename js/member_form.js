@@ -6,7 +6,7 @@ function check_input() {
     }
 
     if (!document.member_form.pass_confirm.value) {
-        alert("비밀번호를 입력하세요;!");
+        alert("비밀번호 확인을 입력하세요!");
         document.member_form.pass.focus();
         return;
     }
@@ -24,6 +24,5 @@ function check_input() {
 function reset_form() {
     document.member_form.pass.value = "";
     document.member_form.pass_confirm.value = "";
-    document.member_form.role.value = "";
     document.member_form.pass.focus();
 }
