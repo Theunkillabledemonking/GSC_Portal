@@ -11,7 +11,7 @@
         // 내용 입력 여부 확인
         if (!document.board_form.content.value) {
             alert("내용을 입력하세요!"); // 내용 입력 요청 메시지지
-            document.board_form.content.focuse(); // 내용 입력 칸으로 포컷스 이동
+            document.board_form.content.focus(); // 내용 입력 칸으로 포컷스 이동
             return; // 함수 종료
         }
         // 제목과 내용이 모두 입력된 경우 폼 제출출
@@ -43,11 +43,14 @@
         $subject= $row["subject"]; // 게시글 제목
         $content = $row["content"]; // 게시글 내용
         $file_name = $row["file_name"]; // 첨부 파일
+        mysqli_close($con);
     ?>  
         <!-- 수정 폼 시작 -->
         <form name="board_form" method="post"
             action="board_modify_form.php?num=<?=$num?>&page=<?=$page?>"  
-            entype="multipart/form-data"> <!-- 파일 업로드 허용하는 폼 설정 -->
+            enctype="multipart/form-data"> <!-- 파일 업로드 허용하는 폼 설정 -->
+            <input type="hidden" name="num" value="<?=$num?>">
+            <input type="hidden" name="page" value="<?=$page?>">
             
             <!-- 게시글 수정 입력 폼 -->
             <ul id="board_form">
@@ -59,8 +62,8 @@
                 <!-- 제목 입력 -->
                 <li>
                     <span class="col1">제목 : </span>
-                    <span class="col2"><input name="subject" type="tetx"
-                        values="<?=$subject?>"></span>
+                    <span class="col2"><input name="subject" type="text"
+                        value="<?=$subject?>"></span>
                 </li>
                 <!-- 내용 입력 -->
                 <li id="text_area">
@@ -87,7 +90,5 @@
                     </li>
                 </ul>
         </form>
-
-
     </div>
 </section>

@@ -1,5 +1,5 @@
 <?php
-    $num = $_GET["num"]; // 삭제할 게시글의 고유 버호호
+    $num = isset($_GET["num"]) ? intval($_GET['num']) : 0; // 삭제할 게시글의 고유 버호호
     $page = $_GET["page"]; // 삭제 후돌아갈 페이지 번호
 
     $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");
@@ -13,12 +13,11 @@
         unlink($file_path); // 파일 삭제제
     }
 
-    $sql = "delete from board where num = $num"; // 게시글 삭제 SQL 쿼리
+    $sql_delete = "delete from board where num = $num"; // 게시글 삭제 SQL 쿼리
+    if (mysqli_query($con, $sql_delete)) {
+        echo "<script>alert('게시글이 삭제되었습니다.'); location.href='board_list.php';</script>";
+    } else {
+        echo "<script>alert('게시글 삭제에 실패했습니다.'); history.go(-1);</script>";
+    }    
     mysqli_close($con); // DB 연결 종료료
-
-    echo "
-        <script>
-            location.href = 'board_list.php?page=$page'; 
-        </script>
-        ";
     ?>
