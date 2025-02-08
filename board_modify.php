@@ -54,7 +54,7 @@
         $upload_file = $upload_dir . $new_file_name;
 
         // 파일 크기 제한 (1MB 이하)
-        if ($upload_file > 1000000) {
+        if ($upfile_size > 1000000) {
             echo "<script>alert('업로드 파일 크기가 1MB를 초과합니다.'); history.go(-1);</script>";
             exit;
         }

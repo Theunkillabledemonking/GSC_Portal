@@ -6,13 +6,25 @@
             $num = isset($_GET["num"]) ? intval($_GET["num"]) : 0;
             $page = isset($_GET["page"]) ? intval($_GET["page"]) : 1;
 
+            if ($num <= 0) {
+                die("유효하지 않은 번호입니다.");
+            }
+
             $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");
+            if (!$con) {
+                die("DB 연결 실패: " . mysqli_connect_error());
+            }
+
             // 특정 게시글 (num에 해당하는 글) 조회
-            $sql = "select * from board where num = $num";
+            $sql = "SELECT * FROM board WHERE num = $num";
             $result = mysqli_query($con, $sql);
+            if (!$result || mysqli_num_rows($result) == 0) {
+                die("게시글을 찾을 수 없습니다.");
+            }
             $row = mysqli_fetch_array($result);
 
-            // 게시글 데이터 가져오기
+
+        // 게시글 데이터 가져오기
             $id = $row["id"]; // 작성자 ID
             $name = $row["name"]; // 작성자 이름
             $regist_day = $row["regist_day"]; // 등록 날짜
@@ -29,8 +41,9 @@
 
             // 조회수 증가 (현재 조회수 + 1)
             $new_hit = $hit + 1;
-            $sql = "update board set hit = $new_hit where id = $id";
+            $sql = "UPDATE board SET hit = $new_hit WHERE num = $num";
             mysqli_query($con, $sql);
+
         ?>
             <ul id="view_content">
                 <li>
@@ -40,20 +53,19 @@
             <li>
         <?php
             // 첨부 파일이 있는 경우 다운로드 링크 표시
-            if ($file_name) {
+            if (!empty($file_name)) {
                 $real_name = $file_copied;
                 $file_path = "./data/" . $real_name;
-                $file_size = file_exists($file_path) ? filesize($file_path) : 0; // 파일 크기 계산
+
                 if (file_exists($file_path)) {
-                    echo "-> 첨부파일 : $file_name ($file_size Byte) &nbsp;&nbsp;&nbsp;&nbsp;
-                    <a href='board_download.php?num=$num&
-                    real_name=$real_name&
-                    file_name=$file_name&
-                    file_type=$file_type'>[다운로드]</a><br><br>";
+                    $file_size = filesize($file_path);
+                    echo "첨부파일: <a href='board_download.php?num=$num&real_name=$real_name&file_name=$file_name&file_type=$file_type'>
+                    $file_name ($file_size Byte)</a><br>";
                 } else {
-                    echo "<span style='color:red;'>파일을 찾을 수 없습니다.</span>";
+                    echo "<span style='color:red;'>첨부 파일이 존재하지 않습니다.</span>";
                 }
             }
+
         ?>
             <?=$content?> <!-- 게시글 본문 출력 -->
             </li>
@@ -88,7 +100,7 @@
             $comment_id = $row["id"]; // 댓글 ID
             $parent_id = $row["parent_id"]; // 부모 댓글 ID (NULL이면 최상위 댓글)
             $username = $row["username"]; // 작성자 이름
-            $content = $row["content"]; // 댓글 내용
+            $content = htmlspecialchars($row["content"]); // 댓글 내용
             $created_at = $row["created_at"]; // 작성 날짜
 
             // 댓글 출력

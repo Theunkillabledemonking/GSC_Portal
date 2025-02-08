@@ -25,29 +25,43 @@
         <h3 id="board_title"> 게시판 > 글쓰기</h3>
     <?php
         // GET 매개변수로 전달된 글 번호(num)와 페이지 번호(page) 가져오기
-        $num = $_GET["num"]; // 글 번호
-        $page = $_GET["page"]; // 현재 페이지 번호
+        $num = isset($_GET["num"]) ? intval($_GET["num"]) : 0; // 글 번호
+        $page = isset($_GET["page"]) ? intval($_GET["page"]) : 1; // 현재 페이지 번호
 
+        if ($num === 0) {
+            echo "<script>alert('유효하지 않은 접근입니다.'); history.go(-1);</script>";
+            exit;
+        }
         // db 연결
         $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");
         
         // 글 번호(num)에 해당하는 게시물 데이터 가져오기
-        $sql = "select * from board where num=$num";
-        $result = mysqli_query($con, $sql);
+        $sql = "select * from board where num = ?";
+        $stmt = $con->prepare($sql);
+        $stmt->bind_param("i", $num);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        // 데이터 확인
+        if ($result->num_rows === 0) {
+            echo "<script>alert('존재하지 않는 게시물입니다.'); history.go(-1);</script>";
+            exit;
+        }
+
 
         // 게시글 데이터 배열로 가져오기
-        $row = mysqli_fetch_array($result);
-
+        $row = $result->fetch_assoc();
         // 게시글 데이터 변수에 저장
         $name = $row["name"]; // 작성자 이름
         $subject= $row["subject"]; // 게시글 제목
         $content = $row["content"]; // 게시글 내용
         $file_name = $row["file_name"]; // 첨부 파일
+        $stmt->close();
         mysqli_close($con);
     ?>  
         <!-- 수정 폼 시작 -->
         <form name="board_form" method="post"
-            action="board_modify.php?num=<?=$num?>&page=<?=$page?>"
+            action="board_modify.php"
             enctype="multipart/form-data"> <!-- 파일 업로드 허용하는 폼 설정 -->
             <input type="hidden" name="num" value="<?=$num?>"> <!-- 게시물 번호 유지 -->
             <input type="hidden" name="page" value="<?=$page?>"> <!-- 페이지 번호 유지 -->
