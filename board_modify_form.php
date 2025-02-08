@@ -2,17 +2,17 @@
     // 사용자가 제목과 내용을 입력했는지 확인하는 함수
     function check_input() {
         // 제목 입력 여부 확인
-        if (!document.board_form.subject.value) {
+        if (!document.board_form.subject.value.trim()) {
             alert("제목을 입력하세요!"); // 제목 입력 요청 메시지
             document.board_form.subject.focus(); // 제목 입력 칸으로 포커스 이동
-            return; // 종료
+            return false; // 종료
         }
 
         // 내용 입력 여부 확인
-        if (!document.board_form.content.value) {
+        if (!document.board_form.content.value.trim()) {
             alert("내용을 입력하세요!"); // 내용 입력 요청 메시지지
             document.board_form.content.focus(); // 내용 입력 칸으로 포컷스 이동
-            return; // 함수 종료
+            return false; // 함수 종료
         }
         // 제목과 내용이 모두 입력된 경우 폼 제출출
         document.board_form.submit();
@@ -47,7 +47,7 @@
     ?>  
         <!-- 수정 폼 시작 -->
         <form name="board_form" method="post"
-            action="board_modify_form.php?num=<?=$num?>&page=<?=$page?>"  
+            action="board_modify.php?num=<?=$num?>&page=<?=$page?>"
             enctype="multipart/form-data"> <!-- 파일 업로드 허용하는 폼 설정 -->
             <input type="hidden" name="num" value="<?=$num?>">
             <input type="hidden" name="page" value="<?=$page?>">
@@ -63,13 +63,13 @@
                 <li>
                     <span class="col1">제목 : </span>
                     <span class="col2"><input name="subject" type="text"
-                        value="<?=$subject?>"></span>
+                        value="<?=htmlspecialchars($subject)?>"></span>
                 </li>
                 <!-- 내용 입력 -->
                 <li id="text_area">
                     <span class="col1">내용 : </span>
                     <span class="col2">
-                        <textarea name="content"><?=$content?></textarea>
+                        <textarea name="content"><?=htmlspecialchars($content)?></textarea>
                     </span>
                 </li>
                 <!-- 첨부파일 -->
