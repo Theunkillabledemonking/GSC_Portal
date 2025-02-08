@@ -52,7 +52,7 @@
             enctype="multipart/form-data"> <!-- 파일 업로드 허용하는 폼 설정 -->
             <input type="hidden" name="num" value="<?=$num?>"> <!-- 게시물 번호 유지 -->
             <input type="hidden" name="page" value="<?=$page?>"> <!-- 페이지 번호 유지 -->
-            <input type="hidden" name="existing_file" value="<?=$file_name?>"> <!-- 기존 파일 유지 -->
+            <input type="hidden" name="existing_file" value="<?=$file_copied?>"> <!-- 기존 파일 유지 -->
             
             <!-- 게시글 수정 입력 폼 -->
             <ul id="board_form">
@@ -80,7 +80,7 @@
                     <span class="col2">
                         <?php if ($file_name): ?>
                             <!-- 기존 파일이 있으면 다운로드 링크 제공 -->
-                            <a href="board_download.php?real_name=<?=$file_copied?>"><?=$file_copied?></a>
+                            <a href="board_download.php?real_name=<?=$file_copied?>"><?=$file_name ? $file_name : $file_copied?></a>
                             <input type="checkbox" name="delete_file" value="1"> 삭제
                         <?php else: ?>
                             (첨부파일 없음)

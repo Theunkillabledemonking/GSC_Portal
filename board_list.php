@@ -38,7 +38,7 @@ $result = mysqli_query($con, $sql);
                 <span class="col6">조회</span>
             </li>
             <?php
-            // 게시글 번호 계산
+            // 게시글 번호 계산 (맨 위 = 최근)
             $number = $total_records - $start;
 
             // 현재 페이지에서 출력할 게시글을 반복하여 가져오기
@@ -56,13 +56,13 @@ $result = mysqli_query($con, $sql);
                     $file_type = $row["file_type"];
 
                     // 첨부 파일 처리
-                    // 파일이 이미지 형식이면 썸네일 표시
-                    if (!empty($file_copied) && !empty($file_type) && preg_match("/^image/", $file_type)) {
-                        $file_name = "<img src='./data/$file_copied' alt='첨부 이미지' style='width:50px;height:50px;'>";
+                    // 이미지면 썸네일, 아니면 다운로드, 없으면 -
+                    if (!empty($file_copied) && preg_match("/^image/", $file_type)) {
+                        $file_str = "<img src='./data/$file_copied' style='width:50px; height:50px;' alt='첨부 이미지'>";
                     } elseif (!empty($file_copied)) {
-                        $file_name = "<a href='./data/$file_copied' download>다운로드</a>";
+                        $file_str = "<a href='./data/$file_copied' download>다운로드</a>";
                     } else {
-                        $file_name = "<span style='color:gray;'>-</span>"; // 파일 없을 경우 기본 메시지
+                        $file_str = "<span style='color:gray;'>-</span>";
                     }
             ?>
                 <li>
@@ -71,7 +71,7 @@ $result = mysqli_query($con, $sql);
                         <a href="./board_view.php?num=<?=$num?>&page=<?=$page?>"><?=$subject?></a>
                     </span> <!-- 제목 클릭 시 해당 글 보기 -->
                     <span class="col3"><?=$name?></span> <!-- 작성자 -->
-                    <span class="col4"><?=$file_name?></span> <!-- 첨부 파일 여부 -->
+                    <span class="col4"><?=$file_str?></span> <!-- 첨부 파일 여부 -->
                     <span class="col5"><?=$regist_day?></span> <!-- 등록일 -->
                     <span class="col6"><?=$hit?></span> <!-- 조회수 -->
                 </li>

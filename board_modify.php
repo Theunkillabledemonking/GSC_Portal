@@ -43,10 +43,12 @@
             }
         }
         $new_file_name = ""; // 파일 삭제 빈 값으로 업데이트
+
     } elseif ($upfile_name && !$upfile_error) {
         // 새파일이 업로드된 경우 처리
         $file = explode(".", $upfile_name);
         $file_ext = end($file);
+        // 서버 저장용 파일명
         $new_file_name = date("Y_m_d_H_i_s") . "_" . uniqid() . "." . $file_ext;
         $upload_file = $upload_dir . $new_file_name;
 
@@ -69,9 +71,9 @@
     // 새 파일이 업로드된 경우
     if (!empty($new_file_name)) {
         $stmt = $con->prepare("UPDATE board SET subject=?, content=?, file_name=?, file_copied=?, file_type=? WHERE num=?");
-        $stmt->bind_param("sssssi", $subject, $content, $new_file_name, $new_file_name, $upfile_type, $num);
+        $stmt->bind_param("sssssi", $subject, $content, $upfile_name, $new_file_name, $upfile_type, $num);
     } else {
-        $stmt = $con->prepare("UPDATE board SET subject=?, content=? WHERE num=?");
+        $stmt = $con->prepare("UPDATE board SET subject=?, content=? file_name='', file_copied='', file_type='' WHERE num=?");
         $stmt->bind_param("ssi", $subject, $content, $num);
     }
         $stmt->execute();
