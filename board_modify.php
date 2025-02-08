@@ -17,10 +17,7 @@
 
     if (empty($subject) || empty($content)) {
         echo "<script>alert('제목과 내용을 모두 입력해주세요'); history.go(-1);</script>";
-    }
-
-    if (!$con) {
-        die("데이터베이스 연결 실패:" . mysqli_connect_error());
+        exit;
     }
 
     // 기존 파일 유지 여부 확인
@@ -54,14 +51,14 @@
         $upload_file = $upload_dir . $new_file_name;
 
         // 파일 크기 제한 (1MB 이하)
-        if ($upload_file > 1000000) {
+        if ($upfile_size > 1000000) {
             echo "<script>alert('업로드 파일 크기가 1MB를 초과합니다.'); history.go(-1);</script>";
             exit;
         }
 
-        // 파일업로드 오류
+        // 파일 이동
         if (!move_uploaded_file($upfile_tmp_name, $upload_file)) {
-            echo "<script>alert('파일 업로드 실패. 다시 시도해주세요.');history.go(-1);</script>";
+            echo "<script>alert('성공!.(파일이동)');history.go(-1);</script>";
         }
     } else {
         // 파일 변경 없을 경우 기존 파일 유지
@@ -77,7 +74,6 @@
         $stmt = $con->prepare("UPDATE board SET subject=?, content=? WHERE num=?");
         $stmt->bind_param("ssi", $subject, $content, $num);
     }
-        $stmt->execute();
         $stmt->execute();
 
 

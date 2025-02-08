@@ -43,6 +43,7 @@
         $subject= $row["subject"]; // 게시글 제목
         $content = $row["content"]; // 게시글 내용
         $file_name = $row["file_name"]; // 첨부 파일
+        $file_copied = $row["file_copied"]; // 서버에 저장된 파일명
         mysqli_close($con);
     ?>  
         <!-- 수정 폼 시작 -->
@@ -79,7 +80,7 @@
                     <span class="col2">
                         <?php if ($file_name): ?>
                             <!-- 기존 파일이 있으면 다운로드 링크 제공 -->
-                            <a href="board_download.php?real_name=<?=$file_name?>"><?=$file_name?></a>
+                            <a href="board_download.php?real_name=<?=$file_copied?>"><?=$file_copied?></a>
                             <input type="checkbox" name="delete_file" value="1"> 삭제
                         <?php else: ?>
                             (첨부파일 없음)
