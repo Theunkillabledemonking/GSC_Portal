@@ -11,7 +11,7 @@
     }
     // 사용자 브라우저 확인 (IE / Internet Explorer 검사)
     $ie = preg_match('~MSIE|Internet Explorer~i', $_SERVER['HTTP_USER_AGENT']) // MSI나 Internet Explorer를 검사 
-            || (strpos($_SERVER['HTTP_USER_AGEMT'], 'Trident/7.0') // Trident/7.0: IE 11 확인
+            || (strpos($_SERVER['HTTP_USER_AGENT'], 'Trident/7.0') // Trident/7.0: IE 11 확인
             !== false && strpos($_SERVER['HTTP_USER_AGENT'], 'rv:11.0') !== false); // rv:11.0: IE 11 버전 체크
     
     // 만약 사용자가 Internet Explorer라면, 파일명이 깨지는 것을 방지하기 위한 처리

@@ -10,13 +10,27 @@ if (!isset($_SESSION['userid'])) { // 로그인 상태인지 확인
 
 // POST 데이터 받기 (`intval()` 사용하여 정수 변환)
 $board_id = intval($_POST['board_id']); // 댓글이 달릴 게시글 ID
-$parent_id = isset($_POST['parent_id']) ? intval($_POST['parent_id']) : NULL; //부모 댓글 ID
+$parent_id = isset($_POST['parent_id']) && !empty($_POST['parent_id']) ? intval($_POST['parent_id']) : NULL; //부모 댓글 ID
 $content = trim($_POST['content']); // 입력된 댓글 내용 (앞뒤 공백 제거)
 $user_id = $_SESSION['userid']; // 세션에서 로그인한 사용자 ID 가져오기
 $username = $_SESSION['username']; // 세션에서 로그인한 사용자 이름 가져오기
 
 // DB 연결
 $con = mysqli_connect('localhost', 'root', 'gsc1234!@#$', 'school_portal');
+
+if ($parent_id !== NULL) {
+    $stmt = $con->prepare("SELECT COUNT(*) FROM comments WHERE id = ?");
+    $stmt->bind_param('i', $parent_id);
+    $stmt->execute();
+    $stmt->bind_result($count);
+    $stmt->fetch();
+    $stmt->close();
+
+    if ($count === 0) {
+        echo "<script>alert('유효하지 않은 parent_id입니다.'); history.go(-1);</script>";
+        exit;
+    }
+}
 
 if (!$con) {
     die("데이터베이스 연결 실패: ".mysqli_connect_error()); // DB 연결 실패 시 에러 메시지 출력

@@ -14,7 +14,6 @@
     }
 
     $sql = "delete from board where num = $num"; // 게시글 삭제 SQL 쿼리
-    $result = mysqli_query($sql, $con); // 쿼리 실행행
     mysqli_close($con); // DB 연결 종료료
 
     echo "
