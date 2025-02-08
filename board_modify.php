@@ -60,7 +60,7 @@
 
         // 파일 이동
         if (!move_uploaded_file($upfile_tmp_name, $upload_file)) {
-            echo "<script>alert('성공!.(파일이동)');history.go(-1);</script>";
+            echo "<script>alert('파일 이동 실패!');history.go(-1);</script>";
         }
     } else {
         // 파일 변경 없을 경우 기존 파일 유지
@@ -73,7 +73,7 @@
         $stmt = $con->prepare("UPDATE board SET subject=?, content=?, file_name=?, file_copied=?, file_type=? WHERE num=?");
         $stmt->bind_param("sssssi", $subject, $content, $upfile_name, $new_file_name, $upfile_type, $num);
     } else {
-        $stmt = $con->prepare("UPDATE board SET subject=?, content=? file_name='', file_copied='', file_type='' WHERE num=?");
+        $stmt = $con->prepare("UPDATE board SET subject=?, content=?, file_name='', file_copied='', file_type='' WHERE num=?");
         $stmt->bind_param("ssi", $subject, $content, $num);
     }
         $stmt->execute();

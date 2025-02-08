@@ -1,4 +1,4 @@
-<sectron>
+<section>
     <div id="board_box">
         <h3 class="title">게시판 > 내용 보기</h3>
         <?php
@@ -63,10 +63,10 @@
                 <li><button onclick="location.href='board_list.php?page=<?=$page?>'">목록</button></li>
                 <li><button onclick="location.href='board_modify_form.php?num=<?=$num?>&page=<?=$page?>'">수정</button></li>
                 <li><button onclick="location.href='board_delete.php?num=<?=$num?>&page=<?=$page?>'">삭제</button></li>
-                <li><button onclick="location.href='board_form.php">글쓰기</button></li>
+                <li><button onclick="location.href='board_form.php'">글쓰기</button></li>
             </ul>
     </div>
-</sectron>
+</section>
 
 <!-- 댓글 입력 폼 -->
 <form action="comment_insert.php" method="post">
