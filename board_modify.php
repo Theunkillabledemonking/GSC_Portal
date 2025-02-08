@@ -65,12 +65,19 @@
         // 파일 변경 없을 경우 기존 파일 유지
         $new_file_name = $existing_file;
     }
-    // SQL 쿼리: 게시글 수정 (게시물 제목, 내용 -> 특정 게시글 번호에 대해 수정)
-    $stmt = $con -> prepare("UPDATE board SET subject = ?, content = ?, file_name = ? WHERE num = ?");
-    $stmt->bind_param("ssi", $subject, $content, $new_file_name, $num);
+
+    // SQL 문장을 동적으로 구성하여 파일이 없을 때를 처리
+    if (!empty($new_file_name)) {
+        $stmt = $con->prepare("UPDATE board SET subject=?, content=?, file_name=? WHERE num=?");
+        $stmt->bind_param("sssi", $subject, $content, $new_file_name, $num);
+    } else {
+        $stmt = $con->prepare("UPDATE board SET subject=?, content=? WHERE num=?");
+        $stmt->bind_param("ssi", $subject, $content, $num);
+    }
     $stmt->execute();
 
-    // 수정 후 list로 이동
+
+// 수정 후 list로 이동
     if ($stmt->affected_rows > 0) {
         echo "<script>location.href = 'board_list.php?page=$page';</script>";
     } else {
