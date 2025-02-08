@@ -49,8 +49,9 @@
         <form name="board_form" method="post"
             action="board_modify.php?num=<?=$num?>&page=<?=$page?>"
             enctype="multipart/form-data"> <!-- 파일 업로드 허용하는 폼 설정 -->
-            <input type="hidden" name="num" value="<?=$num?>">
-            <input type="hidden" name="page" value="<?=$page?>">
+            <input type="hidden" name="num" value="<?=$num?>"> <!-- 게시물 번호 유지 -->
+            <input type="hidden" name="page" value="<?=$page?>"> <!-- 페이지 번호 유지 -->
+            <input type="hidden" name="existing_file" value="<?=$file_name?>"> <!-- 기존 파일 유지 -->
             
             <!-- 게시글 수정 입력 폼 -->
             <ul id="board_form">
@@ -72,10 +73,21 @@
                         <textarea name="content"><?=htmlspecialchars($content)?></textarea>
                     </span>
                 </li>
-                <!-- 첨부파일 -->
+                <!-- 첨부파일 관리 -->
                 <li>
                     <span class="col1">첨부파일 : </span>
-                    <span class="col2"><?=$file_name?></span>
+                    <span class="col2">
+                        <?php if ($file_name): ?>
+                            <!-- 기존 파일이 있으면 다운로드 링크 제공 -->
+                            <a href="board_download.php?real_name=<?=$file_name?>"><?=$file_name?></a>
+                            <input type="checkbox" name="delete_file" value="1"> 삭제
+                        <?php else: ?>
+                            (첨부파일 없음)
+                        <?php endif; ?>
+                        <br>
+                        <!-- 새파일 업로드 옵션 -->
+                        <input type="file" name="upfile">
+                    </span>
                 </li>
             </ul>
                 <!-- 수정 버튼 및 목록 버튼 -->

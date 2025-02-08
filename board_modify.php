@@ -1,4 +1,6 @@
 <?php
+    session_start();
+
     // MySQL 데이터베이스 연결
     $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");
 
@@ -21,9 +23,51 @@
         die("데이터베이스 연결 실패:" . mysqli_connect_error());
     }
 
+    // 기존 파일 유지 여부 확인
+    $existing_file = $_POST["existing_file"]; // 기존 파일 이름
+    $delete_file = isset($_POST["delete_file"]) ? $_POST["delete_file"] : 0; // 파일 삭제 여부
+
+    // 새 파일 업로드 처리
+    $upload_dir = "./data/";
+    $upfile_name = $_FILES["upfile"]["name"]; // 새 파일 이름
+    $upfile_tmp_name = $_FILES["upfile"]["tmp_name"]; // 임시  파일 경로
+    $upfile_type = $_FILES["upfile"]["type"]; // 파일 타입
+    $upfile_size = $_FILES["upfile"]["size"]; // 파일 크기
+    $upfile_error = $_FILES["upfile"]["error"]; // 업로드 중 오류 발생 여부
+
+    if ($delete_file == 1) {
+        // 사용자가 "삭제"를 선택한 경우 기존 파일 삭제
+        if ($existing_file) {
+            $file_path = $upload_dir . $existing_file;
+            if (file_exists($file_path)) {
+                unlink($file_path); //파일 삭제
+            }
+        }
+        $new_file_name = ""; // 파일 삭제 빈 값으로 업데이트
+    } elseif ($upfile_name && !$upfile_error) {
+        // 새파일이 업로드된 경우 처리
+        $file = explode(".", $upfile_name);
+        $file_ext = end($file);
+        $new_file_name = date("Y_m_d_H_i_s") . "_" . uniqid() . "." . $file_ext;
+        $upload_file = $upload_dir . $new_file_name;
+
+        // 파일 크기 제한 (1MB 이하)
+        if ($upload_file > 1000000) {
+            echo "<script>alert('업로드 파일 크기가 1MB를 초과합니다.'); history.go(-1);</script>";
+            exit;
+        }
+
+        // 파일업로드 오류
+        if (!move_uploaded_file($upfile_tmp_name, $upload_file)) {
+            echo "<script>alert('파일 업로드 실패. 다시 시도해주세요.');history.go(-1);</script>";
+        }
+    } else {
+        // 파일 변경 없을 경우 기존 파일 유지
+        $new_file_name = $existing_file;
+    }
     // SQL 쿼리: 게시글 수정 (게시물 제목, 내용 -> 특정 게시글 번호에 대해 수정)
-    $stmt = $con -> prepare("UPDATE board SET subject = ?, content = ? WHERE num = ?");
-    $stmt->bind_param("ssi", $subject, $content, $num);
+    $stmt = $con -> prepare("UPDATE board SET subject = ?, content = ?, file_name = ? WHERE num = ?");
+    $stmt->bind_param("ssi", $subject, $content, $new_file_name, $num);
     $stmt->execute();
 
     // 수정 후 list로 이동
