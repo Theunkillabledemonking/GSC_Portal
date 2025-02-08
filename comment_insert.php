@@ -23,7 +23,7 @@ if (!$con) {
 }
 
 // 댓글 저장 (Prepared Statement 사용하여 SQL Injection 방지)
-$stmt = $con->prepare("INSERT INTO comments (board_id, parent_id, content, user_id, username) VALUES(?, ?, ?, ?, ?)");
+$stmt = $con->prepare("INSERT INTO comment (board_id, parent_id, content, user_id, username) VALUES(?, ?, ?, ?, ?)");
 $stmt->bind_param("iisss", $board_id, $parent_id, $content, $user_id, $username);
 $stmt->execute();
 

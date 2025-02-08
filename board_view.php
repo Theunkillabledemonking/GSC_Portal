@@ -43,12 +43,16 @@
             if ($file_name) {
                 $real_name = $file_copied;
                 $file_path = "./data/" . $real_name;
-                $file_size = filesize($file_path); // 파일 크기 계싼
-                echo "-> 첨부파일 : $file_name ($file_size Byte) &nbsp;&nbsp;&nbsp;&nbsp;
+                $file_size = file_exists($file_path) ? filesize($file_path) : 0; // 파일 크기 계산
+                if (file_exists($file_path)) {
+                    echo "-> 첨부파일 : $file_name ($file_size Byte) &nbsp;&nbsp;&nbsp;&nbsp;
                     <a href='board_download.php?num=$num&
                     real_name=$real_name&
                     file_name=$file_name&
-                    file_type=$file_type'>[저장]</a><br><br>";
+                    file_type=$file_type'>[다운로드]</a><br><br>";
+                } else {
+                    echo "<span style='color:red;'>파일을 찾을 수 없습니다.</span>";
+                }
             }
         ?>
             <?=$content?> <!-- 게시글 본문 출력 -->
@@ -76,7 +80,7 @@
 <ul>
     <?php
         // 현재 게시글에 해당하는 댓글 목록 조회 (최상위 댓글 -> 대댓글 순서로 정렬)
-        $sql = "SELECT * FROM comments WHERE board_id = $num ORDER BY parent_id ASC, created_at ASC";
+        $sql = "SELECT * FROM comment WHERE board_id = $num ORDER BY parent_id ASC, created_at ASC";
         $result = mysqli_query($con, $sql);
 
         // 댓글 목록 출력
