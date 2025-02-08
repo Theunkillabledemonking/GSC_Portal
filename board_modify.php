@@ -67,13 +67,20 @@
     }
 
     // SQL 문장을 동적으로 구성하여 파일이 없을 때를 처리
+    // 새 파일이 업로드된 경우
     if (!empty($new_file_name)) {
-        $stmt = $con->prepare("UPDATE board SET subject=?, content=?, file_name=? WHERE num=?");
-        $stmt->bind_param("sssi", $subject, $content, $new_file_name, $num);
+        $stmt = $con->prepare("UPDATE board SET subject=?, content=?, file_name=?, file_copied=?, file_type=? WHERE num=?");
+        $stmt->bind_param("sssssi", $subject, $content, $new_file_name, $new_file_name, $upfile_type, $num);
+    } elseif ($delete_file == 1) {
+        // 파일을 삭제한 경우 file_name, file_copied를 NULL로 설정
+        $stmt = $con->prepare("UPDATE board SET subject=?, content=?, file_name=NULL, file_copied=NULL, file_type=NULL WHERE num=?");
+        $stmt->bind_param("ssi", $subject, $content, $num);
     } else {
+        // 기존 파일 유지
         $stmt = $con->prepare("UPDATE board SET subject=?, content=? WHERE num=?");
         $stmt->bind_param("ssi", $subject, $content, $num);
     }
+    $stmt->execute();
     $stmt->execute();
 
 

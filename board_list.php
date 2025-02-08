@@ -53,15 +53,13 @@ $result = mysqli_query($con, $sql);
                     $hit = $row["hit"]; //조회수
 
                     // 첨부 파일 처리
-                    // 첨부 파일이 이미지인지 확인
-                    if (!empty($row["file_type"]) && preg_match("/^image/", $row["file_type"])) {
-                        $file_name = "<img src='./data/{$row["file_copied"]}' alt='첨부 이미지' style='width:50px;height:50px;'>";
-                    } elseif (!empty($row["file_copied"])) {
-                        // 일반 파일인 경우 다운로드 링크 제공
-                        $file_name = "<a href='./data/{$row['file_copied']}' download>다운로드</a>";
+                    // 파일이 이미지 형식이면 썸네일 표시
+                    if (!empty($file_copied) && !empty($file_type) && preg_match("/^image/", $file_type)) {
+                        $file_name = "<img src='./data/$file_copied' alt='첨부 이미지' style='width:50px;height:50px;'>";
+                    } elseif (!empty($file_copied)) {
+                        $file_name = "<a href='./data/$file_copied' download>다운로드</a>";
                     } else {
-                        // 첨부파일 없는 경우
-                        $file_name = "";
+                        $file_name = "<span style='color:gray;'>첨부 파일 없음</span>"; // 파일 없을 경우 기본 메시지
                     }
             ?>
                 <li>
