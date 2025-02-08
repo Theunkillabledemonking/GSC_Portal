@@ -52,6 +52,9 @@ $result = mysqli_query($con, $sql);
                     $regist_day = $row["regist_day"]; // 작성 날짜
                     $hit = $row["hit"]; //조회수
 
+                    $file_copied = $row["file_copied"];
+                    $file_type = $row["file_type"];
+
                     // 첨부 파일 처리
                     // 파일이 이미지 형식이면 썸네일 표시
                     if (!empty($file_copied) && !empty($file_type) && preg_match("/^image/", $file_type)) {
@@ -59,7 +62,7 @@ $result = mysqli_query($con, $sql);
                     } elseif (!empty($file_copied)) {
                         $file_name = "<a href='./data/$file_copied' download>다운로드</a>";
                     } else {
-                        $file_name = "<span style='color:gray;'>첨부 파일 없음</span>"; // 파일 없을 경우 기본 메시지
+                        $file_name = "<span style='color:gray;'>-</span>"; // 파일 없을 경우 기본 메시지
                     }
             ?>
                 <li>

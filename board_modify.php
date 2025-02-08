@@ -24,7 +24,7 @@
     }
 
     // 기존 파일 유지 여부 확인
-    $existing_file = $_POST["existing_file"]; // 기존 파일 이름
+    $existing_file = isset($_POST["existing_file"]) ? $_POST["existing_file"] : ""; // 기존 파일 이름
     $delete_file = isset($_POST["delete_file"]) ? $_POST["delete_file"] : 0; // 파일 삭제 여부
 
     // 새 파일 업로드 처리
@@ -34,6 +34,8 @@
     $upfile_type = $_FILES["upfile"]["type"]; // 파일 타입
     $upfile_size = $_FILES["upfile"]["size"]; // 파일 크기
     $upfile_error = $_FILES["upfile"]["error"]; // 업로드 중 오류 발생 여부
+
+    $new_file_name = $existing_file; // 기본적으로 기존 파일 유지
 
     if ($delete_file == 1) {
         // 사용자가 "삭제"를 선택한 경우 기존 파일 삭제
@@ -71,17 +73,12 @@
     if (!empty($new_file_name)) {
         $stmt = $con->prepare("UPDATE board SET subject=?, content=?, file_name=?, file_copied=?, file_type=? WHERE num=?");
         $stmt->bind_param("sssssi", $subject, $content, $new_file_name, $new_file_name, $upfile_type, $num);
-    } elseif ($delete_file == 1) {
-        // 파일을 삭제한 경우 file_name, file_copied를 NULL로 설정
-        $stmt = $con->prepare("UPDATE board SET subject=?, content=?, file_name=NULL, file_copied=NULL, file_type=NULL WHERE num=?");
-        $stmt->bind_param("ssi", $subject, $content, $num);
     } else {
-        // 기존 파일 유지
         $stmt = $con->prepare("UPDATE board SET subject=?, content=? WHERE num=?");
         $stmt->bind_param("ssi", $subject, $content, $num);
     }
-    $stmt->execute();
-    $stmt->execute();
+        $stmt->execute();
+        $stmt->execute();
 
 
 // 수정 후 list로 이동
