@@ -80,7 +80,7 @@
 <ul>
     <?php
         // 현재 게시글에 해당하는 댓글 목록 조회 (최상위 댓글 -> 대댓글 순서로 정렬)
-        $sql = "SELECT * FROM comment WHERE board_id = $num ORDER BY parent_id ASC, created_at ASC";
+        $sql = "SELECT * FROM comments WHERE board_id = $num ORDER BY parent_id ASC, created_at ASC";
         $result = mysqli_query($con, $sql);
 
         // 댓글 목록 출력
