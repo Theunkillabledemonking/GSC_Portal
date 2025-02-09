@@ -3,7 +3,7 @@
     $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");
     $sql = "select * from members order by id desc";
     $result = mysqli_query($con, $sql);
-    $total_record = mysqli_fetch_array($result); // 전체 회원 수 가져오기
+    $total_record = mysqli_num_rows($result); // 전체 회원 수 가져오기
 
     $number = $total_record; // 역순으로 번호를 부여하기 위해 설정
 ?>
@@ -73,8 +73,14 @@
         <!-- 게시글 삭제 폼 -->
         <form action="admin_board_delete.php" method="post">
         <?php
+            // 게시판 데이터 가져오기
+            $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");
+            if (!$con) {
+                die("Database connection failed: " . mysqli_connect_error());
+            }
+
             // 게시판 글 목록 가져오기기
-            $sql = "select * from board order by id desc";
+            $sql = "select * from board order by num desc";
             $result = mysqli_query($con, $sql);
             $total_record = mysqli_num_rows($result); // 전체 글 수
 
@@ -82,11 +88,11 @@
 
             while ($row = mysqli_fetch_array($result)) {
                $num = $row["num"]; // 게시글 번호
-               $name = $row["row"]; // 작성자 이름
+               $name = $row["id"]; // 작성자 이름
                $subject = $row["subject"]; // 게시글 제목
                $file_name = $row["file_name"]; // 첨부 파일명
                $regist_day = $row["create_at"]; // 등록일
-               $regist_day = substr($regist_day, 0, 10) // 등록일 앞 10자리 (YYYY-MM-DD)
+               $regist_day = substr($regist_day, 0, 10); // 등록일 앞 10자리 (YYYY-MM-DD)
             
         ?>
             <li>
