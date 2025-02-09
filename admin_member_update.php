@@ -3,8 +3,7 @@
     session_start();
 
     // 세션에서 사용자 역할(role) 값 가져오기 (관리자인지 확인)
-    if (isset($_SESSION["role"])) $role = $_SESSION["role"];
-    else $role = ""; // 없으면 빈 값 설정
+    $role = isset($_POST["role"]) ? intval($_POST["role"]) : null;
 
     // 현재 사용자가 관리자가 아닌 경우 접근 차단
     if (intval($role) !== 1) {
@@ -18,25 +17,37 @@
     }
 
     // GET 방식으로 전달된 회원 번호(id) 가져오기
-    $id = $_GET["id"];
+    $id = isset($_GET["id"]) ? trim($_GET["id"]) : null;
 
     // POST 방식으로 전달된 새로운 role 값 가져오기
     $role = $_POST["role"];
     
     // MySQL 데이터베이스 연결결
     $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");
-    
+    if (!$con) {
+        die("Database connection failed: " . mysqli_connect_error());
+    }
+
     // 회원 정보(권한 role) 업데이트 SQL 실행
-    $sql = "update members set role=$role where id=$id";
-    mysqli_query($con, $sql); // SQL 실행
+    $sql = "update members set role = ? where id = ?";
+    $stmt = mysqli_prepare($con, $sql);
+    mysqli_stmt_bind_param($stmt, "ii", $role, $id);
 
-    // DB 연결 종료
-    mysqli_close($con);
-
-    // 관리자 페이지로 이동
-    echo "
+    if (mysqli_stmt_execute($stmt)) {
+        echo ("
         <script>
+            alert('회원 정보가 성곡적으로 수정되었습니다.');
             location.href = 'admin.php';
+        </script>");
+    }else {
+        echo "
+        <script>
+            alert('회원 정보 수정 중 오류가 발생했습니다: " . mysqli_error($con) . "');
+            history.go(-1);
         </script>
     ";
-?>
+    }
+
+    // DB 연결 종료
+    mysqli_stmt_close($stmt);
+    mysqli_close($con);

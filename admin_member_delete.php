@@ -38,6 +38,7 @@
 
     if (mysqli_stmt_execute($stmt)) {
         echo "Member deleted successfully!";
+        header("Location: admin.php");
     } else {
         echo "Error deleting record: " . mysqli_error($con);
     }
@@ -45,12 +46,3 @@
     // 데이터베이스 연결 종료
     mysqli_stmt_close($stmt);
     mysqli_close($con);
-
-    // 삭제 완료 후 관리자 페이지 이동동
-    echo ("
-        <script>
-            location.href = 'admin.php';
-        </scirpt>
-    ");
-
-    ?>
