@@ -43,7 +43,8 @@
                     <span class="col4"><input type="text" name="role"
                             value="<?=$role?>"></span>
                     <span class="col5"><?=$regist_day?></span>
-                    <span class="col6"><button type="submit">수정
+                    <input type="text" name="role" value="<?= $role ?>" required>
+                    <button type="submit">수정</button>
                     </button></span>
                     <span class="col7"><button type="button"
                             onclick= "location.href='admin_member_delete.php?id=<?=$id?>'">삭제</button></span>
