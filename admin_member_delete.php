@@ -18,7 +18,11 @@
     }
 
     // GET 방식으로 전달된 회원 번호(id) 가져오기
-    $id = $_GET["id"];
+    if (isset($_GET['id']) && !empty($_GET['id'])) {
+        $id = intval($_GET['id']); // 숫자로 변환하여 SQL 인젝션 방지
+    } else {
+        die("Invalid ID."); // ID가 없으면 종료
+    }
 
     // Mysql 데이터베이스 연결
     $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");

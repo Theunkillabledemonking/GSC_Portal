@@ -47,7 +47,7 @@
                     <span class="col6"><button type="submit">수정
                     </button></span>
                     <span class="col7"><button type="button"
-                            onclick= "location.href='admin_member_delete.php?num=<?=$id?>'">삭제</button></span>
+                            onclick= "location.href='admin_member_delete.php?id=<?=$id?>'">삭제</button></span>
             </form>
         </li>
 
