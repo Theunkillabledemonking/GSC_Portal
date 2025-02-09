@@ -1,3 +1,13 @@
+<?php
+    // 회원 정보를 가져오는 sql 쿼리리
+    $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");
+    $sql = "select * from members order by id desc";
+    $result = mysqli_query($con, $sql);
+    $total_record = mysqli_fetch_array($result); // 전체 회원 수 가져오기
+
+    $number = $total_record; // 역순으로 번호를 부여하기 위해 설정
+?>
+
 <section>
     <div id="admin_box">
         <h3 id="member_title">
@@ -16,38 +26,28 @@
             <span class="col6">수정</span>
             <span class="col7">삭제</span>
         </li>
-    <?php 
-        // 회원 정보를 가져오는 sql 쿼리리
-        $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");
-        $sql = "select * from members order by num desc";
-        $result = mysqli_query($con, $sql);
-        $total_record = mysqli_fetch_array($result); // 전체 회원 수 가져오기
-
-        $number = $total_record; // 역순으로 번호를 부여하기 위해 설정
-
+        <?php
         // 사용자 리스트 출력
         while ($row = mysqli_fetch_array($result)) {
-            $num = $row["num"]; // 회원 고유 번호
             $id = $row["id"]; // 회원 아이디
             $name = $row["name"]; // 회원 이름
             $role = $row["role"]; // 회원 역할 (관리자, 교수, 학생)
-            $regist_day = $row["regist_day"]; // 가입일
-        
-        ?>
+            $regist_day = $row["create_at"]; // 가입일
+?>
         <li>
             <!-- 회원 수정 폼 (권한 변경 가능) -->
-            <form method="post" action="admin_membre_update.php?num=
-                    <?=$num?>">
+            <form method="post" action="admin_membre_update.php?id=
+                    <?=$id?>">
                     <span class="col1"><?=$number?></span>
                     <span class="col2"><?=$id?></span>
                     <span class="col3"><?=$name?></span>
                     <span class="col4"><input type="text" name="role"
                             value="<?=$role?>"></span>
                     <span class="col5"><?=$regist_day?></span>
-                    <span class="col6"><button type="sumbit">수정
+                    <span class="col6"><button type="submit">수정
                     </button></span>
                     <span class="col7"><button type="button"
-                            onclick= "location.href='admin_member_delete.php?num=<?=$num?>'">삭제</button></span>
+                            onclick= "location.href='admin_member_delete.php?num=<?=$id?>'">삭제</button></span>
             </form>
         </li>
 
@@ -56,6 +56,7 @@
         }
         ?>
     </ul>
+    <?php mysqli_close($con); ?>
 
     <!-- 게시판 관리 -->
     <h3 id="member_title">관리자 모드 > 게시판 관리</h3>
@@ -73,7 +74,7 @@
         <form action="admin_board_delete.php" method="post">
         <?php
             // 게시판 글 목록 가져오기기
-            $sql = "select * from board order by num desc";
+            $sql = "select * from board order by id desc";
             $result = mysqli_query($con, $sql);
             $total_record = mysqli_num_rows($result); // 전체 글 수
 
@@ -84,7 +85,7 @@
                $name = $row["row"]; // 작성자 이름
                $subject = $row["subject"]; // 게시글 제목
                $file_name = $row["file_name"]; // 첨부 파일명
-               $regist_day = $row["regist_day"]; // 등록일
+               $regist_day = $row["create_at"]; // 등록일
                $regist_day = substr($regist_day, 0, 10) // 등록일 앞 10자리 (YYYY-MM-DD)
             
         ?>
@@ -95,7 +96,6 @@
                 <span class="col2"><?=$number?></span>
                 <span class="col3"><?=$name?></span>
                 <span class="col4"><?=$subject?></span>
-                <span class="col5"><?=$conetnt?></span>
                 <span class="col6"><?=$file_name?></span>
                 <span class="Col7"><?=$regist_day?></span>
             </li>

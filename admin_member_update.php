@@ -17,8 +17,8 @@
         exit; // 코드 실행 중단
     }
 
-    // GET 방식으로 전달된 회원 번호(num) 가져오기
-    $num = $_GET["num"];
+    // GET 방식으로 전달된 회원 번호(id) 가져오기
+    $id = $_GET["id"];
 
     // POST 방식으로 전달된 새로운 role 값 가져오기
     $role = $_POST["role"];
@@ -27,7 +27,7 @@
     $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");
     
     // 회원 정보(권한 role) 업데이트 SQL 실행
-    $sql = "update members set role=$role where num=$num";
+    $sql = "update members set role=$role where id=$id";
     mysqli_query($con, $sql); // SQL 실행
 
     // DB 연결 종료

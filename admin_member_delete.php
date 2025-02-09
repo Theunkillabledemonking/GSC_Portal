@@ -17,14 +17,14 @@
         exit; // 이후 코드 실해 중단
     }
 
-    // GET 방식으로 전달된 회원 번호(num) 가져오기
-    $num = $_GET["num"];
+    // GET 방식으로 전달된 회원 번호(id) 가져오기
+    $id = $_GET["id"];
 
     // Mysql 데이터베이스 연결
     $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");
     
     // 회원 삭제 SQL 실행 (지정된 num 값을 가진 회원 삭제)
-    $sql = "delete from members where num = $num";
+    $sql = "delete from members where id = $id";
     mysqli_query($con, $sql); // SQL 실행
 
     // 데이터베이스 연결 종료
