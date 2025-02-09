@@ -28,10 +28,22 @@
     $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");
     
     // 회원 삭제 SQL 실행 (지정된 num 값을 가진 회원 삭제)
-    $sql = "delete from members where id = $id";
-    mysqli_query($con, $sql); // SQL 실행
+    if (!$con) {
+        die("Could not connect: " . mysqli_error($con));
+    }
+
+    $sql = "DELETE FROM members WHERE id = ?";
+    $stmt = mysqli_prepare($con, $sql);
+    mysqli_stmt_bind_param($stmt, "i", $id);
+
+    if (mysqli_stmt_execute($stmt)) {
+        echo "Member deleted successfully!";
+    } else {
+        echo "Error deleting record: " . mysqli_error($con);
+    }
 
     // 데이터베이스 연결 종료
+    mysqli_stmt_close($stmt);
     mysqli_close($con);
 
     // 삭제 완료 후 관리자 페이지 이동동
