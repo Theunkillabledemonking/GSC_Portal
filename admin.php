@@ -36,8 +36,7 @@
 ?>
         <li>
             <!-- 회원 수정 폼 (권한 변경 가능) -->
-            <form method="post" action="admin_member_update.php?id=
-                    <?=$id?>">
+            <form method="post" action="admin_member_update.php?id=<?= $id ?>">
                     <span class="col1"><?=$number?></span>
                     <span class="col2"><?=$id?></span>
                     <span class="col3"><?=$name?></span>

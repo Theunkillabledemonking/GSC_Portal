@@ -17,11 +17,18 @@
     }
 
     // GET 방식으로 전달된 회원 번호(id) 가져오기
-    $id = isset($_GET["id"]) ? trim($_GET["id"]) : null;
-
-    // POST 방식으로 전달된 새로운 role 값 가져오기
-    $role = $_POST["role"];
-    
+    if (isset($_GET['id']) && !empty(trim($_GET['id']))) {
+        $id = intval($_GET['id']); // ID를 숫자로 변환하여 보안 강화
+    } else {
+        echo "
+            <script>
+                alert('잘못된 요청입니다. 회원 번호가 없습니다.');
+                history.go(-1);
+            </script>
+        ";
+        exit;
+    }
+    ?>
     // MySQL 데이터베이스 연결결
     $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");
     if (!$con) {
