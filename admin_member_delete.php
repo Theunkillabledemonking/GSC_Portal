@@ -7,7 +7,7 @@
     else $role = "";
 
     // 현재 사용자가 관리자가 아닌 경우 접근 차단
-    if ($role !== 1) {
+    if (intval($role) !== 1) {
         echo ("
             <script>
             alert('관리자가 아닙니다! 회원 삭제는 관리자만 가능합니다!');

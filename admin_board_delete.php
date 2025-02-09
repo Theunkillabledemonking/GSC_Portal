@@ -7,7 +7,7 @@
     else $role = "";
 
     // 현재 사용자가 관리자가 아닌 경우 접근 차단단
-    if ($role !== 1) {
+    if (intval($role) !== 1) {
         echo ("
             <script>
                 alert('관리자가 아닙니데이! 회원 삭제는 관리자만 가능해요!');
@@ -46,7 +46,7 @@
 
         // 첨부 파일이 있으면 서버에서 삭제
         if ($copied_name) {
-            $file_path - "./data/".$copied_name; // 파일 경로 설정
+            $file_path = "./data/".$copied_name; // 파일 경로 설정
             if (file_exists($file_path)) { // 파일 존재 여부 확인
                 unlink($file_path); // 파일 삭제
             }
