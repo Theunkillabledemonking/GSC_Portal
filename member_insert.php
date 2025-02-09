@@ -1,4 +1,6 @@
 <?php
+    session_start();
+
     $id = $_POST["id"];
     $pass = password_hash($_POST["pass"], PASSWORD_DEFAULT);
     $name = $_POST["name"];
