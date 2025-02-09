@@ -28,7 +28,7 @@
             }
         ?>
         <?php
-            if ($role === 1) {
+            if (intval($role) === 1) {
                 ?>
         <li> | </li>
         <li><a href="admin.php">관리자 모드</a></li>
