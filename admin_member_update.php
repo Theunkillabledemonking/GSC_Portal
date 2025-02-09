@@ -28,7 +28,7 @@
         ";
         exit;
     }
-    ?>
+
     // MySQL 데이터베이스 연결결
     $con = mysqli_connect("localhost", "root", "gsc1234!@#$", "school_portal");
     if (!$con) {
@@ -58,3 +58,4 @@
     // DB 연결 종료
     mysqli_stmt_close($stmt);
     mysqli_close($con);
+?>
