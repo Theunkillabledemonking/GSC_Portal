@@ -3,7 +3,7 @@
     session_start();
 
     // 세션에서 사용자 역할(role) 값 가져오기 (관리자인지 확인)
-    $role = isset($_POST["role"]) ? intval($_POST["role"]) : null;
+    $role = isset($_SESSION["role"]) ? intval($_SESSION["role"]) : null;
 
     // 현재 사용자가 관리자가 아닌 경우 접근 차단
     if (intval($role) !== 1) {
