@@ -19,7 +19,7 @@
 
         mysqli_close($con);
 
-        if ($pass != $db_pass) {
+        if (!password_verify($pass, $db_pass)) {
             echo("<script>
                     window.alert('비밀번호가 틀립니다!')
                     history.go(-1);
