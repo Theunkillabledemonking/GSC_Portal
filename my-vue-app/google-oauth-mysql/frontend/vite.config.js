@@ -1,6 +1,6 @@
-import { defineConfig } from "vite";
-import vue from "@vitejs/plugin-vue";
-import path from "path";
+import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
+import path from 'path';
 
 export default defineConfig({
   plugins: [vue()],
@@ -10,4 +10,9 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"), // ✅ `@`을 `src`로 설정
     },
   },
+  server: {
+    host: '0.0.0.0', // ✅ 외부에서 접속 가능하게 설정
+    port: 5173,      // ✅ 포트 고정 (변경 가능)
+    strictPort: true // ✅ 지정한 포트가 사용 중이면 실패 (자동 변경 방지)
+  }
 });
