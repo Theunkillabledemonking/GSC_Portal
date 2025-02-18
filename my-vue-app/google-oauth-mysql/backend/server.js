@@ -11,10 +11,10 @@ require("./passport");           // passport.js 설정 로드
 
 const app = express();
 
-// CORS 설정 (프론트엔드 http://localhost:5173 허용)
+
 app.use(
     cors({
-        origin: ["http://localhost:5173", "http://210.101.236.159:5173"], // 프론트엔드 주소 추가
+        origin: ["http://210.101.236.159:5176"], // 프론트엔드 주소 추가
         credentials: true,
     })
 );
