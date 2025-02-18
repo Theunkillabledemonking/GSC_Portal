@@ -12,9 +12,12 @@ export default defineConfig({
   },
   server: {
     host: "0.0.0.0",
-    port: 5173,
+    port: 5176,
     strictPort: true,
     cors: true,
     allowedHosts: ["abcqkdnxm.o-r.kr"], // ✅ 무료 도메인 추가
+    headers: {
+      "Access-Control-Allow-Origin": "*", // ✅ 모든 도메인 허용 (테스트용, 실제 배포시 특정 도메인만 허용)
+    }
   }
 });

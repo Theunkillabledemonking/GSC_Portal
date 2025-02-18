@@ -14,10 +14,13 @@ const app = express();
 
 app.use(
     cors({
-        origin: ["http://abcqkdnxm.o-r.kr:5176", "http://localhost:5176"], // 프론트엔드 주소 추가
-        credentials: true,
+        origin: ["http://abcqkdnxm.o-r.kr:5176", "http://localhost:5176"],  // ✅ 허용할 프론트엔드 도메인
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],  // ✅ 허용할 HTTP 메서드 추가
+        allowedHeaders: ["Content-Type", "Authorization"],  // ✅ 허용할 헤더 추가
+        credentials: true,  // ✅ 쿠키 및 세션 허용
     })
 );
+
 
 // 세션 설정
 app.use(
