@@ -11,8 +11,10 @@ export default defineConfig({
     },
   },
   server: {
-    host: '0.0.0.0', // ✅ 외부에서 접속 가능하게 설정
-    port: 5176,      // ✅ 포트 고정 (변경 가능)
-    strictPort: true // ✅ 지정한 포트가 사용 중이면 실패 (자동 변경 방지)
+    host: "0.0.0.0",
+    port: 5173,
+    strictPort: true,
+    cors: true,
+    allowedHosts: ["abcqkdnxm.o-r.kr"], // ✅ 무료 도메인 추가
   }
 });
