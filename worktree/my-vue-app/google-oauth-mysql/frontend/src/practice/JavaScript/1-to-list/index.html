@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>To-Do List DOM Events</title>
+  </head>
+  <body>
+    <script>
+      // -----------------------------------------------------
+      // 🏗️ 1. 기본 구조 생성 (To-Do List의 전체적인 DOM 구조)
+      // - App (전체 컨테이너)
+      //   - Header (헤더 영역, 카운터 포함)
+      //   - InputField (할 일 입력 필드)
+      //   - ItemListContainer (할 일 목록 컨테이너)
+      // -----------------------------------------------------
+
+      // 🌟 1-1. `App` (전체 컨테이너) 생성
+      const App = createElement({
+        tagName: 'div',
+        properties: { id: 'app' },
+        parent: document.body, // `App`을 `body`에 추가
+      });
+
+      // 🌟 1-2. `header` (헤더) 생성 및 `App`에 추가
+      const header = createElement({
+        tagName: 'div',
+        properties: { id: 'header' },
+        parent: App, // `App`의 자식 요소
+        children: [
+          { tagName: 'h1', properties: { innerText: 'To-do List' } },
+          {
+            tagName: 'div',
+            properties: { id: 'counter' },
+            children: [
+              { tagName: 'span', properties: { innerText: 'Total: ' } },
+              { tagName: 'span', properties: { innerText: '0' } }, // 총 개수
+              { tagName: 'span', properties: { innerText: ' Completed: ' } },
+              { tagName: 'span', properties: { innerText: '0' } }, // 완료 개수
+            ],
+          },
+        ],
+      });
+
+      // 🌟 1-3. `inputField` (입력 필드) 생성 및 `App`에 추가
+      const inputField = createElement({
+        tagName: 'div',
+        properties: { id: 'input-field' },
+        parent: App,
+        children: [
+          {
+            tagName: 'input',
+            properties: { placeholder: '할 일을 입력해주세요...' },
+          },
+          {
+            tagName: 'button',
+            properties: { innerText: 'Add' }, // 버튼
+          },
+        ],
+      });
+
+      // 🌟 1-4. `itemListContainer` (할 일 목록) 생성 및 `App`에 추가
+      const itemListContainer = createElement({
+        tagName: 'div',
+        properties: { id: 'item-list-container' },
+        parent: App,
+        children: [
+          {
+            tagName: 'ul',
+            properties: { id: 'item-list' }, // 목록 리스트
+          },
+        ],
+      });
+
+      // -----------------------------------------------------
+      // 🛠️ 2. 할 일 추가 이벤트 처리
+      // -----------------------------------------------------
+
+      const styleSheet = new CSSStyleSheet();
+      styleSheet.replaceSync(`
+      *. {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        height: 100vh;
+        background: linear-gradient(
+          180deg,
+          #3ac6f3 0%,
+          rgba(200, 180, 0.4) 40%,
+          rgba(255, 0, 0.56) 100%
+        );
+        overflow: hidden;
+      }
+
+      #app {
+        background: #fff;
+        max-width: 500px;
+        width: 100%;
+        margin: 100px auto;
+        padding: 20px;
+        border-radius: 6px:
+        box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      #header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      #counter span {
+        margin-right: 0.5rem;
+      }
+
+      #input-field {
+        margin: 20px 0;
+        width: 100px;
+        display: flex;
+        height: 2.5rem;
+      }
+
+      #input-field input {
+        width: 85%;
+        height: 100%;
+        border-radius: 3px;
+        border: 1px solid #ccc;
+        font-size: 0.8rem;
+        padding-left: 15px;
+        outline: none;
+      }
+
+      #input-filed input:focus {
+        border-color: #ff0051;
+      }
+
+      #input-filed button {
+        widht: 50px;
+        height: 100%;
+        border: none;
+        color: #fff;
+        margin-left: 5px;
+        font-size: 21px;
+        outline: none;
+        background: #3ac6f3;
+        border-radius: 3px;
+      }
+
+      #input-field button:hover {
+        background: #ff0051;
+      }
+
+      #item-list-container {
+        max-height: 250px;
+        overflow: scroll;
+        scrollbar-width: none;
+      }
+
+      #item-list-container li {
+        position: relactive;
+        display: flex;
+        justify-content: space-between;
+        list-style: none;
+        height: 3rem;
+        line-height: 3rem;
+        margin-botton: 0.5rem;
+        overflow: hidden;
+        border-radius: 5px;
+      }
+
+      #item-list-container div {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+      }
+      #item-list-container input {
+        margin: 1rem;
+        transition-duration: 0.5s;
+        opacity: 1;
+      }
+      #item-list-container button {
+        width: 3rem;
+        margin: 0.3rem 1rem;
+        width: 3rem;
+        border: none;
+        color: #fff;
+        margin-left: 5px;
+        font-size: 0.8rem;
+        font-weight: bold;
+        outline: none;
+        background: #f97;
+        border-radius: 3px;
+        transition-duration: 0.5s;
+        opacity: 1;
+      }
+      #item-list-container button:hover {
+        background-color: #ddd;
+      }
+      #item-list-container span {
+        width: 100%;
+        text-align: 'left';
+      }`
+      );
+
+      document.adoptedStyleSheets = [styleSheet];
+      
+      const addButton = document.querySelector('#input-field button');
+      addButton.addEventListener('click', () => {
+        // ✅ 1. 입력창의 값 가져오기
+        const inputField = document.querySelector('#input-field input');
+        const inputValue = inputField.value.trim(); // 공백 제거
+        if (!inputValue) return; // 입력값이 없으면 종료
+
+        // ✅ 2. 아이템 컨테이너 가져오기
+        const itemContainer = document.querySelector('#item-list');
+
+        // ✅ 3. 새로운 아이템 생성
+        const item = createElement({
+          tagName: 'li',
+          parent: itemContainer, // `ul` 요소의 자식으로 추가
+          children: [
+            { tagName: 'input', properties: { type: 'checkbox' } },
+            { tagName: 'span', properties: { innerText: inputValue } },
+            { tagName: 'button', properties: { innerText: '삭제' } },
+          ],
+        });
+
+        // ✅ 4. 카운터 업데이트
+        updateCounters();
+
+        // ✅ 5. 입력창 초기화
+        inputField.value = '';
+
+        // -----------------------------------------------------
+        // 🛠️ 3. 체크박스 이벤트 처리 (할 일 완료)
+        // -----------------------------------------------------
+        const [checkbox, text, removeButton] = item.children;
+        checkbox.addEventListener('change', () => {
+          if (checkbox.checked) {
+            text.style.textDecoration = 'line-through'; // 밑줄 긋기
+          } else {
+            text.style.removeProperty('text-decoration'); // 밑줄 제거
+          }
+          updateCounters(); // 완료 개수 업데이트
+        });
+
+        // -----------------------------------------------------
+        // 🛠️ 4. 삭제 버튼 이벤트 처리
+        // -----------------------------------------------------
+        removeButton.addEventListener('click', () => {
+          item.remove(); // 해당 아이템 삭제
+          updateCounters(); // 카운터 업데이트
+        });
+      });
+
+      // -----------------------------------------------------
+      // 🛠️ 5. 카운터 업데이트 함수
+      // -----------------------------------------------------
+      function updateCounters() {
+        const itemContainer = document.querySelector('#item-list');
+        const counter = document.getElementById('counter');
+
+        // ✅ 총 개수 업데이트
+        counter.children[1].innerText = itemContainer.children.length;
+
+        // ✅ 완료된 개수 업데이트
+        const completedCount = Array.from(itemContainer.children).filter(
+          (child) => child.firstChild.checked
+        ).length;
+        counter.lastChild.innerText = completedCount;
+      }
+
+      // -----------------------------------------------------
+      // 🛠️ 6. createElement 함수 (DOM 요소를 동적으로 생성)
+      // -----------------------------------------------------
+      function createElement({
+        tagName, // 생성할 태그명 (예: 'div', 'span', 'button' 등)
+        properties, // 요소에 추가할 속성들 (예: { innerText: 'hello' })
+        parent, // 생성된 요소가 추가될 부모 요소
+        children, // 자식 요소 목록 (재귀적으로 생성 가능)
+        count = 1, // 요소를 몇 개 생성할지 (기본값: 1)
+      }) {
+        const create = () => {
+          const element = document.createElement(tagName); // 태그 생성
+          Object.assign(element, properties); // 속성 추가
+
+          if (parent) parent.appendChild(element); // 부모 요소에 추가
+
+          if (children) {
+            children.forEach((child) => {
+              child.parent = element;
+              createElement(child); // 🔁 재귀 호출
+            });
+          }
+
+          return element;
+        };
+
+        if (count > 1) {
+          return Array.from({ length: count }, create); // 여러 개 생성
+        } else {
+          return create();
+        }
+      }
+    </script>
+  </body>
+</html>

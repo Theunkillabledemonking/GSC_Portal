@@ -1,0 +1,7 @@
+#!/bin/bash
+echo "🚀 Deploying application..."
+
+# Git 저장소에서 Work Tree로 코드 업데이트
+GIT_WORK_TREE=/home/projects/sg/worktree git checkout -f master
+
+echo "✅ Code has been deployed to /home/projects/sg/worktree"
