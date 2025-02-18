@@ -22,3 +22,10 @@ npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
 lerna-debug.log*
+
+echo ".env" >> .gitignore
+git rm --cached my-vue-app/google-oauth-mysql/.env
+git rm --cached my-vue-app/google-oauth-mysql/backend/.env
+git rm --cached my-vue-app/google-oauth-mysql/frontend/.env
+
+git commit -m "Remove .env files from tracking"
