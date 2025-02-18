@@ -1,2 +1,24 @@
+# 환경 변수 파일 (비밀번호, API Key 등)
 .env
-.env
+
+# Node.js 패키지 폴더 (각 환경에서 자동 설치 가능)
+node_modules/
+dist/
+build/
+
+# IDE 설정 파일 (개인 설정, 캐시)
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# 로그 및 기타 불필요한 파일
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
