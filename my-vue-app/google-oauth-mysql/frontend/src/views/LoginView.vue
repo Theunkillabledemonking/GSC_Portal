@@ -11,7 +11,7 @@ export default {
   methods: {
     googleLogin() {
       // 백엔드 /auth/google 로 이동 (Oauth 시작)
-      window.location.href = "http://localhost:5000/auth/google";
+      window.location.href = "http://abcqkdnxm.o-r.kr:5000/auth/google";
     }
   }
 };

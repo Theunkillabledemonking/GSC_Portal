@@ -17,7 +17,7 @@ const pendingUsers = ref([]);
 
 const fetchPendingUsers = async () => {
   try {
-    const response = await fetch("http://localhost:5000/admin/pending-users");
+    const response = await fetch("http://abcqkdnxm.o-r.kr:5000/admin/pending-users");
     pendingUsers.value = await response.json();
   } catch (error) {
     console.error("승인 대기 회원 불러오기 실패:", error);
@@ -26,7 +26,7 @@ const fetchPendingUsers = async () => {
 
 const approveUser = async (userId) => {
   try {
-    await fetch("http://localhost:5000/admin/approve-user", {
+    await fetch("http://abcqkdnxm.o-r.kr:5000/admin/approve-user", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId }),

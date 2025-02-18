@@ -34,11 +34,11 @@ router.get(
 
             if (user[0].role === "pending") {
                 // 승인 대기 중이면 승인 대기 페이지로 리다이렉트
-                return res.redirect("http://localhost:5176/pending-approval");
+                return res.redirect("http://abcqkdnxm.o-r.kr:5176/pending-approval");
             }
 
             // 승인된 사용자라면 로그인 성공 후 메인 페이지로 이동
-            res.redirect(`http://localhost:5176/login-success?token=${token}`);
+            res.redirect(`http://abcqkdnxm.o-r.kr:5176/login-success?token=${token}`);
         } catch (error) {
             console.error("Database error:", error);
             res.redirect("/");

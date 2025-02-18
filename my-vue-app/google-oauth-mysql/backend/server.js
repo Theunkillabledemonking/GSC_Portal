@@ -14,7 +14,7 @@ const app = express();
 
 app.use(
     cors({
-        origin: ["http://abcqkdnxm.o-r.kr", "http://localhost:5176"], // 프론트엔드 주소 추가
+        origin: ["http://abcqkdnxm.o-r.kr:5176", "http://localhost:5176"], // 프론트엔드 주소 추가
         credentials: true,
     })
 );
