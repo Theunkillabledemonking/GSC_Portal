@@ -5,14 +5,27 @@
   </div>
 </template>
 
-<script>
-export default {
-  name: "LoginView",
-  methods: {
-    googleLogin() {
-      // 백엔드 /auth/google 로 이동 (Oauth 시작)
-      window.location.href = "http://abcqkdnxm.o-r.kr:5000/auth/google";
-    }
-  }
-};
+<script setup>
+import { useAuthStore } from '../store/auth.js';
+
+const authStore = useAuthStore();
+
+// Google 로그인
+const loginWithGoogle = () => {
+  window.location.href = `${import.meta.env.VITE_BACKEND_URL}/auth/google`;
+}
 </script>
+
+<style scoped>
+.login-page {
+  text-align: center;
+  margin-top: 100px;
+}
+button {
+  padding: 10px 20px;
+  background-color: #4285F4;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
