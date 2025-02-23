@@ -1,59 +1,42 @@
-// server.js
 const express = require("express");
 const cors = require("cors");
-const passport = require("passport");
 const session = require("express-session");
-const jwt = require("jsonwebtoken");
-const authRoutes = require("./auth");
+const passport = require("passprot");
+const authRoutes = require("./routes/authoRoutes");
+const keys = require("./config/keys");
 
-require("dotenv").config();      // .env 로드
-require("./passport");           // passport.js 설정 로드
+require("dotenv").config();
+require("./passport");
 
 const app = express();
 
-
+// CORS 설정
 app.use(
-    cors({
-        origin: ["http://abcqkdnxm.o-r.kr:5176", "http://localhost:5176"],  // ✅ 허용할 프론트엔드 도메인
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],  // ✅ 허용할 HTTP 메서드 추가
-        allowedHeaders: ["Content-Type", "Authorization"],  // ✅ 허용할 헤더 추가
-        credentials: true,  // ✅ 쿠키 및 세션 허용
-    })
+  cors({
+    origin: ["http://localhost:5176"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
 );
 
-
-// 세션 설정
+app.use(express.json()); // JSON 요청 파싱
 app.use(
-    session({
-        secret: process.env.SESSION_SECRET,
-        resave: false,
-        saveUninitialized: false,
-        cookie: { secure: false }, // HTTPS 환경이라면 true
-    })
+  session({
+    secret: keys.jwtSecret,
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: false },
+  })
 );
 
-// Passport 초기화 & 세션연동
 app.use(passport.initialize());
 app.use(passport.session());
 
-// /auth 라우트 연결
+// 라우트 연결
 app.use("/auth", authRoutes);
 
-// JWT 검증용 테스트 API
-app.get("/api/protected", (req, res) => {
-    // Authorization: Bearer <토큰>
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) return res.status(401).json({ message: "Unauthorized" });
-
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        res.json({ message: "Protected content", user: decoded });
-    } catch (error) {
-        res.status(401).json({ message: "Invalid token" });
-    }
-});
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
+// 서버 실행
+app.listen(keys.port, "0.0.0.0", () => {
+  console.log(`Server running on http://0.0.0.0:${keys.port}`);
 });
