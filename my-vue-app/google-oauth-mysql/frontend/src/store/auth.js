@@ -1,75 +1,76 @@
-// ✅ Pinia 스토어: 사용자의 로그인 상태와 토큰 관리
 import { defineStore } from "pinia";
 import axios from "axios";
 
-// ✅ authStore: 사용자의 상태 및 인증 관련 기능
 export const useAuthStore = defineStore("auth", {
   state: () => ({
-    user: null, // 사용자 정보
-    accessToken: localStorage.getItem("accessToken") || null, // Access Token
-    refreshToken: localStorage.getItem("refreshToken") || null, // Refresh Token
-    isAuthenticated: !!localStorage.getItem("accessToken"), // 로그인 여부
+    user: null,
+    accessToken: localStorage.getItem("accessToken") || null,
+    refreshToken: localStorage.getItem("refreshToken") || null,
+    isAuthenticated: (state) => !!state.accessToken && !!state.user,
   }),
 
   getters: {
-    // ✅ 현재 사용자의 이름 반환 (없으면 null)
     userName: (state) => state.user?.name || null,
+    isAdmin: (state) => state.user?.user_type === "ADMIN",
+    isApproved: (state) => state.user?.is_approved === 1,
+    isFirstInput: (state) => state.user?.is_first_input === 1,
   },
 
   actions: {
-    // ✅ Google OAuth 로그인 (백엔드로 리디렉션)
+    // ✅ Google OAuth 로그인
     loginWithGoogle() {
       window.location.href = `${import.meta.env.VITE_BACKEND_URL}/auth/google`;
     },
 
     // ✅ Access Token과 Refresh Token을 로컬 스토리지에 저장
     setTokens(accessToken, refreshToken) {
+      if (!accessToken || !refreshToken) return;
+
       this.accessToken = accessToken;
       this.refreshToken = refreshToken;
       this.isAuthenticated = true;
       localStorage.setItem("accessToken", accessToken);
       localStorage.setItem("refreshToken", refreshToken);
+
+      axios.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
+      this.fetchUser();
     },
 
-    // ✅ 사용자의 프로필 정보를 가져오기
+    // ✅ 사용자 정보 가져오기 (Access Token 사용)
     async fetchUser() {
       if (!this.accessToken) return;
 
       try {
         const response = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/user`,
-          {
-            headers: {
-              Authorization: `Bearer ${this.accessToken}`,
-            },
-          }
+            `${import.meta.env.VITE_BACKEND_URL}/api/user-status`,
+            {
+              headers: { Authorization: `Bearer ${this.accessToken}` },
+            }
         );
-        this.user = response.data.user;
+        this.user = response.data; // ✅ 사용자 정보 저장
       } catch (error) {
-        if (error.response?.status === 401) {
-          await this.refreshAccessToken();
-        }
+        if (error.response?.status === 401) await this.refreshAccessToken();
       }
     },
 
-    // ✅ Refresh Token으로 Access Token 재발급
+    // ✅ Refresh Token을 사용하여 Access Token 재발급
     async refreshAccessToken() {
       if (!this.refreshToken) return;
 
       try {
         const response = await axios.post(
-          `${import.meta.env.VITE_BACKEND_URL}/auth/refresh-token`,
-          {
-            refreshToken: this.refreshToken,
-          }
+            `${import.meta.env.VITE_BACKEND_URL}/auth/refresh-token`,
+            { refreshToken: this.refreshToken }
         );
-        this.setTokens(response.data.accessToken, this.refreshToken);
+        this.accessToken = response.data.accessToken;
+        this.isAuthenticated = true;
+        sessionStorage.setItem("accessToken", this.accessToken);
       } catch (error) {
         this.logout();
       }
     },
 
-    // ✅ 로그아웃 (로컬 스토리지 및 상태 초기화)
+    // ✅ 로그아웃
     logout() {
       this.user = null;
       this.accessToken = null;
@@ -77,6 +78,9 @@ export const useAuthStore = defineStore("auth", {
       this.isAuthenticated = false;
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
+      sessionStorage.clear();
+
+      delete axios.defaults.headers.common["Authorization"];
     },
   },
 });

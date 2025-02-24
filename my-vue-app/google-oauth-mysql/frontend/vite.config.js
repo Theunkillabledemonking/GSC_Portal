@@ -1,13 +1,12 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vite';    // ✅ 반드시 추가해야 함
 import vue from '@vitejs/plugin-vue';
 import path from 'path';
 
 export default defineConfig({
   plugins: [vue()],
-  root: ".", // ✅ 현재 프로젝트 루트에서 시작하도록 설정
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "src"), // ✅ `@`을 `src`로 설정
+      "@": path.resolve(__dirname, "src"),
     },
   },
   server: {
@@ -15,9 +14,12 @@ export default defineConfig({
     port: 5176,
     strictPort: true,
     cors: true,
-    allowedHosts: ["abcqkdnxm.o-r.kr"], // ✅ 무료 도메인 추가
-    headers: {
-      "Access-Control-Allow-Origin": "*", // ✅ 모든 도메인 허용 (테스트용, 실제 배포시 특정 도메인만 허용)
-    }
-  }
+  },
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, "index.html"),
+      },
+    },
+  },
 });

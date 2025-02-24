@@ -1,68 +1,75 @@
 const jwt = require("jsonwebtoken");
 const keys = require("../config/keys");
-const { updateRefreshToken, findUserById } = require("../modles/userModel");
+const { updateRefreshToken, findUserById } = require("../models/userModel");
 
-// Access Token 생성 함수
-const generateAccessToken = (user) => {
+// Access Token 생성
+function generateAccessToken(user) {
+  // user.id는 DB의 user_id
   return jwt.sign(
-    { id: user.id, email: user.email, role: user.role },
-    keys.jwtSecret,
-    {
-      expiresIn: keys.jwtAccessExpiration, // Access Token 만료 시간 (15분)
-    }
+      { id: user.user_id, email: user.email },
+      keys.jwtSecret,
+      { expiresIn: keys.jwtAccessExpiration }
   );
-};
+}
 
-const generateRefreshToken = (user) => {
-  return jwt.sign({ id: user.id }, keys.jwtSecret, {
-    expiresIn: keys.jwtRefreshExpiration, // Refresh Token 만료 시간 (7일)
-  });
-};
+// Refresh Token 생성
+function generateRefreshToken(user) {
+  return jwt.sign(
+      { id: user.user_id },
+      keys.jwtSecret,
+      { expiresIn: keys.jwtRefreshExpiration }
+  );
+}
 
-// Google OAuth 로그인 콜백 함수
-exports.gooleCallback = async (req, res) => {
-  const user = req.user; // Passport에서 전달한 사용자 정보
+// Google OAuth 로그인 콜백
+exports.googleCallback = async (req, res) => {
+  const user = req.user; // Passport에서 전달 (user.id = user.user_id)
 
-  // 1) 사용자가 승인 상태인지 확인
-  if (user.status === "pending") {
-    return res.status(403).json({ message: "승인 대기 중인 사용자입니다." });
+  // ✅ 승인 상태 확인
+  if (user.is_approved === 0) {
+    return res.redirect(`${keys.frontendUrl}/pending-approval`);
   }
-  if (user.status === "rejected") {
-    return res.status(403).json({ message: "승인이 거부된 사용자입니다." });
+  if (user.is_approved === -1) { // 예시: -1이면 승인 거부 상태로 정의 가능
+    return res.redirect(`${keys.frontendUrl}/rejected`);
   }
 
-  // 2) Access Token과 Refresh Token 발급
+  // 토큰 발급
   const accessToken = generateAccessToken(user);
   const refreshToken = generateRefreshToken(user);
+  console.log("Generated Refresh Token:", refreshToken);
 
-  // 3) Refresh Token을 DB에 저장 (토큰 재발급 시 사용)
-  await updateRefreshToken(user.id, refreshToken);
+  // Refresh Token DB 저장
+  await updateRefreshToken(user.user_id, refreshToken);
 
-  // 4) Access Token과 Refresh Token을 JSON을 응답
-  res.json({ accessToken, refreshToken });
+  // 첫 회원가입이라 student_id가 없으면 register 페이지로
+  if (!user.student_id) {
+    return res.redirect(
+        `${keys.frontendUrl}/register?accessToken=${accessToken}&refreshToken=${refreshToken}`
+    );
+  } else {
+    return res.redirect(
+        `${keys.frontendUrl}/dashboard?accessToken=${accessToken}&refreshToken=${refreshToken}`
+    );
+  }
 };
 
-// Refresh Token을 사용한 Access Token 재발급 함수
+// Refresh Token으로 Access Token 재발급
 exports.refreshToken = async (req, res) => {
   const { refreshToken } = req.body;
   if (!refreshToken) return res.status(401).json({ message: "Unauthorized" });
 
   try {
-    // 1) Refresh Token 검증
     const decoded = jwt.verify(refreshToken, keys.jwtSecret);
-
-    // 2) DB에서 사용자 정보 조회
     const user = await findUserById(decoded.id);
 
-    // 3) Refresh Token이 일치하는지 확인
-    if (!user || user.refresh_token !== refreshToken) {
+    if (!user) return res.status(404).json({ message: "User not found" });
+    if (user.refresh_token !== refreshToken) {
       return res.status(403).json({ message: "Invalid refresh token" });
     }
 
-    // 4) 새로운 Access Token 발급
-    const accessToken = generateAccessToken(user);
-    res.json({ accessToken }); // 새로운 Access Token 반환
+    const newAccessToken = generateAccessToken(user);
+    return res.json({ accessToken: newAccessToken });
   } catch (error) {
-    res.status(403).json({ message: "Invalid refresh token " });
+    return res.status(403).json({ message: "Invalid refresh token" });
   }
 };

@@ -5,44 +5,58 @@ const { findUserByEmail, createUser } = require("./models/userModel");
 
 // Google OAuth 설정
 passport.use(
-  new GoogleStrategy(
-    {
-      clientID: keys.googleClientID, // 클라이언트 ID
-      clinetSecret: keys.googleClientSecret, // 클라이언트 비밀 키
-      callbackURL: keys.googleCallbackURL, // 인증 후 리디렉션 URL
-    },
-    async (accessToken, refreshToken, profile, done) => {
-      try {
-        // 1) 사용자의 이메일로 DB에서 사용자 찾기
-        let user = await findUserByEmail(profile.emails[0].value);
+    new GoogleStrategy(
+        {
+            clientID: keys.googleClientID,
+            clientSecret: keys.googleClientSecret,
+            callbackURL: keys.googleCallbackURL,
+            scope: ["profile", "email"],
+        },
+        async (accessToken, refreshToken, profile, done) => {
+            try {
+                // 구글 계정 이메일
+                const email = profile.emails && profile.emails[0] ? profile.emails[0].value : null;
+                if (!email) {
+                    return done(new Error("Google account has no email"), null);
+                }
 
-        // 2) 사용자가 없으면 새로 생성
-        if (!user) {
-          const userId = await createUser(
-            profile.id,
-            profile.displayName,
-            profile.emails[0].value,
-            refreshToken
-          );
-          user = {
-            id: userId,
-            google_id: profile.id,
-            name: profile.displayName,
-            email: profile.emails[0].value,
-            status: "pending",
-          };
+                // 사용자 찾기
+                let user = await findUserByEmail(email);
+                if (!user) {
+                    // 새 사용자 생성
+                    const userId = await createUser(profile.id, profile.displayName, email, refreshToken);
+                    // user_id를 id로 매핑
+                    user = {
+                        user_id: userId,         // DB PK
+                        google_id: profile.id,   // 구글 식별자
+                        name: profile.displayName,
+                        email: email,
+                        status: "pending",
+                    };
+                } else {
+                    // 이미 존재하면 그대로 사용
+                }
+
+                // 세션에 저장할 객체.
+                // 내부 로직에서 "user.id"를 참조하므로, user_id를 별도 프로퍼티로 배치
+                // 만약 userModel의 결과가 { user_id: 1, google_id: "...", ... } 형태라면 다음처럼 정리:
+                const finalUser = {
+                    id: user.user_id,        // jwt 생성 시 user.id => user_id로 사용
+                    user_id: user.user_id,
+                    google_id: user.google_id,
+                    name: user.name,
+                    email: user.email,
+                    status: user.status,
+                };
+
+                return done(null, finalUser);
+            } catch (error) {
+                return done(error, null);
+            }
         }
-
-        done(null, user); // 사용자 정보를 done()을 통해 반환
-      } catch (error) {
-        done(error, null); // 오류 발생 시 null 반환
-      }
-    }
-  )
+    )
 );
 
-// 사용자 직렬화 (세션에 사용자 정보 저장)
 passport.serializeUser((user, done) => done(null, user));
-
-// 사용자 역직렬화 (세션에서 사용자 정보 복원)
 passport.deserializeUser((user, done) => done(null, user));
+

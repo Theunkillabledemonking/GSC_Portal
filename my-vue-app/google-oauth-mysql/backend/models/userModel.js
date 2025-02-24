@@ -1,35 +1,40 @@
 const db = require("../config/db");
 
 // 이메일로 사용자 찾기
-const findUserByEmail = async (eamil) => {
-  const [rows] = await db.query("SELECT * FROM users WHERE email = ?", [email]);
-  return rows.length ? rows[0] : null; // 사용자가 있으면 첫 번째 레코드 반환
-};
-
-// 사용자 ID로 사용자 찾기
-const findUserById = async (id) => {
-  const [rows] = await db.query("SELECT * FROM users WHERE id = ?", [id]);
-  return rows.length ? rows[0] : null;
-};
-
-// 새 사용자 추가 (Google OAuth 로그인 시)
-const createUser = async (googleId, name, email, refreshToken) => {
-  const [result] = await db.query(
-    "INSERT INTO users (google_id, name, email, refresh_token) VALUES (?, ?, ?, ?)",
-    [googleId, name, email, refreshToken]
+async function findUserByEmail(email) {
+  const [rows] = await db.query(
+      "SELECT user_id, google_id, name, email, refresh_token, is_approved FROM users WHERE email = ?",
+      [email]
   );
-  return result.insertId; // 삽입된 사용자의 ID 반환
-};
+  return rows.length ? rows[0] : null;
+}
 
-// 사용자 Refresh Token 업데이트 (토큰 재발급 사용)
-const updateRefreshToken = async (userId, refreshToken) => {
-  await db.query("UPDATE users SET refresh_token = ? WHERE id = ?", [
+async function findUserById(id) {
+  const [rows] = await db.query(
+      "SELECT user_id, google_id, name, email, refresh_token, is_approved FROM users WHERE user_id = ?",
+      [id]
+  );
+  return rows.length ? rows[0] : null;
+}
+
+// 새 사용자 추가 (Google OAuth 첫 로그인 시)
+async function createUser(googleId, name, email, refreshToken) {
+  const [result] = await db.query(
+      "INSERT INTO users (google_id, name, email, refresh_token, is_approved) VALUES (?, ?, ?, ?, ?)",
+      [googleId, name, email, refreshToken, 0]
+  );
+  return result.insertId; // 삽입된 user_id
+}
+
+// 사용자 Refresh Token 업데이트
+async function updateRefreshToken(userId, refreshToken) {
+  await db.query("UPDATE users SET refresh_token = ? WHERE user_id = ?", [
     refreshToken,
     userId,
   ]);
-};
+}
 
-moduel.export = {
+module.exports = {
   findUserByEmail,
   findUserById,
   createUser,

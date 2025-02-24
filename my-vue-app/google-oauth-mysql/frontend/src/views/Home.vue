@@ -1,53 +1,44 @@
 <template>
   <div class="home">
     <Header />
-    <nav>
-      <router-link to="/board">게시판</router-link> |
-      <router-link to="/timetable">시간표</router-link> |
-      <router-link to="/inquiry">문의사항</router-link>
-    </nav>
 
-    <div v-if="isAuthenticated">
-      <LoginButton />
-      <UserProfile />
+    <!-- ✅ 승인 상태에 따라 화면 표시 -->
+    <div v-if="isAuthenticated && !isPendingApproval">
       <h1>포털 메인 페이지</h1>
     </div>
+
+    <div v-else-if="isPendingApproval">
+      <h1>승인 대기 중입니다.</h1>
+      <p>관리자가 승인하면 알림을 통해 알려드립니다.</p>
+      <button @click="logout" class="btn-secondary">로그아웃</button>
+    </div>
+
     <div v-else>
-      <p>로그인 후 이용해 주세요.</p>
-      <router-link to="/login"></router-link>
+      <LoginButton />
     </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted } from "vue";
-import { useUserStore } from "../store/user.js";
-import Header from "../components/Header.vue"; // 확장자 추가
-import LoginButton from "@/components/LoginButton.vue";
-import UserProfile from "@/components/UserProfile.vue";
-import { useAuthStore } from "../store/auth.js";
+import { computed, onMounted } from "vue";
+import Header from "@/components/Header.vue";
+import LoginButton from "../components/LoginButton.vue";
+import { useAuthStore } from "@/store/auth";
 
 const authStore = useAuthStore();
-const isAuthenticated = authStore.isAuthenticated; // 로그인 상태 가져오기;
-export default {
-  name: "Home",
-  component: { LoginButton, UserProfile },
+const isAuthenticated = computed(() => authStore.isAuthenticated);
+const isPendingApproval = computed(() => authStore.user?.is_first_input === 1);
+
+// ✅ 로그아웃 함수
+const logout = () => {
+  authStore.logout();
+  window.location.href = "/";
 };
 
-defineOptions({
-  name: "HomeView",
-});
-
-const userStore = useUserStore();
-
-onMounted(() => {
-  userStore.fetchUser(); // fetchUser() 한 번만 호출
+// ✅ 사용자 승인 상태 확인
+onMounted(async () => {
+  if (isAuthenticated.value) {
+    await authStore.fetchUser();
+  }
 });
 </script>
-
-<style scoped>
-.home {
-  text-align: center;
-  margin-top: 50px;
-}
-</style>

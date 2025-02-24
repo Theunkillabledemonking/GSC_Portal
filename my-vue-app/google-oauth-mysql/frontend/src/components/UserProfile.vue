@@ -1,45 +1,34 @@
-<template>
-  <div v-if="isAuthenticated" class="user-profile">
-    <p>안녕하세요, {{ userName }}님!</p>
-    <button @click="logout">로그아웃</button>
-  </div>
-</template>
+<script setup>
+import { useAuthStore } from "../store/auth";
+import { useRouter } from "vue-router";
 
-<script>
-import { useAuthStore } from "@/store/auth";
-import { computed } from "vue";
+const authStore = useAuthStore();
+const router = useRouter();
 
-export default {
-  name: "UserProfile",
-  setup() {
-    const authStore = useAuthStore();
-
-    const userName = computed(() => authStore.userName);
-    const isAuthenticated = computed(() => authStore.isAuthenticated);
-
-    const logout = () => {
-      authStore.logout(); // ✅ 사용자를 로그아웃합니다.
-    };
-
-    return { userName, isAuthenticated, logout };
-  },
+const handleLogout = () => {
+  authStore.logout();
+  router.push("/");
 };
 </script>
 
+<template>
+  <div class="user-profile">
+    <span>{{ authStore.user?.name }}</span>
+    <button @click="handleLogout">로그아웃</button>
+  </div>
+</template>
+
 <style scoped>
 .user-profile {
-  text-align: center;
-  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
-.user-profile p {
-  font-size: 18px;
-  margin-bottom: 10px;
-}
-.user-profile button {
-  padding: 8px 12px;
-  background-color: #ff5555;
+button {
+  background: #ff4b4b;
   color: white;
   border: none;
+  padding: 5px 10px;
   border-radius: 5px;
   cursor: pointer;
 }
