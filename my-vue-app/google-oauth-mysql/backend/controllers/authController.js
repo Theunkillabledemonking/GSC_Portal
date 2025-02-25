@@ -27,6 +27,7 @@ exports.googleLogin = async (req, res) => {
 
         // 4. 데이터베이스에 사용자가 없을 경우 (최초 사용자)
         if (rows.length === 0) {
+            // 신규 사용자일 경우 이름과 이메일반환
             res.status(200).json({ status: 'new', email: googleUser.email, name: googleUser.name });
         } else {
             // 5. 기존 사용자가 있을 경우

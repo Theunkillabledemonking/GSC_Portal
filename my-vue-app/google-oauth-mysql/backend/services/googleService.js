@@ -21,6 +21,7 @@ exports.getGoogleUser = async (code) => {
     // 3. 사용자 이메일과 이름을 반환
     return {
         email: userResponse.data.email, // 사용자의 이메일 주소
-        name: userResponse.data.name    // 사용자의 이름
+        name: userResponse.data.name,    // 사용자의 이름
+        sub: userResponse.data.sub,
     };
 };
