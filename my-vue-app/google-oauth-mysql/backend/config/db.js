@@ -9,7 +9,10 @@ const pool = mysql.createPool({
     host: process.env.DB_HOST,      // 데이터베이스 서버의 호스트명 또는 IP 주소
     user: process.env.DB_USER,      // 데이터베이스에 접속할 사용자명
     password: process.env.DB_PASS,  // 해당 사용자의 비밀번호
-    database: process.env.DB_NAME   // 사용할 데이터 베이스의 이름
+    database: process.env.DB_NAME,   // 사용할 데이터 베이스의 이름
+    waitForConnections: true,
+    connectionLimit: 10,     // 최대 연결 수
+    queueLimit: 0            // 대기열 제한 없음
 });
 
 // MySQL 연결 풀 객체를 외부에서 사용할 수 있도록 내보냅니다.
