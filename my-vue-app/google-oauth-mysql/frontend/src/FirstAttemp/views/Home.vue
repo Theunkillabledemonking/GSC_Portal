@@ -21,9 +21,9 @@
 
 <script setup>
 import { computed, onMounted } from "vue";
-import Header from "@/components/Header.vue";
+import Header from "@/FirstAttemp/components/Header.vue";
 import LoginButton from "../components/LoginButton.vue";
-import { useAuthStore } from "@/store/auth";
+import { useAuthStore } from "@/FirstAttemp/store/auth.js";
 
 const authStore = useAuthStore();
 const isAuthenticated = computed(() => authStore.isAuthenticated);

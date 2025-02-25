@@ -42,9 +42,9 @@
 
 <script setup>
 import { ref, toRaw } from "vue";
-import axios from "../axios";
+import axios from "../axios.js";
 import { useRouter } from "vue-router";
-import { useAuthStore } from "../store/auth";
+import { useAuthStore } from "../store/auth.js";
 import { onMounted } from "vue";
 
 const authStore = useAuthStore();

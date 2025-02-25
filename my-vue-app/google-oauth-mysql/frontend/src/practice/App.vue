@@ -6,7 +6,7 @@
 </template>
 
 <script setup>
-import { useAuthStore } from "@/store/auth";
+import { useAuthStore } from "@/FirstAttemp/store/auth.js";
 import { useRouter } from "vue-router";
 import { onMounted, watch } from "vue";
 

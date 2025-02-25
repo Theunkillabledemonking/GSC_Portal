@@ -22,7 +22,7 @@
 
 <script setup>
 import { useRouter } from 'vue-router';
-import { useAuthStore } from '@/store/auth';
+import { useAuthStore } from '@/FirstAttemp/store/auth.js';
 
 const router = useRouter();
 const authStore = useAuthStore();

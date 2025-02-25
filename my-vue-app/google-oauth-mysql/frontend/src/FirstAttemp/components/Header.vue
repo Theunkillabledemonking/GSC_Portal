@@ -20,7 +20,7 @@
 
 <script setup>
 import { computed } from "vue";
-import { useAuthStore } from "@/store/auth";
+import { useAuthStore } from "@/FirstAttemp/store/auth.js";
 import UserProfile from "./UserProfile.vue";
 import LoginButton from "./LoginButton.vue";
 

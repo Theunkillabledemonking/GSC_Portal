@@ -4,7 +4,7 @@ import LoginSuccess from "../views/LoginSuccess.vue";
 import TimetableView from "../views/TimetableView.vue";
 import Admin from "../views/Admin.vue";
 import Register from "../views/Register.vue";
-import PendingApproval from "@/views/PendingApproval.vue";
+import PendingApproval from "@/FirstAttemp/views/PendingApproval.vue";
 import { useAuthStore } from "../store/auth.js";
 import { nextTick } from "vue";
 

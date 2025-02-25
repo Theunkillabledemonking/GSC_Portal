@@ -1,9 +1,9 @@
 import { createApp } from "vue";
 import { createPinia } from "pinia";
-import { useAuthStore } from "./store/auth";
+import { useAuthStore } from "./store/auth.js";
 import router from "./router/index.js";
 import axios from "./axios.js";
-import App from "./App.vue";
+import App from "../practice/App.vue";
 
 const pinia = createPinia();
 const app = createApp(App);
