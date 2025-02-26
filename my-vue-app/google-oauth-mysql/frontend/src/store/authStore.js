@@ -32,6 +32,10 @@ export const useAuthStore = defineStore('auth', {
         /**
          * ✅ Google 로그인 처리
          * 사용자가 Google 로그인을 하면 API를 호출하여 상태와 토큰을 업데이트합니다.
+         * 1: 승인 완료 -> 토큰 저장 및 로그인 성공
+         * 0: 승인 대기 -> 대기 메시지 출력
+         * 2: 승인 거부 -> 실패 메시지 출력
+         * 3: 신규 사용자 -> 회원가입 페이지로 리다이렉트
          * @param {string} code - Google OAuth에서 받은 인증 코드
          */
         async loginWithGoogle(code) {
@@ -47,9 +51,18 @@ export const useAuthStore = defineStore('auth', {
                 this.role = response.role;         // 사용자 권한 저장
                 this.grade = response.grade;       // 사용자 학년 저장
                 this.level = response.level;       // 사용자 레벨 저장
-            } else if (response.status === 'new') {
+            } else if (response.status === 0) {
+                // 승인 대기 중
+                // alert('승인 대기 중입니다. 관리자의 승인을 기다려주세요.');
+            } else if (response.status === 2) {
+                // 승인 거부
+                //alert('승인 거부된 사용자입니다. 관리자에게 문의주십시오.');
+            } else if (response.status === 3) {
                 // 최초 사용자라면 Register 페이지로 이동
-                window.location.href = `/register?email=${response.email}$name=${response.name}`;
+                window.location.href = `/register?email=${response.email}&name=${response.name}`;
+            } else {
+                // 그 외 알 수 없는 상태
+                alert('알 수 없는 상태입니다. status=' + this.status);
             }
         },
 
@@ -60,11 +73,16 @@ export const useAuthStore = defineStore('auth', {
          * @param {Object} userData - 사용자 데이터 (이메일, 이름, 학번, 전화번호, 학년, 레벨 등)
          */
         async register(userData) {
-            // 1. 회원가입 API 호출 (authService.js의 registerUser 함수 사용)
-            await registerUser(userData);
+            try {
+                // 1. 회원가입 API 호출 (authService.js의 registerUser 함수 사용)
+                await registerUser(userData);
 
-            // 2. 회원가입이 완료되면 승인 대기 상태(0)로 설정
-            this.status = 0;
+                // 2. 회원가입이 완료되면 승인 대기 상태(0)로 설정
+                this.status = 0;
+            } catch (error) {
+                console.error("회원가입 처리 중 오류 발생: ", error);
+                alert('회원가입 처리 중 오류가 발생했습니다.');
+            }
         }
     }
 });

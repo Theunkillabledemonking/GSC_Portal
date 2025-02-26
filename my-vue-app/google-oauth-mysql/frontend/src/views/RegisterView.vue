@@ -9,16 +9,22 @@ const router = useRouter();
 
 // 사용자 정보 제출 함수
 const handleSubmit = async (userData) => {
-  await authStore.register(userData);
-  alert('회원가입 완료. 승인 대기 중입니다.');
-  router.push('/login'); // 로그인 페이지로 이동
+  try {
+    await authStore.register(userData);
+    alert('회원가입 완료. 승인 대기 중입니다.');
+    router.push('/login');
+  } catch (error) {
+    console.log('회원가입 오류:', error);
+    alert('회원가입 처리 중 오류가 발생했습니다.');
+  }
 };
 </script>
 
 <template>
   <div class="register">
     <h1>사용자 정보 입력</h1>
-    <RegisterUserForm @submit="handleSubmit" />
+    <!-- 자식 컴포넌트에 submit 이벤트 핸들러 연결 -->
+    <RegisterUserForm @submit="handleSubmit"/>
   </div>
 </template>
 

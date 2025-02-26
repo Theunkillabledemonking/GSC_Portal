@@ -60,8 +60,8 @@ exports.checkStatus = (req, res, next) => {
         // 1. 사용자가 승인 완료 상태이면 다음 미들웨어로 넘어감
         next();
     } else if (req.user.status === 0) {
-        // 2. 사용자가 승인 대기 상태이면 403 상태 코드와 메시지를 반환
-        res.status(403).json({ message: '승인 대기 중입니다.' });
+        // 2. 사용자가 승인 대기 상태이면 200 상태 코드와 메시지를 반환
+        res.status(200).json({ status: 0 });
     } else {
         // 3. 사용자가 승인 거부 상태이면 403 상태 코드와 메시지를 반환
         res.status(403).json({ message: '승인 거부되었습니다.' });

@@ -14,9 +14,10 @@ exports.getGoogleUser = async (code) => {
     });
 
     // 2. Access Token을 사용해 사용자 정보 요청
-    const userResponse = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
-        headers: { Authorization: `Bearer ${tokenResponse.data.accessToken}` } // HTTP 헤더에 Bearer Token 추가
-    });
+    const userResponse = await axios.get(
+        'https://www.googleapis.com/oauth2/v3/userinfo',
+        { headers: { Authorization: `Bearer ${tokenResponse.data.access_token}` } }
+    );
 
     // 3. 사용자 이메일과 이름을 반환
     return {

@@ -1,55 +1,69 @@
-<script setup>
-import { ref, defineEmits } from 'vue';
-
-// 사용자 입력 데이터
-const name = ref('');
-const student_id = ref('');
-const phone = ref('');
-const grade = ref('');
-const level = ref('');
-
-// 부모 컴포넌트로 이벤트 전달
-const emit = defineEmits(['submit']);
-
-// 정보 제출 함수
-const handleSubmit = async () => {
-  emit('submit', {
-    name: name.value,
-    student_id: student_id.value,
-    phone: phone.value,
-    grade: grade.value,
-    level: level.value
-  });
-};
-</script>
-
 <template>
-  <div class="register-user-form">
-    <h2>사용자 정보 등록</h2>
-    <input v-model="name" placeholder="이름" disabled />
-    <input v-model="student_id" placeholder="학번" disabled/>
-    <input v-model="phone" placeholder="전화번호" />
-    <input v-model="grade" placeholder="학년 (1~3)" />
-    <input v-model="level" placeholder="레벨 (TOPIK 6, N1 등)" />
+  <div>
+    <h2>회원가입 페이지</h2>
+    <form @submit.prevent="emitSubmit">
+      <!-- 이메일: 수정 불가 (readonly) -->
+      <label>이메일</label>
+      <input v-model="form.email" readonly />
 
-    <button @click="handleSubmit">등록</button>
+      <label>이름</label>
+      <input v-model="form.name" />
+
+      <label>학번</label>
+      <input v-model="form.student_id" />
+
+      <label>전화번호</label>
+      <input v-model="form.phone" />
+
+      <label>학년</label>
+      <input v-model="form.grade" />
+
+      <label>레벨 (예: N2, TOPIK 4 등)</label>
+      <input v-model="form.level" />
+
+      <button type="submit">등록</button>
+    </form>
   </div>
 </template>
 
-<style scoped>
-.register-user-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 300px;
-  margin: 0 auto;
-}
+<script setup>
+import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { useAuthStore } from '@/store/authStore'
 
+const emit = defineEmits(['submit'])
+
+// 폼 데이터
+const form = ref({
+  email: '',
+  name: '',
+  student_id: '',
+  phone: '',
+  grade: '',
+  level: ''
+})
+
+// 쿼리 파라미터 읽기용
+const route = useRoute()
+// 컴포넌트 로드 시점에 쿼리 파라미터에서 email, name을 가져온다
+onMounted(() => {
+  form.value.email = route.query.email || ''
+  form.value.name = route.query.name || ''
+})
+
+const emitSubmit = () => {
+  emit('submit', form.value)
+}
+</script>
+<style scoped>
+/* 스타일은 필요에 따라 조정 */
 input {
   padding: 10px;
   font-size: 16px;
   border: 1px solid #ccc;
   border-radius: 8px;
+  margin-bottom: 10px;
+  width: 100%;
 }
 
 button {

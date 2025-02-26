@@ -3,8 +3,8 @@
 import { useAuthStore } from '@/store/authStore.js';
 
 // Google OAuth 클라이언트 ID (환경 변수 사용 권장)
-const GOOGLE_CLIENT_ID = import.meta.env.GOOGLE_CLIENT_ID;
-const GOOGLE_REDIRECT_URI = import.meta.env.GOOGLE_RIDIRECT_URI;
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const GOOGLE_REDIRECT_URI = import.meta.env.VITE_GOOGLE_REDIRECT_URI;
 
 // Pinia 인증 스토어 사용
 const authStore = useAuthStore();
@@ -15,7 +15,10 @@ const authStore = useAuthStore();
 const handleGoogleLogin = async () => {
   try {
     // 1. Google OAuth 팝업 열기 (OAuth 인증 창)
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${GOOGLE_REDIRECT_URI}&response_type=code&scope=openid%20email%20profile&access_type=offline&prompt=consent`;
+    const authUrl =
+        `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${GOOGLE_REDIRECT_URI}` +
+        `&response_type=code&scope=openid%20email%20profile&access_type=offline&prompt=consent`;
 
     const popup = window.open(authUrl, '_blank', 'width=500,height=600');
 
@@ -31,8 +34,10 @@ const handleGoogleLogin = async () => {
       window.location.href = '/dashboard'; // 메인 페이지로 이동
     } else if (authStore.status === 0) {
       alert('승인 대기 중입니다. 관리자의 승인을 기다려주세요.');
-    } else {
+    } else if (authStore.status === 2) {
       alert('로그인 실패 or 승인 거부');
+    } else if (authStore.status === 3) {
+      alert('회원 정보 입력창으로 이동합니다.');
     }
   } catch (error) {
     console.error('Google 로그인 오류:', error);
