@@ -6,6 +6,9 @@ import { defineStore } from "pinia";
 // googleLogin: Google 로그인 요청 함수
 // registerUser: 회원가입 요청 함수
 import { googleLogin, registerUser } from "../services/authService";
+import axios from "axios";
+
+const VITE_BASE_URL = import.meta.env.VITE_API_URL;
 
 // 'auth'라는 이름의 스토어를 정의합니다.
 // 이 스토어는 인증과 관련된 상태 및 액션을 관리합니다.
@@ -21,7 +24,8 @@ export const useAuthStore = defineStore('auth', {
         token: null,    // JWT 액세스 토큰 (사용자 인증에 사용됨)
         role: null,     // 사용자 권한 (1: 관리자, 2: 교수, 3: 학생)
         grade: null,    // 사용자 학년 (1, 2, 3)
-        level: null     // 사용자 레벨 (N3=3, N2=2, N1=1, TOPIK 6=6, TOPIK 4=4)
+        level: null,     // 사용자 레벨 (N3=3, N2=2, N1=1, TOPIK 6=6, TOPIK 4=4)
+        name: null
     }),
 
     // =========================
@@ -51,6 +55,11 @@ export const useAuthStore = defineStore('auth', {
                 this.role = response.role;         // 사용자 권한 저장
                 this.grade = response.grade;       // 사용자 학년 저장
                 this.level = response.level;       // 사용자 레벨 저장
+                this.name = response.name;
+
+                // ✅ `localStorage`에 토큰 저장 (자동 로그인 유지)
+                localStorage.setItem("accessToken", response.accessToken);
+                localStorage.setItem("role", response.role);
             } else if (response.status === 0) {
                 // 승인 대기 중
                 // alert('승인 대기 중입니다. 관리자의 승인을 기다려주세요.');
@@ -66,6 +75,50 @@ export const useAuthStore = defineStore('auth', {
             }
         },
 
+        /**
+         * 로그아웃 (토큰 제거)
+         */
+        logout() {
+            this.token = null;
+            this.role = null;
+            this.grade = null;
+            this.level = null;
+            this.name = null;
+
+            // localStorage 데이터 삭제
+            localStorage.removeItem("accessToken");
+            localStorage.removeItem("role");
+        },
+
+        /**
+         * 새로고침 후 로그인 상태 복구
+         */
+        restoreSession() {
+            this.token = localStorage.getItem("accessToken") || null;
+            this.role = Number(localStorage.getItem("role")) || null;
+        },
+
+        async fetchUserInfo() {
+            try {
+                const token = localStorage.getItem("accessToken");
+                if (!token) {
+                    console.warn('토큰이 없습니다.');
+                }
+
+                const response = await axios.get(`${VITE_BASE_URL}/user/me`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                this.role = response.data.role;
+                this.grade = response.data.grade;
+                this.name = response.data.level;
+                this.status = response.data.status;
+
+                console.log('사용자 정보 불러오기 성공:', response.data);
+            } catch (error) {
+                console.log('사용자 정보 불러오기 오류:', error);
+            }
+        },
 
         /**
          * ✅ 사용자 회원가입 처리

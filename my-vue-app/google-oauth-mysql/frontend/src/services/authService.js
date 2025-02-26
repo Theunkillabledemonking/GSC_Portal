@@ -13,4 +13,4 @@ export const googleLogin = async (code) => {
 export const registerUser = async (userData) => {
     const response = await axios.post(`${API_BASE_URL}/auth/register`, userData);
     return response.data;
-};
+};1

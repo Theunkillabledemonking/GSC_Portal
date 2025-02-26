@@ -5,7 +5,7 @@ const { getUserInfo, updateUserInfo, getAccessibleBoards } = require('../control
 const router = express.Router();
 
 // 사용자 정보 조회 (GET /api/user/me)
-router.get('/me', verifyToken, checkStatus, getUserInfo);
+router.get('/me', verifyToken, getUserInfo);
 
 // 사용자 정보 수정 (PUT /api/user/update)
 router.put('/update', verifyToken, checkStatus, updateUserInfo);

@@ -56,6 +56,10 @@ exports.hasRole = (role) => {
 // 사용자의 승인 상태(status)를 확인합니다.
 // - 1: 승인 완료, 0: 승인 대기, 2: 승인 거부
 exports.checkStatus = (req, res, next) => {
+    if (req.path === "/auth/me") {
+        return next();
+    }
+
     if (req.user.status === 1) {
         // 1. 사용자가 승인 완료 상태이면 다음 미들웨어로 넘어감
         next();

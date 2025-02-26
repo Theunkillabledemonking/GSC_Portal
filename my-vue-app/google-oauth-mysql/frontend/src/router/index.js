@@ -6,13 +6,15 @@ import HomeView from '@/views/HomeView.vue';
 import LoginView from '@/views/LoginView.vue';
 import RegisterView from '@/views/RegisterView.vue';
 import DashboardView from '@/views/DashboardView.vue';
+import AdminUserView from '@/views/AdminUserList.vue';
 
 // 라우트 정의
 const routes = [
     { path: '/', name: 'Home', component: HomeView },
     { path: '/login', name: 'Login', component: LoginView },
     { path: '/register', name: 'Register', component: RegisterView },
-    { path: '/dashboard', name: 'Dashboard', component: DashboardView }
+    { path: '/dashboard', name: 'Dashboard', component: DashboardView },
+    { path: '/admin/users', component: AdminUserView }
 ]
 
 // Vue Router 인스턴스 생성

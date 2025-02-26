@@ -12,19 +12,17 @@ exports.getUserInfo = async (req, res) => {
         const userId = req.user.id;
 
         // MySQL에서 사용자 정보를 조회합니다.
-        const [user] = await pool.query(
+        const [rows] = await pool.query(
             'SELECT name, email, phone, grade, level, role FROM users WHERE id = ?',
             [userId]
         );
 
         // 사용자가 존재하지 않으면 404 상태와 메시지를 반환합니다.
-        if (user.length === 0) {
+        if (rows.length === 0) {
             return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
         }
 
-        // 사용자 정보를 응답으로 반환합니다.
-        res.status(200).json(user[0]);
-
+        res.status(200).json(rows[0]);
     } catch (error) {
         // 데이터베이스 오류 발생 시 500 상태 코드와 오류 메시지를 반환합니다.
         res.status(500).json({ error: error.message });
