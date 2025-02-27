@@ -17,7 +17,9 @@ export const useNoticeStore = defineStore('notice', {
 
         // 공지사항 상세 불러오기
         async loadNotice(id) {
-            this.selectedNotice = await fetchNoticeById(id);
+            if (this.notices.length === 0) {
+                this.selectedNotice = await fetchNoticeById(id);
+            }
         },
 
         // 공지사항 등록

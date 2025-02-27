@@ -8,10 +8,12 @@ exports.createNotices = async (req, res) => {
         const { title, content, grade, is_important, notify_kakao } = req.body;
         const author_id = req.user.id; // `verifyToken` 미들웨어 덕분에 req.user 사용 가능
 
+        const gradeValue = grade === "" ? null : grade;
+
         // 2. 공지사항 등록
         const [result] = await pool.query(
             "INSERT INTO notices (title, content, author_id, grade, is_important) VALUES (?, ?, ?, ?, ?)",
-            [title, content, author_id, grade, is_important ? 1 : 0],
+            [title, content, author_id, gradeValue, is_important ? 1 : 0],
         );
 
         res.status(201).json({ message: "Notice created successfully", notice_id: result.insertId });
@@ -34,11 +36,24 @@ exports.getNotices = async (req, res) => {
         const role = req.user.role;
         const grade = req.user.grade;
 
-        let query = 'SELECT * FROM notices ORDER BY is_important DESC, created_at DESC';
+        let query = `
+            SELECT n.id, n.title, n.content, u.name AS author, n.grade,
+                   n.created_at, n.updated_at, n.is_important, n.notify_kakao, n.views
+            FROM notices n
+            JOIN users u ON n.author_id = u.id
+            ORDER BY n.is_important DESC, n.created_at DESC
+        `;
         let params = [];
 
         if (role === 3) {
-            query = 'SELECT * FROM notices WHERE grade IS NULL OR grade = ? ORDER BY is_important DESC, created_at DESC';
+            query = `
+                SELECT n.id, n.title, n.content, u.name AS author, n.grade,
+                       n.created_at, n.updated_at, n.is_important, n.notify_kakao, n.views
+                FROM notices n
+                JOIN users u ON n.author_id = u.id
+                WHERE n.grade IS NULL OR n.grade = ?
+                ORDER BY n.is_important DESC, n.created_at DESC
+            `;
             params = [grade];
         }
 
@@ -46,10 +61,11 @@ exports.getNotices = async (req, res) => {
         res.status(200).json({ notices });
 
     } catch (error) {
-        console.error('공지사항 오류', error);
+        console.error('공지사항 조회 오류:', error);
         res.status(500).json({ message: '서버 오류가 발생했습니다.' });
     }
 };
+
 
 /**
  * 공지사항 상세 조회
@@ -57,7 +73,18 @@ exports.getNotices = async (req, res) => {
 exports.getNoticeById = async (req, res) => {
     try {
         const { id } = req.params;
-        const [notices] = await pool.query('SELECT * FROM notices WHERE id = ?', [id]);
+
+        // 1. 조회수 증가
+        await pool.query('UPDATE notices SET views = views + 1 WHERE id = ?', [id]);
+
+        // 2. 공지사항 상세 정보 가져오기
+        const [notices] = await pool.query(`
+            SELECT n.id, n.title, n.content, u.name AS author, n.grade,
+                   n.created_at, n.updated_at, n.is_important, n.notify_kakao, n.views
+            FROM notices n
+            JOIN users u ON n.author_id = u.id
+            WHERE n.id = ?
+        `, [id]);
 
         if (notices.length === 0) {
             return res.status(404).json({ message: '공지사항을 찾을 수 없습니다.' });
@@ -65,10 +92,11 @@ exports.getNoticeById = async (req, res) => {
 
         res.status(200).json(notices[0]);
     } catch (error) {
-        console.log("공지사항 상세 조회 오류", error);
-        res.status(500).json( {message: '서버 오류가 발생했습니다.'});
+        console.log("공지사항 상세 조회 오류:", error);
+        res.status(500).json({ message: '서버 오류가 발생했습니다.' });
     }
-}
+};
+
 
 /**
  * 공지사항 수정 (교수는 본인 글만, 관리자는 모두 가능)

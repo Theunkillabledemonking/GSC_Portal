@@ -5,22 +5,29 @@ import {createRouter, createWebHistory } from "vue-router";
 import HomeView from '@/views/HomeView.vue';
 import LoginView from '@/views/LoginView.vue';
 import RegisterView from '@/views/RegisterView.vue';
+
 import DashboardView from '@/views/DashboardView.vue';
 import AdminUserView from '@/views/AdminUserList.vue';
-import NoticesList from '@/components/NoticesList.vue';
-import NoticeDetail from "@/components/NoticeDetail.vue";
-import NoticeForm from "@/components/NoticeForm.vue";
+
+import NoticesView from '@/views/NoticesView.vue';
+import NoticeCreateView from "@/views/NoticeCreateView.vue";
+import NoticeDetailView from "@/views/NoticeDetailView.vue";
+import NoticeEditView from "@/views/NoticeEditView.vue";
 
 // 라우트 정의
 const routes = [
     { path: '/', name: 'Home', component: HomeView },
     { path: '/login', name: 'Login', component: LoginView },
     { path: '/register', name: 'Register', component: RegisterView },
+
     { path: '/dashboard', name: 'Dashboard', component: DashboardView },
     { path: '/admin/users', component: AdminUserView },
-    { path: '/notices', component: NoticesList },
-    { path: '/notices/:id', component: NoticeDetail },
-    { path: '/notices/new', component: NoticeForm },
+
+    { path: '/notices', component: NoticesView },
+    { path: '/notices/create', component: NoticeCreateView },
+    { path: '/notices/:id', component: NoticeDetailView },
+    { path: '/notices/edit/:id', component: NoticeEditView },
+
 ]
 
 // Vue Router 인스턴스 생성
