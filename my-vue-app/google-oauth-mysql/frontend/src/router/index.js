@@ -7,6 +7,9 @@ import LoginView from '@/views/LoginView.vue';
 import RegisterView from '@/views/RegisterView.vue';
 import DashboardView from '@/views/DashboardView.vue';
 import AdminUserView from '@/views/AdminUserList.vue';
+import NoticesList from '@/components/NoticesList.vue';
+import NoticeDetail from "@/components/NoticeDetail.vue";
+import NoticeForm from "@/components/NoticeForm.vue";
 
 // 라우트 정의
 const routes = [
@@ -14,7 +17,10 @@ const routes = [
     { path: '/login', name: 'Login', component: LoginView },
     { path: '/register', name: 'Register', component: RegisterView },
     { path: '/dashboard', name: 'Dashboard', component: DashboardView },
-    { path: '/admin/users', component: AdminUserView }
+    { path: '/admin/users', component: AdminUserView },
+    { path: '/notices', component: NoticesList },
+    { path: '/notices/:id', component: NoticeDetail },
+    { path: '/notices/new', component: NoticeForm },
 ]
 
 // Vue Router 인스턴스 생성

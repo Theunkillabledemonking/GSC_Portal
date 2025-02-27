@@ -13,6 +13,7 @@ require('dotenv').config(); // ✅ 환경 변수 로드
 const authRoutes = require('./routes/authRoutes');   // 인증 라우트
 const userRoutes = require('./routes/userRoutes');   // 사용자 라우트
 const adminRoutes = require('./routes/adminRoutes'); // 관리자 라우트
+const noticeRoutes = require('./routes/noticeRoutes');
 
 // =======================
 // ✅ Express 앱 초기화
@@ -36,10 +37,10 @@ app.use(express.json());
 // =======================
 // ✅ 라우터 등록
 // =======================
-app.use('/api/auth', authRoutes);   // ✅ 인증 라우트 (Google 로그인 및 회원가입)
-app.use('/api/user', userRoutes);   // ✅ 사용자 라우트 (사용자 정보 조회 및 수정)
-app.use('/api/admin', adminRoutes); // ✅ 관리자 라우트 (승인 및 권한 관리)
-
+app.use('/api/auth', authRoutes);       // ✅ 인증 라우트 (Google 로그인 및 회원가입)
+app.use('/api/user', userRoutes);       // ✅ 사용자 라우트 (사용자 정보 조회 및 수정)
+app.use('/api/admin', adminRoutes);     // ✅ 관리자 라우트 (승인 및 권한 관리)
+app.use('/api/notices', noticeRoutes);  // ✅ 공지사항 라우트
 
 // =======================
 // ✅ 에러 핸들러 (Global Error Handler)
