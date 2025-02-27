@@ -26,6 +26,11 @@ console.log("현재 role 값:", authStore.role);
 const userName = computed(() => authStore.name || "사용자");
 const isAdmin = computed(() => Number(authStore.role) === 1); // 관리자(1)만 true
 
+// ✅ 로그인되지 않은 경우 로그인 페이지로 이동
+if (!authStore.token) {
+  router.push("/login");
+}
+
 // ✅ 사용자 프로필 페이지 이동
 const goToUserProfile = () => {
   router.push("/profile");

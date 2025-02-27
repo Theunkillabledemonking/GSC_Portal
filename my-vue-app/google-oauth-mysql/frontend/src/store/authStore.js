@@ -21,15 +21,22 @@ export const useAuthStore = defineStore('auth', {
     // 함수 형태로 작성하여 상태가 초기화될 때마다 새로운 객체를 반환합니다.
     state: () => ({
         status: null,   // 사용자 승인 상태 (0: 대기, 1: 승인, 2: 거부)
-        token: null,    // JWT 액세스 토큰 (사용자 인증에 사용됨)
-        role: null,     // 사용자 권한 (1: 관리자, 2: 교수, 3: 학생)
+        token: localStorage.getItem("accessToken") || null,    // JWT 액세스 토큰 (사용자 인증에 사용됨)
+        role: Number(localStorage.getItem("role")) || null,     // 사용자 권한 (1: 관리자, 2: 교수, 3: 학생)
         grade: null,    // 사용자 학년 (1, 2, 3)
         level: null,     // 사용자 레벨 (N3=3, N2=2, N1=1, TOPIK 6=6, TOPIK 4=4)
         name: null
     }),
 
+    // ========================
+    // ✅ 2. Getters (상태 확인)
+    // ========================
+    getters: {
+        isAuthenticated: (state) => !!state.token,
+    },
+
     // =========================
-    // ✅ 2. Actions (액션 정의)
+    // ✅ 3. Actions (액션 정의)
     // =========================
     // `actions`는 상태를 변경하거나 비동기 작업을 처리합니다.
     actions: {
@@ -43,35 +50,40 @@ export const useAuthStore = defineStore('auth', {
          * @param {string} code - Google OAuth에서 받은 인증 코드
          */
         async loginWithGoogle(code) {
-            // 1. Google 로그인 API 호출 (authService.js의 googleLogin 함수 사용)
-            const response = await googleLogin(code);
+            try {
+                // 1. Google 로그인 API 호출 (authService.js의 googleLogin 함수 사용)
+                const response = await googleLogin(code);
 
-            // 2. 서버 응답에서 사용자 승인 상태를 업데이트
-            this.status = response.status;
+                // 2. 서버 응답에서 사용자 승인 상태를 업데이트
+                this.status = response.status;
 
-            // 3. 사용자가 승인 상태(1)일 때만 토큰과 정보를 저장
-            if (response.status === 1) {
-                this.token = response.accessToken; // JWT 액세스 토큰 저장
-                this.role = response.role;         // 사용자 권한 저장
-                this.grade = response.grade;       // 사용자 학년 저장
-                this.level = response.level;       // 사용자 레벨 저장
-                this.name = response.name;
+                // 3. 사용자가 승인 상태(1)일 때만 토큰과 정보를 저장
+                if (response.status === 1) {
+                    this.token = response.accessToken; // JWT 액세스 토큰 저장
+                    this.role = response.role;         // 사용자 권한 저장
+                    this.grade = response.grade;       // 사용자 학년 저장
+                    this.level = response.level;       // 사용자 레벨 저장
+                    this.name = response.name;
 
-                // ✅ `localStorage`에 토큰 저장 (자동 로그인 유지)
-                localStorage.setItem("accessToken", response.accessToken);
-                localStorage.setItem("role", response.role);
-            } else if (response.status === 0) {
-                // 승인 대기 중
-                // alert('승인 대기 중입니다. 관리자의 승인을 기다려주세요.');
-            } else if (response.status === 2) {
-                // 승인 거부
-                //alert('승인 거부된 사용자입니다. 관리자에게 문의주십시오.');
-            } else if (response.status === 3) {
-                // 최초 사용자라면 Register 페이지로 이동
-                window.location.href = `/register?email=${response.email}&name=${response.name}`;
-            } else {
-                // 그 외 알 수 없는 상태
-                alert('알 수 없는 상태입니다. status=' + this.status);
+                    // ✅ `localStorage`에 토큰 저장 (자동 로그인 유지)
+                    localStorage.setItem("accessToken", response.accessToken);
+                    localStorage.setItem("role", response.role);
+                } else if (response.status === 0) {
+                    // 승인 대기 중
+                    // alert('승인 대기 중입니다. 관리자의 승인을 기다려주세요.');
+                } else if (response.status === 2) {
+                    // 승인 거부
+                    //alert('승인 거부된 사용자입니다. 관리자에게 문의주십시오.');
+                } else if (response.status === 3) {
+                    // 최초 사용자라면 Register 페이지로 이동
+                    window.location.href = `/register?email=${response.email}&name=${response.name}`;
+                } else {
+                    // 그 외 알 수 없는 상태
+                    alert('알 수 없는 상태입니다. status=' + this.status);
+                }
+            } catch (error) {
+                console.log('로그인 오류:', error);
+                alert('로그인 중 오류가 발생했습니다.');
             }
         },
 
@@ -88,6 +100,9 @@ export const useAuthStore = defineStore('auth', {
             // localStorage 데이터 삭제
             localStorage.removeItem("accessToken");
             localStorage.removeItem("role");
+
+            // 로그아웃 후 새로고침
+            window.location.reload();
         },
 
         /**
@@ -96,6 +111,11 @@ export const useAuthStore = defineStore('auth', {
         restoreSession() {
             this.token = localStorage.getItem("accessToken") || null;
             this.role = Number(localStorage.getItem("role")) || null;
+
+            // ✅ 토큰이 있다면 자동으로 사용자 정보 불러오기
+            if (this.token) {
+                this.fetchUserInfo();
+            }
         },
 
         async fetchUserInfo() {
@@ -111,7 +131,8 @@ export const useAuthStore = defineStore('auth', {
 
                 this.role = response.data.role;
                 this.grade = response.data.grade;
-                this.name = response.data.level;
+                this.level = response.data.level;
+                this.name = response.data.name;
                 this.status = response.data.status;
 
                 console.log('사용자 정보 불러오기 성공:', response.data);
