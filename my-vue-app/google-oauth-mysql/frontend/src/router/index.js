@@ -9,10 +9,10 @@ import RegisterView from '@/views/RegisterView.vue';
 import DashboardView from '@/views/DashboardView.vue';
 import AdminUserView from '@/views/AdminUserList.vue';
 
-import NoticesView from '@/views/NoticesView.vue';
-import NoticeCreateView from "@/views/NoticeCreateView.vue";
-import NoticeDetailView from "@/views/NoticeDetailView.vue";
-import NoticeEditView from "@/views/NoticeEditView.vue";
+import NoticesView from '@/views/Notices/NoticesView.vue';
+import NoticeForm from "@/views/Notices/NoticeCreateView.vue";
+import NoticeDetailView from "@/views/Notices/NoticeDetailView.vue";
+import NoticeEditView from "@/views/Notices/NoticeEditView.vue";
 
 // 라우트 정의
 const routes = [
@@ -24,7 +24,7 @@ const routes = [
     { path: '/admin/users', component: AdminUserView },
 
     { path: '/notices', component: NoticesView },
-    { path: '/notices/create', component: NoticeCreateView },
+    { path: '/notices/create', component: NoticeForm },
     { path: '/notices/:id', component: NoticeDetailView },
     { path: '/notices/edit/:id', component: NoticeEditView },
 

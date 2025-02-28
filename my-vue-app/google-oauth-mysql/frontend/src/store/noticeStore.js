@@ -17,9 +17,9 @@ export const useNoticeStore = defineStore('notice', {
 
         // 공지사항 상세 불러오기
         async loadNotice(id) {
-            if (this.notices.length === 0) {
-                this.selectedNotice = await fetchNoticeById(id);
-            }
+            console.log(`📡 공지사항 상세 요청: ${id}`);  // 디버깅용 로그 추가
+            this.selectedNotice = await fetchNoticeById(id);
+            console.log('📩 불러온 공지:', this.selectedNotice); // 응답 확인
         },
 
         // 공지사항 등록

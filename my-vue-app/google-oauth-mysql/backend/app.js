@@ -33,6 +33,7 @@ app.use(cors({
 // 2. JSON 요청 본문 파싱
 app.use(express.json());
 
+const path = require('path');
 
 // =======================
 // ✅ 라우터 등록
@@ -41,6 +42,7 @@ app.use('/api/auth', authRoutes);       // ✅ 인증 라우트 (Google 로그�
 app.use('/api/user', userRoutes);       // ✅ 사용자 라우트 (사용자 정보 조회 및 수정)
 app.use('/api/admin', adminRoutes);     // ✅ 관리자 라우트 (승인 및 권한 관리)
 app.use('/api/notices', noticeRoutes);  // ✅ 공지사항 라우트
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // =======================
 // ✅ 에러 핸들러 (Global Error Handler)

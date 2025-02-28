@@ -1,0 +1,121 @@
+<template>
+  <div class="notice-form">
+    <h2>{{ isEdit ? '공지사항 수정' : '📢공지사항 등록' }}</h2>
+
+    <form @submit.prevent="handleSubmit" enctype="multipart/form-data">
+      <label for="title">제목:</label>
+      <input v-model="form.title" type="text" id="title" required />
+
+      <label for="content">내용:</label>
+      <textarea v-model="form.content" id="content" cols="30" rows="10" required></textarea>
+
+      <label for="grade">대상 학년 (선택):</label>
+      <select v-model="form.grade" id="grade">
+        <option value="">전체</option>
+        <option value="1">1학년</option>
+        <option value="2">2학년</option>
+        <option value="3">3학년</option>
+      </select>
+
+      <!-- 중요 공지 체크박스 추가 -->
+      <label>
+        <input type="checkbox" v-model="form.is_important"
+          :true-value="1" :false-value="0" />
+        중요 공지 (★)
+      </label>
+
+      <!-- 첨부파일 업로드 추가 -->
+      <label>첨부파일:</label>
+      <input type="file" @change="handleFileChange" />
+
+      <button type="submit">{{ isEdit ? '수정하기' : '등록하기'}}</button>
+    </form>
+  </div>
+</template>
+
+<script setup>
+import { ref, defineProps, watch } from "vue";
+import { useNoticeStore } from "@/store/noticeStore.js";
+import { useRouter } from "vue-router";
+
+const props = defineProps({
+  isEdit: Boolean,          // 작성 / 수정 모드 구분
+  initialData: Object       // 수정일 경우 기존 데이터
+})
+
+const noticeStore = useNoticeStore();
+const router = useRouter();
+
+const form = ref ({
+  title: "",
+  content: "",
+  grade: "",
+  is_important: '0',
+  attachment: null  // 파일 업로드용
+})
+
+watch(() => props.initialData, (newData) => {
+  if (props.isEdit && newData) {
+    form.value = {
+      title: newData.title || '',
+      content: newData.content || '',
+      grade: newData.grade ?? '',
+      is_important: newData.is_important === 1 ? '1' : '0',
+      attachment: null
+    };
+  }
+}, { immediate: true });
+
+const handleFileChange = (e) => {
+  form.value.attachment = e.target.files[0];
+}
+
+const handleSubmit = async () => {
+  const data = new FormData();
+  data.append('title', form.value.title);
+  data.append('content', form.value.content);
+  data.append('grade', form.value.grade ?? '');
+  data.append('is_important', form.value.is_important);
+
+  if (form.value.attachment) {
+    data.append('attachment', form.value.attachment);
+  }
+
+  if (props.isEdit) {
+    await noticeStore.editNotice(props.initialData.id, data);
+    alert('공지사항이 수정되었습니다.');
+  } else {
+    await noticeStore.addNotice(data);
+    alert('공지사항이 등록되었습니다.');
+  }
+
+  router.push("/notices");
+};
+
+//     // 카톡 알림은 추후 구편
+</script>
+
+<style scoped>
+.notice-form {
+  padding: 20px;
+}
+
+input, textarea, select {
+  display: block;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 8px;
+}
+
+button {
+  background-color: #4caf50;
+  color: white;
+  padding: 10px;
+  border: none;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #45a049;
+}
+</style>
