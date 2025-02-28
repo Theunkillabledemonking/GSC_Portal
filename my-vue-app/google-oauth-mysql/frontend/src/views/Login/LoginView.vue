@@ -1,5 +1,5 @@
 <script setup>
-import { useAuthStore } from '@/store/authStore';
+import { useAuthStore } from '@/store/authStore.js';
 import { useRouter } from 'vue-router';
 import GoogleLoginButton from "@/components/specific/GoogleLoginButton.vue";
 

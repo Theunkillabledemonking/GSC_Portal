@@ -1,6 +1,6 @@
 <script setup>
 import RegisterUserForm from '@/components/specific/RegisterUserForm.vue';
-import { useAuthStore } from "@/store/authStore";
+import { useAuthStore } from "@/store/authStore.js";
 import { useRouter } from 'vue-router';
 
 // Pinia 스토어 및 Vue Router 초기화

@@ -9,6 +9,9 @@
     "preview": "node_modules/.bin/vite preview"
   },
   "dependencies": {
+    "@fullcalendar/daygrid": "^6.1.15",
+    "@fullcalendar/google-calendar": "^6.1.15",
+    "@fullcalendar/vue3": "^6.1.15",
     "axios": "^1.7.9",
     "pinia": "^3.0.1",
     "vue": "^3.5.13",

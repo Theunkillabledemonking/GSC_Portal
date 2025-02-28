@@ -3,11 +3,11 @@ import {createRouter, createWebHistory } from "vue-router";
 
 // 페이지 별 컴포넌트 가져오기
 import HomeView from '@/views/HomeView.vue';
-import LoginView from '@/views/LoginView.vue';
-import RegisterView from '@/views/RegisterView.vue';
+import LoginView from '@/views/Login/LoginView.vue';
+import RegisterView from '@/views/Login/RegisterView.vue';
 
 import DashboardView from '@/views/DashboardView.vue';
-import AdminUserView from '@/views/AdminUserList.vue';
+import AdminUserView from '@/views/Login/AdminUserList.vue';
 
 import NoticesView from '@/views/Notices/NoticesView.vue';
 import NoticeForm from "@/views/Notices/NoticeCreateView.vue";
