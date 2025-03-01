@@ -38,7 +38,7 @@ exports.updateEvent = async (req, res) => {
 
 exports.listEvents = async (req, res) => {
     try {
-        const { timeMin, timeMax } = req.body;
+        const { timeMin, timeMax } = req.query;
         const events = await calendarService.listEvents(timeMin, timeMax);
         res.status(200).json(events);
     } catch (error) {

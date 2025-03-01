@@ -16,10 +16,11 @@ const handleLogout = () => {
     <nav class="navbar">
       <router-link to="/" class="logo">永進專門大學校</router-link>
       <div class="nav-links"></div>
-        <router-link to="/notices">공지사항</router-link>
-        <router-link to="/calendar">학과 일정</router-link>
-        <router-link to="/dashboard" v-if="authStore.isAuthenticated">대시보드</router-link>
-
+      <ul>
+        <li><router-link to="/notices">공지사항</router-link></li>
+        <li><router-link to="/calendar">학과 일정</router-link></li>
+        <li><router-link to="/dashboard" v-if="authStore.isAuthenticated">대시보드</router-link></li>
+      </ul>
       <button class="logout-button" @click="handleLogout">로그아웃</button>
     </nav>
 </template>
@@ -50,5 +51,20 @@ const handleLogout = () => {
 
 .logout-button:hover {
   background-color: #357AE8;
+}
+
+a {
+  color: white;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+ul {
+  list-style: none;
+  display: flex;
+  gap: 15px;
 }
 </style>
