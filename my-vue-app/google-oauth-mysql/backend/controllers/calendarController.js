@@ -17,6 +17,25 @@ exports.createEvent = async (req, res) => {
     }
 };
 
+exports.updateEvent = async (req, res) => {
+    try {
+        const { eventId } = req.body;
+        const { summary, description, startDate, endDate } = req.body;
+
+        const updateEvent = await calendarService.updateEvent(eventId, {
+            summary,
+            description,
+            startDate,
+            endDate,
+        });
+
+        res.status(200).json(updateEvent);
+    } catch (error) {
+        console.error('구글 캘린더 이벤트 수정 오류', error);
+        res.status(500).json({ message: '서버 오류 발생' })
+    }
+}
+
 exports.listEvents = async (req, res) => {
     try {
         const { timeMin, timeMax } = req.body;

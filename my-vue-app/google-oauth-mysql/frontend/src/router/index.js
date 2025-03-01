@@ -13,6 +13,7 @@ import NoticesView from '@/views/Notices/NoticesView.vue';
 import NoticeForm from "@/views/Notices/NoticeCreateView.vue";
 import NoticeDetailView from "@/views/Notices/NoticeDetailView.vue";
 import NoticeEditView from "@/views/Notices/NoticeEditView.vue";
+import CustomCalendar from "@/components/CustomCalendar.vue";
 
 // 라우트 정의
 const routes = [
@@ -27,6 +28,8 @@ const routes = [
     { path: '/notices/create', component: NoticeForm },
     { path: '/notices/:id', component: NoticeDetailView },
     { path: '/notices/edit/:id', component: NoticeEditView },
+
+    { path: '/calendar', component: CustomCalendar}
 
 ]
 

@@ -17,6 +17,20 @@ exports.createEvent = async (eventData) => {
     return res.data;
 }
 
+exports.updateEvent = async (eventId, eventData) => {
+    const res = await calendar.events.update({
+        calendarId: CALENDAR_ID,
+        eventId: eventId,
+        requestBody: {
+            summary: eventData.summary,
+            description: eventData.description,
+            start: { dateTime: eventData.startDate},
+            end: { dateTime: eventData.endDate},
+        },
+    });
+    return res.data;
+};
+
 // 일정 이벤트 조회
 exports.listEvents = async (timeMin, timeMax) => {
     // timeMin, timeMax: 조회 기간

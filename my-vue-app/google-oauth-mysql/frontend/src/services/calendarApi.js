@@ -15,6 +15,12 @@ export const createEvent = async (eventData) => {
     return res.data;
 }
 
+// 일정 수정
+export const updateEvent = async (eventId, eventData) => {
+    const res = await axios.put(`${API_BASE_URL}/events/${eventId}`, eventData);
+    return res.data;
+}
+
 export const deleteEvent = async (eventId) => {
     const res = await axios.delete(`${API_BASE_URL}/events/${eventId}`);
     return res.data;
