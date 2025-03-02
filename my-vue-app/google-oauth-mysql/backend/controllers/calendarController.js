@@ -19,7 +19,7 @@ exports.createEvent = async (req, res) => {
 
 exports.updateEvent = async (req, res) => {
     try {
-        const { eventId } = req.body;
+        const { eventId } = req.params;
         const { summary, description, startDate, endDate } = req.body;
 
         const updateEvent = await calendarService.updateEvent(eventId, {

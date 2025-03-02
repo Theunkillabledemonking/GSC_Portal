@@ -1,12 +1,14 @@
+<!-- File: CalendarWithEvents.vue -->
 <template>
   <div class="calendar-with-events">
-    <!-- 좌측: 월 전체 일정 목록 -->
+    <!-- 왼쪽 패널: 날짜별 이벤트 목록 -->
     <div class="left-panel">
       <h3>📅 월 전체 일정 목록</h3>
       <div
           v-for="(events, date) in monthlyEvents"
           :key="date"
           class="date-section"
+          :class="{ selected: date === selectedDate }"
           @click="scrollToDate(date)"
       >
         <strong>{{ date }}</strong>
@@ -14,21 +16,37 @@
             v-for="event in events"
             :key="event.id"
             class="event-item"
-            @click.stop="selectEvent(date, event)"
+            @click.stop="handleEventClick(date, event)"
         >
-          {{ event.summary || "제목 없음" }}
+          {{ event.summary || '제목 없음' }}<br />
+          <small>{{ event.description || '설명 없음' }}</small>
         </div>
       </div>
     </div>
 
-    <!-- 우측: 달력 -->
+    <!-- 오른쪽 패널: 달력 + (관리자/교수용) 신규 일정 추가 버튼 + 이벤트 모달 -->
     <div class="right-panel">
-      <!-- (중요) monthlyEvents를 props로 달력에 전달 + 이벤트 바인딩 -->
       <CalendarView
+          ref="calendarRef"
           :monthlyEvents="monthlyEvents"
           @dateSelected="handleDateSelected"
           @monthChanged="handleMonthChanged"
-          ref="calendarRef"
+      />
+
+      <!-- 관리자(1), 교수(2)인 경우만 보이는 새 일정 추가 버튼 -->
+      <div v-if="userRole === 1 || userRole === 2" class="admin-buttons">
+        <button class="new-event-btn" @click="openModalForNew">
+          신규 일정 추가
+        </button>
+      </div>
+
+      <!-- EventModal -->
+      <EventModal
+          v-if="modalVisible"
+          :isEdit="isEditMode"
+          :selectedDay="selectedDay"
+          :selectedEvent="selectedEvent"
+          @close="modalVisible = false"
       />
     </div>
   </div>
@@ -36,133 +54,171 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
-import { listEvents } from "@/services/calendarApi.js";
-import CalendarView from "@/components/specific/CalendarView.vue";
+import CalendarView from './CalendarView.vue';
+import EventModal from './EventModal.vue';
+import { listEvents } from '@/services/calendarApi.js';
 
-// 월별 이벤트를 저장할 상태
+// 사용자 역할 (1=관리자,2=교수,3=학생)
+const userRole = ref(2);  // 예: 교수를 가정
+
+// 이벤트 데이터
 const monthlyEvents = ref({});
+const selectedDate = ref(null); // 왼쪽 패널에서 현재 선택된 날짜
+const modalVisible = ref(false);
+const isEditMode = ref(false);
+const selectedDay = ref(null);
+const selectedEvent = ref(null);
 
-// CalendarView를 제어하기 위한 ref
+// 캘린더 제어
 const calendarRef = ref(null);
 
 /**
- * (1) 특정 연/월에 해당하는 이벤트 불러오기
- *     -> API에서 가져온 후 monthlyEvents에 저장
+ * 특정 달의 이벤트를 불러와 monthlyEvents에 저장
  */
-const loadMonthlyEvents = async (year, month) => {
-  const start = new Date(year, month, 1);
-  const end = new Date(year, month + 1, 0);
-  const events = await listEvents(start.toISOString(), end.toISOString());
-  console.log('API로부터 받은 events:', events);
+async function loadMonthlyEvents(year, month) {
+  const start = new Date(year, month, 1).toISOString();
+  const end = new Date(year, month + 1, 0).toISOString();
 
-  const grouped = events.reduce((acc, event) => {
-    const dateKey = event.start.dateTime?.split('T')[0] || event.start.date;
-    if (!acc[dateKey]) acc[dateKey] = [];
-    acc[dateKey].push(event);
-    return acc;
-  }, {});
+  const events = await listEvents(start, end);
 
+  // 날짜별로 그룹화
+  const grouped = {};
+  for (const e of events) {
+    const dateKey = e.start.dateTime?.split('T')[0] || e.start.date;
+    if (!grouped[dateKey]) grouped[dateKey] = [];
+    grouped[dateKey].push(e);
+  }
   monthlyEvents.value = grouped;
-  console.log('monthlyEvents.value:', monthlyEvents.value);
-};
+}
 
-/**
- * (2) 컴포넌트가 처음 마운트될 때 -> 현재 연/월 이벤트 불러오기
- */
-onMounted(() => {
+// 페이지 초기 로드 시 현재 달 이벤트 조회
+onMounted(async () => {
   const now = new Date();
-  loadMonthlyEvents(now.getFullYear(), now.getMonth());
+  await loadMonthlyEvents(now.getFullYear(), now.getMonth());
 });
 
 /**
- * (3) 달력에서 'monthChanged' 이벤트가 발생하면 -> 해당 달의 이벤트 다시 로드
+ * 왼쪽 패널에서 날짜 클릭 -> 달력으로 스크롤
  */
-const handleMonthChanged = ({ year, month }) => {
-  // ① 디버그용 로그
-  console.log('handleMonthChanged 호출됨:', year, month);
-  loadMonthlyEvents(year, month);
-};
-
-/**
- * (4) 달력에서 날짜를 클릭했을 때
- */
-const handleDateSelected = (date) => {
-  // 필요하다면 여기서 scrollToDate(date) 호출 가능
-  scrollToDate(date);
-};
-
-/**
- * (5) 좌측 목록을 클릭했을 때 -> 달력 위치로 스크롤
- */
-const scrollToDate = (date) => {
+function scrollToDate(date) {
+  selectedDate.value = date;
   calendarRef.value?.scrollToDate(date);
-};
+}
 
 /**
- * (6) 이벤트 아이템을 클릭했을 때
+ * 이벤트 클릭
+ * - 관리자/교수면 수정 모드로 모달 열기
+ * - 학생이면 단순 스크롤
  */
-const selectEvent = (date, event) => {
+function handleEventClick(date, event) {
+  if (userRole.value === 1 || userRole.value === 2) {
+    // 수정 모드
+    isEditMode.value = true;
+    selectedDay.value = { date };
+    selectedEvent.value = event;
+    modalVisible.value = true;
+  } else {
+    // 단순 스크롤만
+    scrollToDate(date);
+  }
+}
+
+/**
+ * 달력에서 날짜 클릭
+ * - 단순히 스크롤(선택) 동작
+ */
+function handleDateSelected(date) {
+  selectedDate.value = date;
   scrollToDate(date);
-  alert(`선택한 일정: ${event.summary || '제목 없음'}\n설명: ${event.description || '설명 없음'}`);
-};
+}
+
+/**
+ * 달력에서 monthChanged 이벤트
+ */
+function handleMonthChanged({ year, month }) {
+  loadMonthlyEvents(year, month);
+}
+
+/**
+ * "신규 일정 추가" 버튼 클릭
+ */
+function openModalForNew() {
+  isEditMode.value = false;
+  selectedDay.value = { date: '' }; // 모달에서 날짜 직접 선택 X, 미리 day 값 지정해도 됨
+  selectedEvent.value = null;
+  modalVisible.value = true;
+}
 </script>
 
 <style scoped>
 .calendar-with-events {
   display: flex;
-  gap: 20px;           /* 좌우 패널 간격 */
-  padding: 20px;       /* 화면 테두리와 간격 */
+  gap: 20px;
+  padding: 20px;
   background-color: #fff;
   box-sizing: border-box;
 }
 
-/* 왼쪽 패널(일정 목록) */
+/* 왼쪽 패널 */
 .left-panel {
-  flex: 1.5;           /* 비율: 왼쪽이 1.5, 오른쪽이 2 */
+  flex: 1.2;
   max-height: 80vh;
   overflow-y: auto;
   background: #f9f9f9;
   padding: 15px;
   border: 1px solid #ddd;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
+/* 오른쪽 패널 */
 .right-panel {
   flex: 2;
-  background: #fff;
   padding: 15px;
+  background: #fff;
   border: 1px solid #ddd;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .date-section {
-  margin-bottom: 15px;
+  margin-bottom: 10px;
+  padding: 6px;
+  border-left: 4px solid transparent;
+  transition: background-color 0.2s;
 }
 
-.date-section strong {
-  display: block;
-  margin-bottom: 5px;
-  font-weight: 600;
+.date-section.selected {
+  background-color: rgba(76, 175, 80, 0.2);
+  border-left-color: #4caf50;
 }
 
 .event-item {
   background: #4caf50;
   color: #fff;
-  padding: 10px;
-  margin: 5px 0;
-  border-radius: 8px;
+  padding: 6px;
+  margin: 4px 0;
+  border-radius: 4px;
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: background 0.2s;
 }
 .event-item:hover {
   background: #45a049;
 }
 
-.left-panel h3 {
-  margin-bottom: 15px;
-  font-size: 1.2rem;
-  color: #333;
+.admin-buttons {
+  margin-top: 15px;
+  text-align: center;
+}
+
+.new-event-btn {
+  padding: 10px 12px;
+  background: #2196f3;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  border: none;
+  transition: background 0.2s;
+}
+.new-event-btn:hover {
+  background: #1976d2;
 }
 </style>
