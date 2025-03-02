@@ -3,12 +3,18 @@ const calendarService = require('../services/calendarService');
 
 exports.createEvent = async (req, res) => {
     try {
-        const { summary, description, startDate, endDate } = req.body;
+        const { summary, description, startDate, endDate, repeatRule } = req.body;
+
+        // 종일 vs 시간대 구분 (예시 로직)
+        const allDay = (startDate?.length === 10 && endDate?.length === 10);
+
         const newEvent = await calendarService.createEvent({
             summary,
             description,
             startDate,
-            endDate
+            endDate,
+            allDay,
+            repeatRule
         });
         res.status(201).json(newEvent);
     } catch (error) {
@@ -20,13 +26,18 @@ exports.createEvent = async (req, res) => {
 exports.updateEvent = async (req, res) => {
     try {
         const { eventId } = req.params;
-        const { summary, description, startDate, endDate } = req.body;
+        const { summary, description, startDate, endDate, repeatRule } = req.body;
+
+        // 종일 vs 시간대 구분 (예시 로직)
+        const allDay = (startDate?.length === 10 && endDate?.length === 10);
 
         const updateEvent = await calendarService.updateEvent(eventId, {
             summary,
             description,
             startDate,
             endDate,
+            allDay,
+            repeatRule
         });
 
         res.status(200).json(updateEvent);

@@ -11,11 +11,22 @@
       <!-- (3) 일정 설명 입력 -->
       <textarea v-model="description" placeholder="설명"></textarea>
 
-      <!-- (4) 날짜 입력 (type="date") -->
-      <label>날짜</label>
-      <input type="date" v-model="selectedDateInput" />
+      <!-- (4) 시작일 / 종료일 (type="date") -->
+      <div class="date-range">
+        <label>시작</label>
+        <input type="date" v-model="startDateInput" />
+        <label>종료</label>
+        <input type="date" v-model="endDateInput" />
+      </div>
 
-      <!-- (5) 시작 시간 선택 -->
+      <!-- 종일 여부 체크 -->
+      <label class="all-day-check">
+        <input type="checkbox" v-model="allDay" />
+        종일
+      </label>
+
+      <!-- (5) 종일이 아닌 경우에만 시작 시간 선택 -->
+      <div v-if="!allDay" class="time-range">
       <div class="time-select">
         <label>시작 시간</label>
         <select v-model="startTime">
@@ -24,7 +35,6 @@
           </option>
         </select>
       </div>
-
       <!-- (6) 종료 시간 선택 -->
       <div class="time-select">
         <label>종료 시간</label>
@@ -34,6 +44,19 @@
           </option>
         </select>
       </div>
+      </div>
+
+      <!-- 반복 주기 -->
+      <div class="repeat-section">
+        <label>반복</label>
+        <select v-model="repeatRule">
+          <option value="none">반복 안 함</option>
+          <option value="daily">매일</option>
+          <option value="weekly">매주</option>
+          <option value="monthly">매월</option>
+          <option value="yearly">매년</option>
+        </select>
+      </div>
 
       <!-- (7) 버튼 그룹 -->
       <div class="button-group">
@@ -41,10 +64,8 @@
         <button @click="saveEvent">
           {{ isEdit ? '수정하기' : '저장하기' }}
         </button>
-
         <!-- 수정 모드에서만 삭제 버튼 노출 -->
         <button v-if="isEdit" @click="deleteEventById">삭제하기</button>
-
         <!-- 닫기 버튼 -->
         <button @click="$emit('close')">닫기</button>
       </div>
@@ -80,11 +101,18 @@ const summary = ref('');
 const description = ref('');
 
 // (B) 날짜 입력값 (HTML <input type="date">)
-const selectedDateInput = ref('');  // 예: "2025-03-15"
+const startDateInput = ref('');  // 예: "2025-03-15"
+const endDateInput = ref('');
+
+// 종일 여부
+const allDay = ref(false);
 
 // (C) 시작/종료 시간 (드롭다운)
 const startTime = ref('09:00');
 const endTime = ref('10:00');
+
+// 반복 주기
+const repeatRule = ref('none'); // none, daily, weekly, monthly, yearly
 
 // (D) 00:00 ~ 23:30까지 30분 간격 타임 옵션
 const timeOptions = computed(() => {
@@ -108,56 +136,58 @@ watch(() => props.selectedEvent, (event) => {
     summary.value = event.summary || '';
     description.value = event.description || '';
     // event.start.dateTime 예: "2025-03-15T09:30:00+09:00"
-    setModalFieldsForUpdate(event);
+    loadEventDates(event);
   } else {
-    // 신규 모드 -> selectedDay.date (혹은 오늘 날짜) + 기본시간
-    summary.value = '';
-    description.value = '';
-    setModalFieldsForCreate();
+    // 신규 모드
+    resetNewEvent();
   }
 }, { immediate: true });
 
 /**
  * (1) 수정 모드: 기존 이벤트에서 날짜/시간 추출
  */
-function setModalFieldsForUpdate(event) {
-  // 날짜 추출
-  // event.start.dateTime이 있으면 파싱, 없으면 event.start.date로 대체
-  const startDt = event.start.dateTime
-      ? new Date(event.start.dateTime)
-      : new Date(`${event.start.date}T09:00`);
-  const endDt = event.end.dateTime
-      ? new Date(event.end.dateTime)
-      : new Date(`${event.end.date}T10:00`);
-
-  // "YYYY-MM-DD" 형태로 변환
-  selectedDateInput.value = formatDateForInput(startDt);
-
-  // 시간 파싱 -> "HH:MM"
-  startTime.value = formatTime(startDt);
-  endTime.value = formatTime(endDt);
+function loadEventDates(event) {
+  // 종일 여부 체크 (event.allDay 등 추가 구현)
+  if (event.start.date) {
+    // 종일 일정
+    allDay.value = true;
+    startDateInput.value = event.start.date;
+    endDateInput.value = event.end.date || event.start.date;
+  } else {
+    // 시간대 일정
+    allDay.value= false;
+    const startDt = new Date(event.start.dateTime);
+    const endDt = new Date(event.end.dateTime);
+    startDateInput.value = formatDate(startDt);
+    endDateInput.value = formatDate(endDt);
+    startTime.value = formatTime(startDt);
+    endTime.value = formatTime(endDt);
+  }
+  // 반복주기
+  // (실제로는 event.recurrence // RRULE 파싱 필요)
+  repeatRule.value = 'none';
 }
 
-/**
- * (2) 신규 모드: selectedDay에 date가 있다면 그 날짜, 없으면 오늘
- */
-function setModalFieldsForCreate() {
-  const today = new Date();
-  const defaultDate = props.selectedDay?.date || formatDateForInput(today);
-  selectedDateInput.value = defaultDate;
-
+function resetNewEvent() {
+  summary.value = '';
+  description.value = '';
+  const dateStr = props.selectedDay?.date || formatDate(new Date());
+  startDateInput.value = dateStr;
+  endDateInput.value = dateStr;
+  allDay.value = false;
   startTime.value = '09:00';
   endTime.value = '10:00';
+  repeatRule.value = 'none';
 }
 
 /**
  * 날짜 -> "YYYY-MM-DD"
  */
-function formatDateForInput(dateObj) {
-  const yyyy = dateObj.getFullYear();
-  const mm = String(dateObj.getMonth() + 1).padStart(2,'0');
-  const dd = String(dateObj.getDate()).padStart(2,'0');
-  return `${yyyy}-${mm}-${dd}`;
+function formatDate(dateObj) {
+  const yy = dateObj.getFullYear();
+  const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const dd = String(dateObj.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
 }
 
 /**
@@ -170,36 +200,63 @@ function formatTime(dateObj) {
 }
 
 /**
+ *  하루 뒤 날짜 (종일 일정시, end가 start와 같다면 +1)
+ */
+function addOneDay(yyyyMmDd) {
+  const [year, month, day] = yyyyMmDd.split('-').map(Number);
+  const dt = new Date(year, month, day);
+  dt.setDate(dt.getDate() + 1);
+  return formatDate(dt);
+}
+
+/**
  * (E) "저장하기"/"수정하기" 버튼 클릭
  *  - 날짜( selectedDateInput.value ), 시간(startTime/endTime) 조합하여
  *    YYYY-MM-DDTHH:MM:00+09:00 형태로 startDate/endDate 구성
  *  - createEvent / updateEvent 호출
  */
 async function saveEvent() {
-  // (1) dateStr: "YYYY-MM-DD"
-  const dateStr = selectedDateInput.value;
-  if (!dateStr) {
-    alert('날짜가 선택되지 않았습니다.');
+  if(!startDateInput.value) {
+    alert('시작 날짜를 입력하세요');
+    return;
+  }
+  if(!endDateInput.value) {
+    alert('종료 날짜를 입력하세요');
     return;
   }
 
-  // 시작이 종료보다 늦으면 에러처리 (선택)
-  if(startTime.value >= endTime.value){
-    alert('시작 시간이 종료 시간보다 같거나 늦을 수 없습니다.');
-    return;
+  // 2) 종일 vs 시간대 => startVal, endVal
+  let startVal, endVal;
+
+  // 종일인지 여부에 따라 date / dateTime 결정
+  if (allDay.value) {
+    // 종일 일정 (date만)
+    startVal = startDateInput.value;
+    endVal   = endDateInput.value;
+    // 만약 사용자가 동일 날짜(또는 end < start)를 지정했으면 +1일 처리
+    if (endVal <= startVal) {
+      endVal = addOneDay(startVal);
+    }
+  } else {
+    // 시간대 일정 (dateTime)
+    startVal = `${startDateInput.value}T${startTime.value}:00+09:00`;
+    endVal   = `${endDateInput.value}T${endTime.value}:00+09:00`;
+    if (startVal > endVal) {
+      alert('시작 시점이 종료 시점보다 늦을 수 없습니다.');
+      return;
+    }
   }
+  // 반복 주기 -> repeatRule ("none"/"daily"/"weekly"/"monthly"/"yearly")
+  let recurrenceRule = (repeatRule.value !== 'none') ? repeatRule.value : null;
 
-  // (2) ISO 형태로 만들기
-  const startDateTime = `${dateStr}T${startTime.value}:00+09:00`;
-  const endDateTime = `${dateStr}T${endTime.value}:00+09:00`;
-
-  // (3) API에 전달할 데이터
   const eventData = {
     summary: summary.value,
     description: description.value,
-    startDate: startDateTime,
-    endDate: endDateTime
-  };
+    allDay: allDay.value,
+    startDate: startVal,
+    endDate: endVal,
+    repeatRule: recurrenceRule
+  }
 
   // (4) 수정 vs 신규
   try {
@@ -212,9 +269,7 @@ async function saveEvent() {
       await createEvent(eventData);
       alert('새 일정이 등록되었습니다.');
     }
-
     location.reload();  // 간단 구현용. 새로고침
-    // emit('close');    // 혹은 모달만 닫고, 상위에서 refreshEvents() 호출
   } catch (error) {
     console.error(error);
     alert('오류 발생');
@@ -238,49 +293,67 @@ async function deleteEventById() {
   }
 }
 </script>
-
 <style scoped>
-/* 모달 배경 & 위치 */
 .modal {
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+  width: 380px;
   background: #fff;
   border: 1px solid #ddd;
+  z-index: 9999;
   padding: 20px;
-  z-index: 1000;
-  width: 320px;
+  box-sizing: border-box;
 }
 
-/* 모달 내부 구조 */
 .modal-content {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-/* 시간 선택 영역 */
-.time-select {
+/* 날짜 범위 */
+.date-range {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* 종일 체크 */
+.all-day-check {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* 시간 범위 */
+.time-range {
   display: flex;
   flex-direction: column;
   gap: 5px;
   margin-top: 8px;
 }
 
+/* 반복 주기 */
+.repeat-section {
+  margin-top: 8px;
+}
+
 /* 버튼 그룹 */
 .button-group {
   display: flex;
-  gap: 10px;
-  justify-content: space-between;
-  margin-top: 10px;
+  gap: 8px;
+  margin-top: 15px;
+  justify-content: flex-end;
 }
 
 /* 버튼 스타일 */
 button {
-  padding: 8px 12px;
   cursor: pointer;
   border: none;
+  padding: 8px 12px;
   background: #4caf50;
   color: #fff;
   border-radius: 4px;

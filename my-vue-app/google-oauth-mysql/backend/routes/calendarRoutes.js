@@ -14,6 +14,6 @@ router.put('/events/:eventId', updateEvent);
 router.get('/events', listEvents);
 
 // 일정 삭제
-router.get('/events/:eventId', deleteEvent);
+router.delete('/events/:eventId', deleteEvent);
 
 module.exports = router;

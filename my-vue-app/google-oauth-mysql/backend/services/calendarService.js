@@ -1,35 +1,75 @@
 // services/calendarService.js
 const { calendar, CALENDAR_ID } = require('../config/googleAPI');
 
-// 일정 (이벤트) 생성
 exports.createEvent = async (eventData) => {
-    // eventData: { summary, description, startDate, endDate, }
+    // eventData: { summary, description, startDate, endDate, allDay }
+    let startObj, endObj;
+
+    if (eventData.allDay) {
+        // 종일
+        startObj = { date: eventData.startDate };
+        endObj = { date: eventData.endDate };
+    } else {
+        // 시간대 일정
+        startObj = { dateTime: eventData.startDate };
+        endObj = { dateTime: eventData.endDate };
+    }
+
+    // 반복 주기
+    let recurrenceArr = null;
+    if (eventData.repeatRule && eventData.repeatRule !== 'none') {
+        const freq = eventData.repeatRule.toUpperCase();
+        recurrenceArr = [`RRULE:FREQ=${freq}`];
+    }
+    console.log(recurrenceArr);
+
     const res = await calendar.events.insert({
         calendarId: CALENDAR_ID,
         requestBody: {
             summary: eventData.summary,
             description: eventData.description,
-            start: { dateTime: eventData.startDate},
-            end: { dateTime: eventData.endDate},
-            // timezone, location 등 추가 가능
+            start: startObj,
+            end: endObj,
+            recurrence: recurrenceArr,
         },
     });
     return res.data;
 }
 
 exports.updateEvent = async (eventId, eventData) => {
+    let startObj, endObj;
+
+    if (eventData.allDay) {
+        // 종일
+        startObj = { date: eventData.startDate };
+        endObj = { date: eventData.endDate };
+    } else {
+        // 시간대 일정
+        startObj = { dateTime: eventData.startDate };
+        endObj = { dateTime: eventData.endDate };
+    }
+
+    // 반복 주기
+    let recurrenceArr = null;
+    if (eventData.repeatRule && eventData.repeatRule !== 'none') {
+        const freq = eventData.repeatRule.toUpperCase();
+        recurrenceArr = [`RRULE:FREQ=${freq}`];
+    }
+    console.log(recurrenceArr);
     const res = await calendar.events.update({
         calendarId: CALENDAR_ID,
         eventId: eventId,
         requestBody: {
             summary: eventData.summary,
             description: eventData.description,
-            start: { dateTime: eventData.startDate},
-            end: { dateTime: eventData.endDate},
+            start: startObj,
+            end: endObj,
+            recurrence: recurrenceArr,
         },
     });
     return res.data;
 };
+
 
 // 일정 이벤트 조회
 exports.listEvents = async (timeMin, timeMax) => {
