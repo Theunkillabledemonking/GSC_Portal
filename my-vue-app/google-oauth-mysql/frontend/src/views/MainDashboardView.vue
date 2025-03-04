@@ -2,7 +2,7 @@
   <div class="main-dashboard">
     <h1>GSC Portal 메인 대시보드</h1>
 
-    <div class="dashboard-grid">
+    <div class="dashboard-container">
       <!-- 공지사항 섹션 -->
       <section class="notice-section">
         <h2>📢 공지사항</h2>
@@ -11,7 +11,7 @@
           v-for="notice in notices"
           :key="notice.id"
           @click="goToNoticeDetail(notice.id)"
-          class="notice-item"
+          class="notice-title"
           >
             <span :class="{ important: notice.is_important }">{{ notice.title}}</span>
             <small>{{ formatDate(notice.created_at)}}</small>
@@ -64,7 +64,8 @@ function checkLoginStatus() {
 // 공지사항 최신 10개 불러오기
 async function loadRecentNotices() {
   const allNotices = await fetchNotices();
-  notices.value = allNotices.slice(0, 20);
+  notices.value = allNotices.slice(0, 25);
+
 }
 
 // 월간 일정 불러오기
@@ -90,6 +91,9 @@ function goToNoticePage() {
 function goToCalendarPage() {
   router.push('/calendar');
 }
+function goToNoticeDetail(id) {
+  router.push(`/notices/${id}`);
+}
 
 // 날짜 포멧 함수
 function formatDate(dateStr) {
@@ -103,7 +107,6 @@ function formatDate(dateStr) {
   padding: 20px;
   background-color: #f5f5f5;
   min-height: 100vh;
-  box-sizing: border-box;
 }
 
 h1 {
@@ -111,49 +114,67 @@ h1 {
   margin-bottom: 20px;
 }
 
-/* 공지사항 + 일정 가로 배치 */
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+/* 전체 컨테이너 - 좌우 50%씩 */
+.dashboard-container {
+  display: flex;
   gap: 20px;
 }
 
-/* 섹션 공통 스타일 */
+/* 공지사항과 캘린더 영역 폭 강제 동일하게 설정 */
 .notice-section, .calendar-section {
+  flex: 1;
+  min-width: 0; /* 내용이 넘쳐도 flex 아이템이 줄어들도록 보장 */
+  box-sizing: border-box; /* 패딩 포함 폭 계산 */
   background: white;
   padding: 15px;
   border-radius: 8px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
-/* 공지사항 리스트 */
+/* 공지사항은 스크롤 가능하게 설정 */
+.notice-section {
+  overflow-y: auto;
+  max-height: 600px;
+}
+
+/* 공지사항 리스트 스타일 */
 .notice-list {
   list-style: none;
   padding: 0;
-  max-height: 300px;
-  overflow-y: auto;
+  margin: 0;
 }
+
 .notice-list li {
   padding: 8px 0;
   display: flex;
   justify-content: space-between;
+  cursor: pointer;
   border-bottom: 1px solid #ddd;
 }
+
+.notice-title {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .notice-list .important {
   color: red;
   font-weight: bold;
 }
 
-/* 버튼 공통 */
+/* 버튼 스타일 */
 button {
   margin-top: 10px;
-  padding: 8px 12px;
+  padding: 6px 12px;
   cursor: pointer;
   background-color: #4caf50;
   color: white;
   border: none;
   border-radius: 4px;
 }
+
 button:hover {
   background-color: #45a049;
 }
