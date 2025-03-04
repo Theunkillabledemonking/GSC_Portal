@@ -7,6 +7,7 @@ import LoginView from '@/views/Login/LoginView.vue';
 import RegisterView from '@/views/Login/RegisterView.vue';
 
 import DashboardView from '@/views/DashboardView.vue';
+import MainDashboardView from "@/views/MainDashboardView.vue";
 import AdminUserView from '@/views/Login/AdminUserList.vue';
 
 import NoticesView from '@/views/Notices/NoticesView.vue';
@@ -14,6 +15,7 @@ import NoticeForm from "@/views/Notices/NoticeCreateView.vue";
 import NoticeDetailView from "@/views/Notices/NoticeDetailView.vue";
 import NoticeEditView from "@/views/Notices/NoticeEditView.vue";
 import CalendarWithEvents from "@/components/specific/CalendarWithEvents.vue";
+import {useAuthStore} from "@/store/authStore.js";
 
 // 라우트 정의
 const routes = [
@@ -21,7 +23,8 @@ const routes = [
     { path: '/login', name: 'Login', component: LoginView },
     { path: '/register', name: 'Register', component: RegisterView },
 
-    { path: '/dashboard', name: 'Dashboard', component: DashboardView },
+    { path: '/main-dashboard', component: MainDashboardView, meta: { requireAuth: true } },
+    { path: '/dashboard', name: 'Dashboard', component: DashboardView, meta: { requireAuth: true } },
     { path: '/admin/users', component: AdminUserView },
 
     { path: '/notices', component: NoticesView },
@@ -38,5 +41,15 @@ const router = createRouter({
     history: createWebHistory(), // 브라우저의 히스토리 모드 사용
     routes //정의한 라우트 적용
 })
+
+// ✅ 전역 가드 추가 (로그인 필수 경로에서 로그인 체크)
+router.beforeEach((to, from, next) => {
+    const authStore = useAuthStore();
+    if (to.meta.requiresAuth && !authStore.token) {
+        next('/login');
+    } else {
+        next();
+    }
+});
 
 export default router; // 라우터 내보내기

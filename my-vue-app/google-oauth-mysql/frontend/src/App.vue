@@ -17,7 +17,7 @@ const authStore = useAuthStore();
     <GoogleLoginButton v-if="!authStore.token"/>
 
     <!-- 사용자가 로그인 한 경우 대시보드로 이동 -->
-    <router-view v-if="authStore.token" />
+    <router-view />
   </div>
 </template>
 
