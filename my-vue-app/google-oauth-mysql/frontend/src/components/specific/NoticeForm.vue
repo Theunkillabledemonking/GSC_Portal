@@ -17,6 +17,13 @@
         <option value="3">3학년</option>
       </select>
 
+      <label for="subject">과목 선택</label>
+      <select v-model="form.subject_id" id="subject">
+        <option value="">전체</option>
+        <option v-for="subject in subjects" :key="subject.id" :value="subject.id">
+          {{ subject.name }}
+        </option>
+      </select>
       <!-- 중요 공지 체크박스 추가 -->
       <label>
         <input type="checkbox" v-model="form.is_important"
@@ -34,7 +41,8 @@
 </template>
 
 <script setup>
-import { ref, defineProps, watch } from "vue";
+import { ref, defineProps, watch, onMounted } from "vue";
+import axios from 'axios';
 import { useNoticeStore } from "@/store/noticeStore.js";
 import { useRouter } from "vue-router";
 
@@ -48,11 +56,29 @@ const router = useRouter();
 
 const form = ref ({
   title: "",
+  subject_id: "",
   content: "",
   grade: "",
   is_important: '0',
   attachment: null  // 파일 업로드용
 })
+
+const subjects = ref([]);
+
+// 학년별 과목 불러오기
+const loadSubjectsByGrade = async () => {
+  if (!form.value.grade) {
+    subjects.value = [];
+    return;
+  }
+  try {
+    const res = await axios.get(`/api/subjects/year/${form.value.grade}`);
+    subjects.value = res.data.subjects;
+  } catch (error) {
+    console.log('과목별 불러오기 실패',error);
+    subjects.value = [];
+  }
+};
 
 watch(() => props.initialData, (newData) => {
   if (props.isEdit && newData) {
@@ -60,11 +86,22 @@ watch(() => props.initialData, (newData) => {
       title: newData.title || '',
       content: newData.content || '',
       grade: newData.grade ?? '',
+      subject_id: newData.subject_id ?? '',
       is_important: newData.is_important === 1 ? '1' : '0',
       attachment: null
     };
+    if (form.value.grade) {
+      loadSubjectsByGrade(); // 수정 시에도 학년 맞는 과목 불러오기
+    }
   }
 }, { immediate: true });
+
+// 새로 공지 작성 시, 학년이 변경될 때마다 과목 목록 갱신
+watch(() => form.value.grade, (newGrade) => {
+  if (!props.isEdit) {
+    loadSubjectsByGrade();
+  }
+});
 
 const handleFileChange = (e) => {
   form.value.attachment = e.target.files[0];
@@ -74,6 +111,7 @@ const handleSubmit = async () => {
   const data = new FormData();
   data.append('title', form.value.title);
   data.append('content', form.value.content);
+  data.append('subject_id', form.value.subject_id ?? '');
   data.append('grade', form.value.grade ?? '');
   data.append('is_important', form.value.is_important);
 

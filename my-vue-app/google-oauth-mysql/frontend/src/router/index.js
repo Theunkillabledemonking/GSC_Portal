@@ -14,6 +14,7 @@ import NoticesView from '@/views/Notices/NoticesView.vue';
 import NoticeForm from "@/views/Notices/NoticeCreateView.vue";
 import NoticeDetailView from "@/views/Notices/NoticeDetailView.vue";
 import NoticeEditView from "@/views/Notices/NoticeEditView.vue";
+import SubjectManage from "@/components/admin/SubjectManage.vue";
 import CalendarWithEvents from "@/components/specific/CalendarWithEvents.vue";
 import {useAuthStore} from "@/store/authStore.js";
 
@@ -31,6 +32,7 @@ const routes = [
     { path: '/notices/create', component: NoticeForm },
     { path: '/notices/:id', component: NoticeDetailView },
     { path: '/notices/edit/:id', component: NoticeEditView },
+    { path: '/admin/subjects', name: 'SubjectManage', component: SubjectManage, meta: { requireAuth: true } },
 
     { path: '/calendar', component: CalendarWithEvents}
 

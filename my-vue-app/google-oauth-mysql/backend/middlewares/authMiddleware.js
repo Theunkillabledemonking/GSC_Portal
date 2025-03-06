@@ -9,6 +9,7 @@ const jwt = require('jsonwebtoken');
 // 요청 헤더에 포함된 JWT를 검증합니다.
 exports.verifyToken = (req, res, next) => {
     // 1. 요청 헤더에서 'authorization' 값을 가져옵니다.
+    console.log('verify token', req.headers);
     const token = req.headers['authorization'];
 
     // 2. 토큰이 없으면 403 상태 코드와 메시지를 반환합니다.
@@ -39,6 +40,7 @@ exports.verifyToken = (req, res, next) => {
 // - 관리자(1), 교수(2), 학생(3) 순으로 낮은 숫자가 더 높은 권한을 의미합니다.
 exports.hasRole = (role) => {
     return (req, res, next) => {
+        console.log(`🔎 [hasRole] 요청한 사용자 role: ${req.user?.role}, 필요한 role: ${role}`);
         // 1. 요청된 사용자의 권한이 파라미터로 받은 권한보다 작거나 같으면 접근 허용
         if (req.user.role <= role) {
             next(); // 다음 미들웨어 또는 라우트 핸들러로 넘어감

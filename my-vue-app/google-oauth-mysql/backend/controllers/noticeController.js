@@ -5,11 +5,11 @@ const BASE_URL = "http://localhost:5000/uploads/";
 */
 exports.createNotices = async (req, res) => {
     try {
-        const { title, content, grade, is_important, notify_kakao } = req.body;
+        const { title, content, grade, is_important, notify_kakao, subject_id } = req.body;
         const author_id = req.user.id; // `verifyToken` 미들웨어 덕분에 req.user 사용 가능
 
         const gradeValue = grade === "" ? null : grade;
-
+        const subjectId = subject_id === "" ? null : subject_id;
         const isImportantVal = parseInt(is_important, 10) === 1 ? 1 : 0;
 
         const attachment = req.file ? req.file.filename : null;
@@ -17,12 +17,21 @@ exports.createNotices = async (req, res) => {
         const originalFileName = req.originalFileName || null;
 
         // 2. 공지사항 등록
-        const [result] = await pool.query(
-            "INSERT INTO notices (title, content, author_id, grade, is_important, attachment, attachment_url, original_filename) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            [title, content, author_id, gradeValue, isImportantVal ? 1 : 0, attachment, attachment_url, originalFileName],
-        );
+        const query = `
+            INSERT INTO notices 
+                (title, content, author_id, grade, subject_id, is_important, attachment, attachment_url, original_filename) 
+            VALUES 
+                (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
 
-        res.status(201).json({ message: "Notice created successfully", notice_id: result.insertId });
+        const params = [
+            title, content, author_id, gradeValue, subjectId,
+            isImportantVal, attachment, attachment_url, originalFileName
+        ];
+
+        const [result] = await pool.query(query, params);
+
+        res.status(201).json({ message: "공지사항이 등록되었습니다.", notice_id: result.insertId });
 
         // 추후 카카오톡 알람 추가 기능
         if (notify_kakao) {
@@ -43,22 +52,30 @@ exports.getNotices = async (req, res) => {
         const grade = req.user.grade;
 
         let query = `
-            SELECT n.id, n.title, n.content, u.name AS author, n.grade,
-                   n.created_at, n.updated_at, n.is_important, n.notify_kakao, n.views,
-                   n.attachment, n.attachment_url
+            SELECT
+                n.id, n.title, n.content, n.grade,
+                n.subject_id,             
+                u.name AS author,
+                n.created_at, n.updated_at,
+                n.is_important, n.notify_kakao, n.views,
+                n.attachment, n.attachment_url,
+                s.name AS subject_name
             FROM notices n
-            JOIN users u ON n.author_id = u.id
+                     JOIN users u ON n.author_id = u.id
+                     LEFT JOIN subjects s ON n.subject_id = s.id
             ORDER BY n.is_important DESC, n.created_at DESC
         `;
+
         let params = [];
 
         if (role === 3) {
             query = `
-                SELECT n.id, n.title, n.content, u.name AS author, n.grade,
+                SELECT n.id, n.title, n.content, u.name AS author, n.grade, n.subject_id,
                        n.created_at, n.updated_at, n.is_important, n.notify_kakao, n.views,
-                       n.attachment, n.attachment_url
+                       n.attachment, n.attachment_url, s.name AS subject_name
                 FROM notices n
-                JOIN users u ON n.author_id = u.id
+                         JOIN users u ON n.author_id = u.id
+                         LEFT JOIN subjects s ON n.subject_id = s.id
                 WHERE n.grade IS NULL OR n.grade = ?
                 ORDER BY n.is_important DESC, n.created_at DESC
             `;
@@ -89,9 +106,10 @@ exports.getNoticeById = async (req, res) => {
         const [notices] = await pool.query(`
             SELECT n.id, n.title, n.content, u.name AS author, n.grade,
                    n.created_at, n.updated_at, n.is_important, n.notify_kakao, n.views,
-                   n.attachment, n.attachment_url, n.original_filename
+                   n.attachment, n.attachment_url, n.original_filename, s.name AS subject_name
             FROM notices n
             JOIN users u ON n.author_id = u.id
+            LEFT JOIN subjects s ON n.subject_id = s.id
             WHERE n.id = ?
         `, [id]);
 
@@ -126,20 +144,16 @@ exports.getNoticeById = async (req, res) => {
 exports.updateNotice = async (req, res) => {
     try {
         const { id } = req.params;
-        const { title, content, is_important, notify_kakao } = req.body;
+        const { title, content, is_important, notify_kakao, subject_id } = req.body;
         let { grade } = req.body;
 
         const userId = req.user.id;
         const role = req.user.role;
 
         // grade 정리 (빈문자열이나 'null'이 오면 null로 세팅
-        if (grade === '' || grade === 'null') {
-            grade = null;
-        } else {
-            grade = Number(grade);
-        }
-
-        const isImportant = parseInt(is_important,10) === 1 ? 1 : 0;
+        grade = grade === '' || grade === 'null' ? null : Number(grade);
+        const subjectId = subject_id === "" ? null : subject_id;
+        const isImportant = parseInt(is_important, 10) === 1 ? 1 : 0;
 
         // 교수는 본인 글만 수정 가능, 관리자는 모든 글 수정 가능
         const [currentNotice] = await pool.query('SELECT * FROM notices WHERE id = ?',  [id]);
@@ -162,15 +176,18 @@ exports.updateNotice = async (req, res) => {
             attachment_url = `${BASE_URL}${req.file.filename}`;
             originalFileName = req.originalFileName || req.file.originalname;  // 업로드 시 한글깨짐 대비 저장
         }
-        console.log({
-            title, content, grade,is_important, attachment_url, originalFileName
-        });
 
-        // 공지사항 업데이트
-        await pool.query(
-            'UPDATE notices SET title = ?, content = ?, grade = ?, is_important = ?, attachment = ?, attachment_url = ?, original_filename = ?, notify_kakao = ? WHERE id = ?',
-            [title, content, grade, isImportant, attachment, attachment_url, originalFileName, notify_kakao, id]
-        );
+        const updateQuery = `
+            UPDATE notices 
+            SET title = ?, content = ?, grade = ?, subject_id = ?, 
+                is_important = ?, attachment = ?, attachment_url = ?, 
+                original_filename = ?, notify_kakao = ?
+            WHERE id = ?
+        `;
+        await pool.query(updateQuery, [
+            title, content, grade, subjectId, isImportant,
+            attachment, attachment_url, originalFileName, notify_kakao, id
+        ]);
 
         res.status(200).json({ message: '공지사항이 수정되었습니다.' });
 
@@ -211,3 +228,5 @@ exports.deleteNotice = async (req, res) => {
         res.status(500).json({ message: "서버 오류가 발생했습니다."});
     }
 }
+
+

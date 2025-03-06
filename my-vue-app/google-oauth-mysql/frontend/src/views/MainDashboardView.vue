@@ -161,7 +161,7 @@ function goToNoticeDetail(id) {
   flex-wrap: wrap;
 }
 
-/* 공지사항 패널 (좌측 4) */
+/* 공지사항 패널 (좌측 4) */TM
 .notice-panel {
   flex: 4;
   min-width: 300px;
