@@ -170,7 +170,7 @@ exports.updateNotice = async (req, res) => {
         let originalFileName = currentNotice[0].original_filename;  // 기존 파일명도 유지
 
         // 새로운 파일이 있으면 교체
-// 새로운 파일이 올라오면 덮어쓰기
+        // 새로운 파일이 올라오면 덮어쓰기
         if (req.file) {
             attachment = req.file.filename;
             attachment_url = `${BASE_URL}${req.file.filename}`;
