@@ -10,7 +10,7 @@ const apiClient = axios.create({
 
 apiClient.interceptors.request.use(config => {
     const authStore = useAuthStore();
-    const token = authStore.accessToken; // Pinia에서 accessToken 가져옴
+    const token = authStore.token; // Pinia에서 token 가져옴
 
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;  // 매 요청마다 토큰 추가

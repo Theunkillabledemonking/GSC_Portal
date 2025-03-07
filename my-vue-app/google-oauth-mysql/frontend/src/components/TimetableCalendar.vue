@@ -10,7 +10,7 @@ import FullCalendar from "@fullcalendar/vue3";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import { useTimetableStore } from "@/store/timetableStore.js";
-import { fetchTimetableWithEvents } from "@/services/timetableApi.js";
+import { fetchTimetableWithEvents } from "@/services/timetapleApi.js";
 import { useAuthStore } from "@/store/authStore.js";
 
 const authStore = useAuthStore();
