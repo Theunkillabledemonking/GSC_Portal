@@ -21,7 +21,7 @@ exports.getTimetableWithEvents = async (req, res) => {
         const [timetables] = await pool.query(`
             SELECT
                 t.id, t.year, t.level, t.day, t.period, t.room,
-                s.name AS subject_name,
+                s.name AS subject_name
                 u.name AS professor_name
             FROM timetables t
             JOIN subjects s ON t.subject_id = s.id
@@ -35,7 +35,7 @@ exports.getTimetableWithEvents = async (req, res) => {
                 e.id, e.timetable_id, e.subject_id,
                 e.event_type, e.event_date, e.start_time, e.end_time,
                 e.description,
-                s.name AS subject_name,
+                s.name AS subject_name
             FROM timetable_events e
             JOIN subjects s ON e.subject_id = s.id
             WHERE e.event_date BETWEEN ? AND ?
@@ -50,6 +50,65 @@ exports.getTimetableWithEvents = async (req, res) => {
 }
 
 /**
+ * 정규 시간표 등록
+ * @route POST /api/timetable
+ */
+exports.createTimetable = async (req, res) => {
+    const { year, level, day, period, subject_id, room, professor_id } = req.body;
+
+    try {
+        await pool.query(`
+            INSERT INTO timetables (year, level, day, period, subject_id, room, professor_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `, [year, level, day, period, subject_id, room, professor_id]);
+
+        res.status(201).json({ message: '시간표가 등록되었습니다.' });
+    } catch (error) {
+        console.log('시간표 등록 오류:', error);
+        res.status(500).json({ message: '서버 오류가 발생했씁니다.'});
+    }
+};
+
+/**
+ * 정규 시간표 수정
+ * @route PUT /api/timetable/:id
+ */
+exports.updateTimetable = async (req, res) => {
+    const { id } = req.params;
+    const { year, level, day, period, subject_id, room, professor_id } = req.body;
+
+    try {
+        await pool.query(`
+            UPDATE timetables
+            SET year = ?, level = ?, day = ?, period = ?, subject_id = ?, room = ?, professor_id =?
+            WHERE id = ?
+        `, [year, level, day, period, subject_id, room, professor_id, id]);
+
+        res.status(200).json({ message: '시간표가 수정되었습니다.' });
+    } catch (error) {
+        console.error('시간표 수정 오류:', error);
+        res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+    }
+};
+
+/**
+ * 정규 시간표 삭제
+ * @route DELETE /api/timetable/:id
+ */
+exports.deleteTimetable = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        await pool.query(`DELETE FROM timetables WHERE id = ?`, [id]);
+        res.status(200).json({ message: '시간표가 삭제되었습니다.'} );
+    } catch (error) {
+        console.error('시간표 삭제 오류', error);
+        res.status(500).json({ message: '서버 오류가 발생했씁니다.'});
+    }
+};
+
+
+/**
  * 휴강/보강/특강 이벤트 등록
  * 교수/관리자가 특정 과목의 특정 날짜에 이벤트를 등록
  *
@@ -57,7 +116,7 @@ exports.getTimetableWithEvents = async (req, res) => {
  * @body timetable_id, subject_id, event_type, event_date, start_time, end_time, description
  */
 exports.createEvent = async (req, res) => {
-    const { timetable_id, subject_id, event_type, event_date, start_time, end_time, description } = req.query;
+    const { timetable_id, subject_id, event_type, event_date, start_time, end_time, description } = req.body;
 
     try {
         // 기본 유효성 체크
@@ -82,12 +141,12 @@ exports.createEvent = async (req, res) => {
  * 휴강/보강/특강 이벤트 수정
  * 잘못 등록한 이벤트 수정
  *
- * @route PUT /api/events/:event+id
+ * @route PUT /api/events/:event_id
  * @param event_id
  */
 exports.updateEvent = async (req, res) => {
     const { event_id } = req.params; // url 에서 event_id 받기
-    const { timetable_id, subject_id, event_type, event_date, start_time, end_time, description } = req.query;
+    const { timetable_id, subject_id, event_type, event_date, start_time, end_time, description } = req.body;
 
     try {
         // 기본 유효성 체크
@@ -120,7 +179,7 @@ exports.updateEvent = async (req, res) => {
  * 휴강/보강/특강 이벤트 삭제
  * 잘못 등록한 이벤트 삭제
  *
- * @route DELETE /api/events/:event+id
+ * @route DELETE /api/events/:event_id
  * @param event_id
  */
 exports.deleteEvent = async (req, res) => {
@@ -133,7 +192,7 @@ exports.deleteEvent = async (req, res) => {
             return res.status(404).json({ message: '해당 이벤트를 찾을 수 없습니다.' });
         }
 
-        req.json({ message: '이벤트가 삭제되었습니다.' });
+        res.json({ message: '이벤트가 삭제되었습니다.' });
     } catch (error) {
         console.error('이벤트 삭제 오류', error);
         res.status(500).json({ message: '서버 오류가 발생했습니다.' });
