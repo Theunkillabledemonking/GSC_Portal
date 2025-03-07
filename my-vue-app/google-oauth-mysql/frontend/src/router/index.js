@@ -1,7 +1,5 @@
-// router/index.js: Vue Router 설정
-import {createRouter, createWebHistory } from "vue-router";
+import { createRouter, createWebHistory } from "vue-router";
 
-// 페이지 별 컴포넌트 가져오기
 import HomeView from '@/views/HomeView.vue';
 import LoginView from '@/views/Login/LoginView.vue';
 import RegisterView from '@/views/Login/RegisterView.vue';
@@ -15,36 +13,34 @@ import NoticeForm from "@/views/Notices/NoticeCreateView.vue";
 import NoticeDetailView from "@/views/Notices/NoticeDetailView.vue";
 import NoticeEditView from "@/views/Notices/NoticeEditView.vue";
 import SubjectManage from "@/components/admin/SubjectManage.vue";
-import CalendarWithEvents from "@/components/specific/CalendarWithEvents.vue";
-import {useAuthStore} from "@/store/authStore.js";
+import TimetableView from "@/views/TimetableView.vue";
 
-// 라우트 정의
+import { useAuthStore } from "@/store/authStore.js";
+
 const routes = [
     { path: '/', name: 'Home', component: HomeView },
     { path: '/login', name: 'Login', component: LoginView },
     { path: '/register', name: 'Register', component: RegisterView },
 
-    { path: '/main-dashboard', component: MainDashboardView, meta: { requireAuth: true } },
-    { path: '/dashboard', name: 'Dashboard', component: DashboardView, meta: { requireAuth: true } },
-    { path: '/admin/users', component: AdminUserView },
+    { path: '/main-dashboard', name: 'MainDashboard', component: MainDashboardView, meta: { requiresAuth: true } },
+    { path: '/dashboard', name: 'Dashboard', component: DashboardView, meta: { requiresAuth: true } },
+    { path: '/admin/users', name: 'AdminUserList', component: AdminUserView, meta: { requiresAuth: true } },
 
-    { path: '/notices', component: NoticesView },
-    { path: '/notices/create', component: NoticeForm },
-    { path: '/notices/:id', component: NoticeDetailView },
-    { path: '/notices/edit/:id', component: NoticeEditView },
-    { path: '/admin/subjects', name: 'SubjectManage', component: SubjectManage, meta: { requireAuth: true } },
+    { path: '/notices', name: 'Notices', component: NoticesView },
+    { path: '/notices/create', name: 'NoticeCreate', component: NoticeForm },
+    { path: '/notices/:id', name: 'NoticeDetail', component: NoticeDetailView },
+    { path: '/notices/edit/:id', name: 'NoticeEdit', component: NoticeEditView },
 
-    { path: '/calendar', component: CalendarWithEvents}
+    { path: '/admin/subjects', name: 'SubjectManage', component: SubjectManage, meta: { requiresAuth: true } },
 
-]
+    { path: '/timetable', name: 'TimetableView', component: TimetableView, meta: { requiresAuth: true } }
+];
 
-// Vue Router 인스턴스 생성
 const router = createRouter({
-    history: createWebHistory(), // 브라우저의 히스토리 모드 사용
-    routes //정의한 라우트 적용
-})
+    history: createWebHistory(),
+    routes
+});
 
-// ✅ 전역 가드 추가 (로그인 필수 경로에서 로그인 체크)
 router.beforeEach((to, from, next) => {
     const authStore = useAuthStore();
     if (to.meta.requiresAuth && !authStore.token) {
@@ -54,4 +50,4 @@ router.beforeEach((to, from, next) => {
     }
 });
 
-export default router; // 라우터 내보내기
+export default router;
