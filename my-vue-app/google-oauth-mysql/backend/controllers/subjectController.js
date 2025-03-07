@@ -5,6 +5,12 @@ const pool = require('../config/db');
  */
 exports.getSubjectsByYear = async (req, res) => {
     const { year } = req.params;
+
+    // 1. 학년 유효성 체크 (1, 2, 3학년만 허용)
+    if (![1, 2, 3].includes(Number(year))) {
+        return res.status(400).json({ message: "올바른 학년을 선택해주세요 (1, 2, 3학년만 가능합니다)." });
+    }
+
     try {
         const query = `
             SELECT id, name, year, level

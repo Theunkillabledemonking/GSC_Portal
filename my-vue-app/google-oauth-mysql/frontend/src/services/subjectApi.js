@@ -3,7 +3,7 @@ import apiClient from "@/services/apiClient.js";
 const API_BASE_URL = import.meta.env.VITE_API_URL;  // 환경변수로 관리
 
 export const getSubjectsByYear = async (year) => {
-    const res = await apiClient.get(`/subjects/${year}`);
+    const res = await apiClient.get(`/subjects/year/${year}`);
     return res.data;
 }
 
