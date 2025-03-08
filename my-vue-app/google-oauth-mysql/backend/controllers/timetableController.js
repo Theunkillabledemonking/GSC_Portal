@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { Timetable } = require('../models/timetable');  // 모델 불러오기
 
 /**
  * 학기별 정규 시간표 + 휴강/보강/특강 이벤트 조회
@@ -11,60 +12,72 @@ const pool = require('../config/db');
 exports.getTimetableWithEvents = async (req, res) => {
     const { year, level, start_date, end_date } = req.query;
 
-    // 학년 유효성 체크 (1, 2, 3 학년만 허용)
+    if (!year || !level || !start_date || !end_date) {
+        return res.status(400).json({
+            message: '필수 요청 값이 누락되었습니다.',
+            received: { year, level, start_date, end_date },
+        });
+    }
+
     if (![1, 2, 3].includes(Number(year))) {
-        return res.status(400).json({ message: '올바른 학년을 선택해주세요 (1, 2, 3학년만 가능합니다.'});
+        return res.status(400).json({ message: '올바른 학년을 선택해주세요 (1, 2, 3학년만 가능합니다.' });
     }
 
     try {
-        // 1. 정규 시간표 조회 (timetables)
+        // 1. 정규 시간표 조회
         const [timetables] = await pool.query(`
             SELECT
-                t.id, t.year, t.level, t.day, t.period, t.room,
+                t.id, t.year, t.level, t.day, t.start_period, t.end_period, t.room,
                 s.name AS subject_name, u.name AS professor_name
             FROM timetables t
-            JOIN subjects s ON t.subject_id = s.id
-            LEFT JOIN users u ON t.professor_id = u.id
+                     JOIN subjects s ON t.subject_id = s.id
+                     LEFT JOIN users u ON t.professor_id = u.id
             WHERE t.year = ? AND t.level = ?
         `, [year, level]);
 
-        // 2. 해당 기간 내 이벤트 조회 (timetable_events)
+        // 2. 이벤트 조회
         const [events] = await pool.query(`
-            SELECT 
+            SELECT
                 e.id, e.timetable_id, e.subject_id,
                 e.event_type, e.event_date, e.start_time, e.end_time,
                 e.description,
                 s.name AS subject_name
             FROM timetable_events e
-            JOIN subjects s ON e.subject_id = s.id
+                     JOIN subjects s ON e.subject_id = s.id
             WHERE e.event_date BETWEEN ? AND ?
         `, [start_date, end_date]);
 
-        // 3. 응답 반환 (정규 시간표 + 이벤트)
-        res.json({ timetables, events });
+        // 빈 배열이라도 응답 반환
+        res.json({ timetables: timetables ?? [], events: events ?? [] });
+
     } catch (error) {
-        console.log("시간표 및 이벤트 조회 오류", error);
+        console.log("❌ 시간표 및 이벤트 조회 오류", error);
         res.status(500).json({ message: "서버 오류가 발생했습니다." });
     }
-}
+};
 
 /**
  * 정규 시간표 등록
  * @route POST /api/timetable
  */
 exports.createTimetable = async (req, res) => {
-    const { year, level, day, period, subject_id, room, professor_id } = req.body;
-
     try {
-        await pool.query(`
-            INSERT INTO timetables (year, level, day, period, subject_id, room, professor_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        `, [year, level, day, period, subject_id, room, professor_id]);
+        console.log("요청 받은 데이터:", req.body);
 
-        res.status(201).json({ message: '시간표가 등록되었습니다.' });
+        const { year, level, subject_id, start_time, end_time, room, description, day, start_period, end_period } = req.body;
+
+        if (!year || !level || !subject_id || !start_time || !end_time) {
+            return res.status(400).json({ error: "필수 데이터가 누락되었습니다." });
+        }
+
+        const newTimetable = await Timetable.create({
+            year, level, subject_id, start_time, end_time, room, description, day, start_period, end_period
+        });
+
+        res.status(201).json(newTimetable);
     } catch (error) {
-        console.log('시간표 등록 오류:', error);
-        res.status(500).json({ message: '서버 오류가 발생했씁니다.'});
+        console.error("시간표 생성 중 오류:", error);
+        res.status(500).json({ error: "서버 에러 발생" });
     }
 };
 
@@ -74,14 +87,14 @@ exports.createTimetable = async (req, res) => {
  */
 exports.updateTimetable = async (req, res) => {
     const { id } = req.params;
-    const { year, level, day, period, subject_id, room, professor_id } = req.body;
+    const { year, level, day, start_period, end_period, subject_id, room, professor_id } = req.body;
 
     try {
         await pool.query(`
             UPDATE timetables
-            SET year = ?, level = ?, day = ?, period = ?, subject_id = ?, room = ?, professor_id = ?
+            SET year = ?, level = ?, day = ?, start_period = ?, end_period = ?, subject_id = ?, room = ?, professor_id = ?
             WHERE id = ?
-        `, [year, level, day, period, subject_id, room, professor_id, id]);
+        `, [year, level, day, start_period, end_period, subject_id, room, professor_id, id]);
 
         res.status(200).json({ message: '시간표가 수정되었습니다.' });
     } catch (error) {

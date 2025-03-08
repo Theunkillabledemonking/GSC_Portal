@@ -7,22 +7,22 @@ const timetableController = require('../controllers/timetableController');
 router.get('/timetable-with-events', timetableController.getTimetableWithEvents);
 
 // 정규 시간표 등록
-router.post('/timetables', timetableController.createTimetable);
+router.post('/', timetableController.createTimetable);
 
 // 정규 시간표 수정
-router.put('/timetables/:id', timetableController.updateTimetable);
+router.put('/:id', timetableController.updateTimetable);
 
 // 정규 시간표 삭제
-router.delete('/timetables/:id', timetableController.deleteTimetable);
+router.delete('/:id', timetableController.deleteTimetable);
 
 
 // 이벤트 등록
-router.post('/timetables/events', timetableController.createEvent);
+router.post('/events', timetableController.createEvent);
 
 // 이벤트 수정
-router.put('/timetables/events/:event_id', timetableController.updateEvent);
+router.put('/events/:event_id', timetableController.updateEvent);
 
 // 이벤트 삭제
-router.delete('/timetables/events/:event_id', timetableController.deleteEvent);
+router.delete('/events/:event_id', timetableController.deleteEvent);
 
 module.exports = router;
