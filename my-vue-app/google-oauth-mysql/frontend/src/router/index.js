@@ -16,6 +16,7 @@ import SubjectManage from "@/components/admin/SubjectManage.vue";
 import TimetableView from "@/views/TimetableView.vue";
 
 import { useAuthStore } from "@/store/authStore.js";
+import CalendarWithEvents from "@/components/specific/CalendarWithEvents.vue";
 
 const routes = [
     { path: '/', name: 'Home', component: HomeView },
@@ -25,6 +26,7 @@ const routes = [
     { path: '/main-dashboard', name: 'MainDashboard', component: MainDashboardView, meta: { requiresAuth: true } },
     { path: '/dashboard', name: 'Dashboard', component: DashboardView, meta: { requiresAuth: true } },
     { path: '/admin/users', name: 'AdminUserList', component: AdminUserView, meta: { requiresAuth: true } },
+    { path: '/calendar', name: 'Calendar', component: CalendarWithEvents, meta: { requiresAuth: true } },
 
     { path: '/notices', name: 'Notices', component: NoticesView },
     { path: '/notices/create', name: 'NoticeCreate', component: NoticeForm },
@@ -33,7 +35,7 @@ const routes = [
 
     { path: '/admin/subjects', name: 'SubjectManage', component: SubjectManage, meta: { requiresAuth: true } },
 
-    { path: '/timetable', name: 'TimetableView', component: TimetableView, meta: { requiresAuth: true } }
+    { path: '/timetables', name: 'TimetableView', component: TimetableView, meta: { requiresAuth: true } }
 ];
 
 const router = createRouter({

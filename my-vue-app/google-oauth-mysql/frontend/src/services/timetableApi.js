@@ -8,7 +8,7 @@ import apiClient from "@/services/apiClient.js";
  */
 export const fetchTimetableWithEvents = async ({ year, level, start_date, end_date }) => {
     try {
-        const response = await apiClient.get('/timetable-with-events', {
+        const response = await apiClient.get('/timetables/timetable-with-events', {
             params: {
                 year,
                 level,
@@ -31,7 +31,7 @@ export const fetchTimetableWithEvents = async ({ year, level, start_date, end_da
  */
 export const createTimetable = async (timetableData) => {
     try {
-        await apiClient.post('/timetable', timetableData);
+        await apiClient.post('/timetables', timetableData);
     } catch (error) {
         console.error('시간표 등록 실패', error);
         throw error;
@@ -58,7 +58,7 @@ export const updateTimetable = async (id, timetableData) => {
  */
 export const deleteTimetable = async (id) => {
     try {
-        await apiClient.delete(`/timetable/${id}`);
+        await apiClient.delete(`/timetables/${id}`);
     } catch (error) {
         console.error('시간표 삭제 실패', error);
         throw error;
@@ -71,7 +71,7 @@ export const deleteTimetable = async (id) => {
  */
 export const createEvent = async (eventData) => {
     try {
-        await apiClient.post('/events', eventData);
+        await apiClient.post('/timetables/events', eventData);
     } catch (error) {
         console.error('이벤트 등록 실패', error);
         throw error;
@@ -85,7 +85,7 @@ export const createEvent = async (eventData) => {
  */
 export const updateEvent = async (eventId, eventData) => {
     try {
-        await apiClient.put(`/events/${eventId}`, eventData);
+        await apiClient.put(`/timetable/events/${eventId}`, eventData);
     } catch (error) {
         console.error('이벤트 수정 실패', error);
         throw error;
@@ -98,7 +98,7 @@ export const updateEvent = async (eventId, eventData) => {
  */
 export const deleteEvent = async (eventId) => {
     try {
-        await apiClient.delete(`/events/${eventId}`);
+        await apiClient.delete(`/timetable/events/${eventId}`);
     } catch (error) {
         console.error('이벤트 삭제 실패', error);
         throw error;

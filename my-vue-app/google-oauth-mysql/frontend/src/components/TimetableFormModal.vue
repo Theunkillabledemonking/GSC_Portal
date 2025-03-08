@@ -59,6 +59,7 @@
 
 <script setup>
 import { ref, onMounted, watch } from "vue";
+import axios from "axios";
 import { createEvent, updateEvent, deleteEvent } from "@/services/timetableApi.js";
 import { getSubjectsByYear } from "@/services/subjectApi.js";
 import { useAuthStore} from "@/store/authStore.js";
@@ -68,7 +69,9 @@ const props = defineProps({
   isOpen: Boolean, // 모달 열림 여부
   initialData: Object, // 수정시 전달받는 기존 데이터
   selectedDate: String, // 클릭한 날짜 (신규 등록 시 필요)
+  year: Number,
 });
+
 const emit = defineEmits(['close' , 'saved', 'deleted']);
 
 // 상태
@@ -88,29 +91,8 @@ const form = ref({
   description: ''
 });
 
-// 초기 데이터 세팅 (수정 모드일 경우)
-watch(() => props.initialData, (data) => {
-  if (data) {
-    isEditMode.value = true;
-    form.value = { ...data };
-  } else {
-    isEditMode.value = false;
-    resetForm();
-  }
-}, { immediate: true });
-
-const loadSubjects = async () => {
-  try {
-    const res = await getSubjectsByYear(authStore.grade);
-    subjects.value = res.data;
-  } catch (error) {
-    console.error('과목 목록 불러오기 실패:', error);
-    subjects.value = [];
-  }
-};
-
 // 학년별 과목 목록 조회
-const restForm = async () => {
+const resetForm = () => {
   form.value = {
     timetable_id: null,
     subject_id: '',
@@ -122,6 +104,18 @@ const restForm = async () => {
     description: ''
   };
 };
+
+// watch에서 사용 (초기 데이터 세팅 시)
+watch(() => props.initialData, (data) => {
+  if (data) {
+    isEditMode.value = true;
+    form.value = { ...data };
+  } else {
+    isEditMode.value = false;
+    resetForm(); // 여기서 resetForm() 호출
+  }
+}, { immediate: true });
+
 
 // 저장 버튼 클릭
 const handleSubmit = async () => {
@@ -170,6 +164,23 @@ const closeModal = () => {
 onMounted(() => {
   loadSubjects();
 })
+
+async function loadSubjects() {
+  try {
+    const yearToUse = props.year || authStore.grade;
+    if (!yearToUse) {
+      console.warn('학년 정보가 없어 과목 목록을 불러올 수 없습니다.');
+      return;
+    }
+    // 공지사항 코드처럼 API 호출
+    const res = await axios.get(`/api/subjects/year/${yearToUse}`);
+    subjects.value = res.data.subjects; // 백엔드 응답 형식에 맞게 조정
+  } catch (error) {
+    console.error('과목 목록 불러오기 실패:', error);
+    subjects.value = [];
+  }
+}
+
 </script>
 
 <style scoped>

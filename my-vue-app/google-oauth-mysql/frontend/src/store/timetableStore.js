@@ -19,28 +19,53 @@ export const useTimetableStore = defineStore("timetable", {
             this.calendarEvents = [];
 
             // 정규 시간표 -> 달력 이벤트로 변환
-            this.timetables.forEach(t => {
-                const dayDate = getNextDayDate(t.day); // 월, 화 같은 요일을 날짜로 반환
+            this.timetables.forEach((t) => {
+                const dayOfWeek = mapDayOfWeek(t.day); // 월, 화 같은 요일을 날짜로 반환
 
                 this.calendarEvents.push({
+                    // FullCalendar 이벤트를 구분하기 위한 식별자
                     id: `t-${t.id}`,
+
+                    // 캘린더에 표시될 제목
                     title: `[${t.subject_name} ${t.professor_name}`,
-                    start: dayDate,
-                    allDay: true,
+
+                    // 반복 이벤트 설정
+                    daysOfWeek: [dayOfWeek],
+
+                    // 하루 중 시작, 종료 시각
+                    startTime: t.startTime,
+                    endTime: t.endTime,
+
+                    // 스타일
                     backgroundColor: "#90caf9", // 기본 시간표 색상
-                    subject_id: t.subject_id    // 필요 시 과목 필터링 대비 (현재는 사용 안함)
+                    // 그외 필요한 정보 extendedProps에 넣어두기
+                    extendedProps: {
+                        timetable_id: t.id,
+                        subject_id: t.subject_id,
+                        description: t.description || '',
+                    },
                 });
             });
 
-            // 이벤트 (휴강, 이벤트, 특강) -> 달력 이벤트로 변환
+            // 이벤트 (휴강, 이벤트, 특강) -> 단발성 이벤트로 변환
             this.events.forEach(e => {
+                // e.event_date = "2025-03-15"
+                // e..event_time = "10:00:00", e.end_time = "11:00:00"
+                const startDateTime = e.event_date + "T" + e.start_time;
+                const endDateTime = e.event_date + "T" +e.end_time;
+
                 this.calendarEvents.push({
                     id: `e-${e.id}`,
                     title: `${getEventTypeName(e.event_type)}: ${e.subject_name}`,
-                    start: e.event_date,
-                    description: e.description,
-                    backgroundColor: getEventColor(e.event_type), // 이벤트 유형별 색상 구분
-                    subject_id: e.subject_id                      // 필요 시 과목 필터링 대비 (현재는 사용 안함)
+                    start: startDateTime,
+                    end: endDateTime,
+                    backgroundColor: getEventTypeName(e.event_type),
+
+                    extendedProps: {
+                        event_id: e.id,
+                        description: e.description || '',
+                        subject_id: e.subject_id,
+                    },
                 });
             });
         },
@@ -48,21 +73,16 @@ export const useTimetableStore = defineStore("timetable", {
 });
 
 /**
- * 요일을 기준으로 다음 주 해당 요일의 날짜 반환
- * @param {string} day '월', '화', '수', '목', '금'
- * @return {string} 날짜 (yyyy--mm-dd)
+ * 요일 문자 ("월", "화", "수" 등)를 Fullcalendar 기준 숫자로 매핑
+ * Fullcalendar 일요일=0, 월=1, 화=2, 수=3, 목=4, 금=5, 토= 6
  */
-function getNextDayDate(day) {
-    const dayMap = { "월": 1, "화": 2, "수": 3, "목": 4, "금": 5 };
-    const today = new Date();
-    const currentDay = today.getDay(); // 0:일요일 1:월요일 ...
-    const targetDay = dayMap[day];
-
-    const diff = (targetDay - currentDay + 7) % 7 || 7; // 다음 주 같은 요일 찾기
-    const resultDate = new Date(today);
-    resultDate.setDate(today.getDate() + diff);
-
-    return resultDate.toISOString().split('T')[0];
+function mapDayOfWeek(dayStr) {
+   const map = {
+       "일": 0, "월": 1, "화":2,
+       "수": 3, "목": 4, "금": 5,
+       "토": 6
+   };
+   return map[dayStr] ?? 1;
 }
 
 /**

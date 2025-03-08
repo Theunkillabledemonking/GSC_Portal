@@ -8,7 +8,7 @@
         v-for="year in [1, 2, 3]"
         :key="year"
         :class="{ active: selectedYear === year }"
-        @click="selectYear"
+        @click="selectYear(year)"
       >
         {{ year }} 학년
       </button>
@@ -42,8 +42,8 @@ const selectYear = async (year) => {
 }
 
 // 초기 데이터 로드 (학생일 경우 본인 학년 과목 바로 로드)
-onMounted(() => {
-})
+// onMounted(() => {
+// })
 </script>
 
 <style scoped>

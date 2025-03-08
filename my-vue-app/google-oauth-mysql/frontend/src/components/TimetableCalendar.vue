@@ -6,6 +6,7 @@
       :isOpen="isModalOpen"
       :initialData="selectedEvent"
       :selectedDate="clickedDate"
+      :year="year"
       @close="closeModal"
       @saved="loadTimetableData"
       @deleted="loadTimetableData"
@@ -18,6 +19,7 @@ import { ref, watch, onMounted } from "vue";
 import FullCalendar from "@fullcalendar/vue3";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
+import timeGridPlugin from "@fullcalendar/timegrid";
 import { useTimetableStore } from "@/store/timetableStore.js";
 import { fetchTimetableWithEvents } from "@/services/timetableApi.js";
 import { useAuthStore } from "@/store/authStore.js";
@@ -35,8 +37,15 @@ const props = defineProps({
 
 // FullCalendar 옵선 설정
 const calendarOptions = ref({
-  plugins: [dayGridPlugin, interactionPlugin],
-  initialView: "dayGridMonth",
+  plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
+  initialView: "timeGridWeek",
+  headerToolbar: {
+    left: "prev,next today",
+    center: "title",
+    right: "dayGridMonth,timeGridWeek,timeGridDay",
+  },
+  slotMinTime: "09:00:00",
+  slotMaxTime: "20:00:00",
   events: timetableStore.calendarEvents, // pinia에서 가져온 이벤트 표시
   dateClick: handleDateClick,            // 날짜 클릭 시 이벤트 등록 모달 띄우기
   eventClick: handleEventClick           // 이벤트 클릭 시 수정/삭제 모달 뛰우기

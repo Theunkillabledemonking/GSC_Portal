@@ -21,8 +21,7 @@ exports.getTimetableWithEvents = async (req, res) => {
         const [timetables] = await pool.query(`
             SELECT
                 t.id, t.year, t.level, t.day, t.period, t.room,
-                s.name AS subject_name
-                u.name AS professor_name
+                s.name AS subject_name, u.name AS professor_name
             FROM timetables t
             JOIN subjects s ON t.subject_id = s.id
             LEFT JOIN users u ON t.professor_id = u.id
@@ -80,7 +79,7 @@ exports.updateTimetable = async (req, res) => {
     try {
         await pool.query(`
             UPDATE timetables
-            SET year = ?, level = ?, day = ?, period = ?, subject_id = ?, room = ?, professor_id =?
+            SET year = ?, level = ?, day = ?, period = ?, subject_id = ?, room = ?, professor_id = ?
             WHERE id = ?
         `, [year, level, day, period, subject_id, room, professor_id, id]);
 
@@ -127,7 +126,7 @@ exports.createEvent = async (req, res) => {
         // DB 저장
         await pool.query(`
             INSERT INTO timetable_events (timetable_id, subject_id, event_type, event_date, start_time, end_time, description)
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         `, [timetable_id || null, subject_id, event_type, event_date, start_time, end_time, description]);
 
         res.status(201).json({ message: '이벤트가 등록되었습니다.' });

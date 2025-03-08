@@ -25,7 +25,7 @@ const handleLogout = () => {
       <li><router-link to="/notices">공지사항</router-link></li>
       <li><router-link to="/calendar">학과 일정</router-link></li>
       <li v-if="authStore.isAuthenticated"><router-link to="/dashboard">대시보드</router-link></li>
-      <li v-if="authStore.isAuthenticated"><router-link to="/timetable">시간표</router-link></li>
+      <li v-if="authStore.isAuthenticated"><router-link to="/timetables">시간표</router-link></li>
 
       <!-- 관리자 전용 메뉴 -->
       <template v-if="isAdmin">
