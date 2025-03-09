@@ -17,7 +17,7 @@
         </div>
 
         <!-- 정규 수업일 경우 요일/교시 선택 -->
-        <template v-if="form.event_type === 'normal'">
+        <template v-if="form.event_type === 'normal' || form.event_type === 'cancel' || form.event_type === 'makeup'">
           <div class="form-group">
             <label>요일 선택</label>
             <select v-model="form.day">
@@ -31,18 +31,18 @@
 
           <div class="form-group">
             <label>교시 선택</label>
-            <select v-model="form.start_period"  @change="setClassTime" required>
+            <select v-model="form.start_period"  @change="getClassTime" required>
               <option v-for="p in 10" :key="p" :value="p">{{p}}교시</option>
             </select>
             <span>~</span>
-            <select v-model="form.end_period"  @change="setClassTime" required>
+            <select v-model="form.end_period"  @change="getClassTime" required>
               <option v-for="p in 10" :key="p" :value="p">{{p}}교시</option>
             </select>
           </div>
         </template>
 
         <!-- 이벤트(휴강/보강/특강)일 경우 시작/종료 날짜 선택 -->
-        <template v-else>
+        <template v-else-if="form.event_type === 'special'">
           <div class="form-group">
             <label>시작 날짜</label>
             <input type="date" v-model="form.start_date" required/>
@@ -50,6 +50,14 @@
           <div class="form-group">
             <label>종료 날짜</label>
             <input type="date" v-model="form.end_date" />
+          </div>
+          <div class="form-group">
+            <label>시간 선택</label>
+            <div class="time-range">
+              <input type="time" v-model="form.start_time" required />
+              <span>~</span>
+              <input type="time" v-model="form.end_time" required />
+            </div>
           </div>
         </template>
 
@@ -146,11 +154,11 @@ const periodTimeMap = {
 };
 
 // 🔹 교시 선택 시 자동 시간 설정
-const setClassTime = () => {
+const getClassTime = () => {
   const { start_period, end_period } = form.value;
   if (start_period && end_period && start_period <= end_period) {
-    form.value.start_time = periodTimeMap[start_period].start;
-    form.value.end_time = periodTimeMap[end_period].end;
+    form.value.start_time = periodTimeMap[start_period].start || "";
+    form.value.end_time = periodTimeMap[end_period].end || "";
   } else {
     form.value.start_time = "";
     form.value.end_time = "";
@@ -160,13 +168,14 @@ const setClassTime = () => {
 const handleSubmit = async () => {
   try {
     const payload = {
-      year: props.year ?? authStore.grade ?? 1,  // 기본값 1로 설정
-      level: authStore.level ?? 1,  // 기본값 1로 설정
+      year: props.year ?? authStore.grade ?? 1,
+      level: authStore.level ?? 1,
       subject_id: form.value.subject_id,
-      start_time: form.value.start_time,
-      end_time: form.value.end_time,
-      room: form.value.room || "",  // 빈 값 방지
-      description: form.value.description || "", // 빈 값 방지
+      day: form.value.day,               // 요일
+      start_period: form.value.start_period,  // 시작 교시
+      end_period: form.value.end_period,      // 종료 교시
+      room: form.value.room || "",
+      description: form.value.description || "",
     };
 
     if (form.value.event_type === "normal") {

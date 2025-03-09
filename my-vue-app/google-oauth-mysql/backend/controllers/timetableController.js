@@ -1,108 +1,174 @@
-const pool = require('../config/db');
-/**
- * 학기별 정규 시간표 + 휴강/보강/특강 이벤트 조회
- * 프론트에서 학기(기간), 학년(year), 레벨(level)을 넘기면
- * 해당 조건에 맞는 정규 시간표와 이벤트 정보를 함께 반환
- *
- * @route GET /api/timetable-with-events
- * @query year, level, start_date, end_date
- */
+const pool = require('../config/db'); // MYSQL 연결 유지
+const { Op } = require('sequelize');
+const { Timetable, Event, Subject, User } = require('../models'); // Sequelize ORM 사용
+const subjectController = require('./subjectController'); // 과목 컨트롤러 가져오기
 
-const { Timetable, Subject, User, Event } = require('../models');
+console.log("timetable 모델 확인", Timetable);
+
+
+// (임시) 교시 -> 시간 변환 함수 (원치 않으면 제거)
+function getClassTime(startPeriod, endPeriod) {
+    // 예시 변환 로직
+    const periodTimeMap = {
+        1: { start: '09:00', end: '09:50' },
+        2: { start: '10:00', end: '10:50' },
+        3: { start: '11:00', end: '11:50' },
+        4: { start: '12:00', end: '12:50' },
+        5: { start: '13:00', end: '13:50' },
+        6: { start: '14:00', end: '14:50' },
+        7: { start: '15:00', end: '15:50' },
+        8: { start: '16:00', end: '16:50' },
+        9: { start: '17:00', end: '17:50' },
+        10: { start: '18:00', end: '18:50' },
+    };
+
+    if (!startPeriod || !endPeriod) {
+        return { start_time: '', end_time: '' };
+    }
+    return {
+        start_time: periodTimeMap[startPeriod]?.start || '',
+        end_time: periodTimeMap[endPeriod]?.end || '',
+    };
+}
+
+console.log("timetable 모델 확인", Timetable);
+
+
+/**
+ * 과목 목록 조회 (subjectController API 호출)
+ * @route GET /api/timetables/subjects
+ */
+exports.getSubjects = async (req, res) => {
+    return subjectController.getSubjects(req, res); // 과목 목록 조회 API 호출
+}
+
+/**
+ * 학년별 과목 조회 (subjectController API 호출)
+ * @route GET /api/timetables/subjects/:year
+ */
+exports.getSubjectsByYear = async (req, res) => {
+    const { year } = req.params;
+    return subjectController.getSubjectsByYear(req, res); // 학년별 과목 조회 API 호출
+}
+/**
+ * 정규 시간표 조회
+ */
+exports.getTimetables = async (req, res) => {
+    try {
+        const timetables = await Timetable.findAll();
+
+        // 교시 -> 시간 변환
+        const formattedTimetables = timetables.map(timetable => {
+            const timeData = getClassTime(timetable.start_period, timetable.end_period);
+            return {
+                ...timetable.toJSON(),
+                start_time: timeData.start_time,
+                end_time: timeData.end_time
+            };
+        });
+        res.status(200).json({ timetables: formattedTimetables });
+    } catch (error) {
+        console.log('시간표 조회 오류', error);
+        res.status(500).json({ message: ' 서버 오류가 발생했습니다.' });
+    }
+}
+
 
 exports.getTimetableWithEvents = async (req, res) => {
     const { year, level, start_date, end_date } = req.query;
 
-    if (!year || !level || !start_date || !end_date) {
-        return res.status(400).json({
-            message: '필수 요청 값이 누락되었습니다.',
-            received: { year, level, start_date, end_date },
+    // level이 undefined 또는 빈 문자열인 경우 기본값 null 할당
+    const levelValue = (level === undefined || level === "") ? null : level;
+
+    try {
+        const timetables = await Timetable.findAll({
+            where: {
+                year,
+                // 정규 수업은 level이 null이어야 하므로, OR 조건을 사용
+                [Op.or]: [
+                    { level: levelValue },  // 만약 levelValue가 제공되면 그 값과 일치하는 데이터 (특강)
+                    { level: null }         // 정규 수업
+                ]
+            },
+            include: [
+                { model: Subject, attributes: ['name'], as: 'subject' },
+                { model: User, attributes: ['name'], as: 'professor', required: false }
+            ]
         });
-    }
 
-    if (![1, 2, 3].includes(Number(year))) {
-        return res.status(400).json({ message: '올바른 학년을 선택해주세요 (1, 2, 3학년만 가능합니다.' });
-    }
-
-   try {
-        // Sequelize ORM을 활용한 시간표 조회
-       const timetables = await Timetable.findAll({
-           where: { year, level },
-           include: [
-               { model: Subject, attributes: ['name'], as: 'subject' },
-               { model: User, attributes: ['name'], as: 'Professor', required: false },
-           ]
-       });
-
-       // Sequelize ORM을 활용한 이벤트 조회
-       const events = await Event.findAll({
-           where: {
-               event_date: {
-                   [Op.between]: [start_date, end_date]
-               }
-           },
-           include: [
-               { model: Subject, attributes: ['name'], as: 'subject' },
-           ]
-       });
-
-       res.json({ timetables, events });
-
+        // (이벤트 관련 데이터 처리 예시는 필요에 따라 추가)
+        res.status(200).json({ timetables, events: [] });
     } catch (error) {
-        console.log("❌ 시간표 및 이벤트 조회 오류", error);
-        res.status(500).json({ message: "서버 오류가 발생했습니다." });
+        console.error("❌ 시간표 조회 오류:", error);
+        res.status(500).json({ message: "서버 오류 발생" });
     }
 };
 
 /**
- * 정규 시간표 등록
- * @route POST /api/timetable
+ * ✅ 정규 시간표 등록
+ * @route POST /api/timetables
  */
 exports.createTimetable = async (req, res) => {
     try {
-        console.log("요청 받은 데이터:", req.body);
+        console.log("📌 요청 받은 데이터:", req.body);
+        // event_type이 없으면 "normal"로 처리
+        const { year, level, subject_id, room, description, day, start_period, end_period, event_type } = req.body;
+        const effectiveEventType = event_type || "normal";
+        // 정규수업은 level을 무시하고 null로 저장
+        const levelValue = effectiveEventType === "normal" ? null : level;
 
-        const { year, level, subject_id, start_time, end_time, room, description, day, start_period, end_period } = req.body;
-
-        if (!year || !level || !subject_id || !start_time || !end_time) {
+        // 필수 데이터 체크 (정규수업인 경우 day, start_period, end_period가 필요)
+        if (!year || !subject_id || !day || !start_period || !end_period) {
             return res.status(400).json({ error: "필수 데이터가 누락되었습니다." });
         }
 
+        // DB에 level 컬럼이 있다면 여기서 levelValue로 저장해야 함!
         const newTimetable = await Timetable.create({
-            year, level, subject_id, start_time, end_time, room, description, day, start_period, end_period
+            year,
+            level: levelValue,  // DB 필드와 매핑
+            subject_id,
+            room,
+            description: description || '',
+            day,
+            start_period,
+            end_period,
         });
 
         res.status(201).json(newTimetable);
     } catch (error) {
-        console.error("시간표 생성 중 오류:", error);
+        console.error("❌ 시간표 생성 중 오류:", error);
         res.status(500).json({ error: "서버 에러 발생" });
     }
 };
 
 /**
- * 정규 시간표 수정
- * @route PUT /api/timetable/:id
+ * ✅ 정규 시간표 수정
+ * @route PUT /api/timetables/:id
  */
 exports.updateTimetable = async (req, res) => {
     const { id } = req.params;
     const { year, level, day, start_period, end_period, subject_id, room, professor_id } = req.body;
 
     try {
-        await Timetable.update(
-            { year, level, day, start_period, end_period, subject_id, room, professor_id },
-            { where: { id } }
-        );
+        const timetable = await Timetable.findByPk(id);
+        if (!timetable) {
+            return res.status(404).json({ error: "해당 시간표를 찾을 수 없습니다." });
+        }
 
-        res.status(200).json({ message: '시간표가 수정되었습니다.' });
+        await timetable.update({
+            year, level, day, start_period, end_period, subject_id, room, professor_id,
+        });
+
+        res.status(200).json({ message: "✅ 시간표가 수정되었습니다." });
     } catch (error) {
-        console.error('시간표 수정 오류:', error);
-        res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+        console.error("❌ 시간표 수정 오류:", error);
+        res.status(500).json({ message: "서버 오류가 발생했습니다." });
     }
 };
 
 /**
- * 정규 시간표 삭제
- * @route DELETE /api/timetable/:id
+ * ✅ 정규 시간표 삭제
+ * @route DELETE /api/timetables/:id
  */
 exports.deleteTimetable = async (req, res) => {
     const { id } = req.params;
@@ -110,105 +176,13 @@ exports.deleteTimetable = async (req, res) => {
     try {
         const timetable = await Timetable.findByPk(id);
         if (!timetable) {
-            return res.status(404).json({error: '해당 시간표를 찾을 수 없습니다.'})
+            return res.status(404).json({ error: "해당 시간표를 찾을 수 없습니다." });
         }
 
-        await Timetable.destroy({where: {id}});
-        res.status(200).json({message: '시간표가 삭제되었습니다.'});
+        await timetable.destroy();
+        res.status(200).json({ message: "✅ 시간표가 삭제되었습니다." });
     } catch (error) {
-        console.error('시간표 삭제 오류', error);
-        res.status(500).json({ message: '서버 오류가 발생했씁니다.'});
-    }
-};
-
-
-/**
- * 휴강/보강/특강 이벤트 등록
- * 교수/관리자가 특정 과목의 특정 날짜에 이벤트를 등록
- *
- * @route POST /api/events
- * @body timetable_id, subject_id, event_type, event_date, start_time, end_time, description
- */
-exports.createEvent = async (req, res) => {
-    const { timetable_id, subject_id, event_type, event_date, start_time, end_time, description } = req.body;
-
-    try {
-        // 기본 유효성 체크
-        if (!['cancel', 'makeup', 'special'].includes(event_type)) {
-            return res.status(400).json({ message: '올바른 이벤트 유형을 선택해주세요 (cancel, makeup, special' });
-        }
-
-        // DB 저장
-        await pool.query(`
-            INSERT INTO timetable_events (timetable_id, subject_id, event_type, event_date, start_time, end_time, description)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        `, [timetable_id || null, subject_id, event_type, event_date, start_time, end_time, description]);
-
-        res.status(201).json({ message: '이벤트가 등록되었습니다.' });
-    } catch (error) {
-        console.log("이벤트 등록 오류", error);
-        res.status(500).json({ message: '서버 오류가 발생했습니다.' });
-    }
-};
-
-/**
- * 휴강/보강/특강 이벤트 수정
- * 잘못 등록한 이벤트 수정
- *
- * @route PUT /api/events/:event_id
- * @param event_id
- */
-exports.updateEvent = async (req, res) => {
-    const { event_id } = req.params; // url 에서 event_id 받기
-    const { timetable_id, subject_id, event_type, event_date, start_time, end_time, description } = req.body;
-
-    try {
-        // 기본 유효성 체크
-        if (!['cancel', 'makeup', 'special'].includes(event_type)) {
-            return res.status(400).json({ message: '올바른 이벤트 유형을 선택해주세요 (cancel, makeup, special)' });
-        }
-
-        // DB 수정
-        await pool.query(`
-            UPDATE timetable_events 
-            SET 
-                timetable_id = ? , 
-                subject_id = ?, 
-                event_type = ?, 
-                event_date = ?, 
-                start_time = ?, 
-                end_time = ?, 
-                description = ? 
-            WHERE id = ?
-        `, [timetable_id || null, subject_id, event_type, event_date, start_time, end_time, description, event_id]);
-
-        res.status(200).json({ message: '이벤트가 수정되었습니다.' });
-    } catch (error) {
-        console.log('이벤트 수정 오류', error);
-        res.status(500).json({ message: '서버 오류가 발생했습니다.'})
-    }
-}
-
-/**
- * 휴강/보강/특강 이벤트 삭제
- * 잘못 등록한 이벤트 삭제
- *
- * @route DELETE /api/events/:event_id
- * @param event_id
- */
-exports.deleteEvent = async (req, res) => {
-    const { event_id } = req.params;
-
-    try {
-        const [result] = await pool.query(`DELETE FROM timetable_events WHERE id = ?`, [event_id]);
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: '해당 이벤트를 찾을 수 없습니다.' });
-        }
-
-        res.json({ message: '이벤트가 삭제되었습니다.' });
-    } catch (error) {
-        console.error('이벤트 삭제 오류', error);
-        res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+        console.error("❌ 시간표 삭제 오류:", error);
+        res.status(500).json({ message: "서버 오류가 발생했습니다." });
     }
 };

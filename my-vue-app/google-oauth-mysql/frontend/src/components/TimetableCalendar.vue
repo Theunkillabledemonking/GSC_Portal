@@ -25,8 +25,8 @@ import { fetchTimetableWithEvents } from "@/services/timetableApi.js";
 import { useAuthStore } from "@/store/authStore.js";
 import TimetableFormModal from "@/components/TimetableFormModal.vue";
 
+// Setup & Props
 const authStore = useAuthStore();
-// 시간표 및 이벤트 저장하는 Pinia 스토어
 const timetableStore = useTimetableStore();
 
 // props: 부모 컴포넌트(TimetableView)에서 전달받는 데이터
@@ -51,6 +51,7 @@ const calendarOptions = ref({
   eventClick: handleEventClick           // 이벤트 클릭 시 수정/삭제 모달 뛰우기
 })
 
+// state
 const isModalOpen = ref(false);
 const selectedEvent = ref(null); // 수정 모드 데이터 저장
 const clickedDate = ref(''); // 신규 등록 시 날짜 지정
@@ -58,16 +59,17 @@ const clickedDate = ref(''); // 신규 등록 시 날짜 지정
 
 /**
  * 시간표 및 이벤트 데이터 불러오기
- */
+ */// 🔹 TimetableCalendar.vue (중요 부분 발췌)
 async function loadTimetableData() {
-  const start_date = `2025-03-01`;
-  const end_date = `2025-07-31`;
-
-  const yearToUse = props.year ?? authStore.grade ?? 1;
-  const levelToUse = authStore.level ?? "N3";
-
   try {
-    console.log("📢 요청 데이터:", { year: yearToUse, level: levelToUse, start_date, end_date });
+    // 임의 범위 설정
+    const start_date = "2025-03-01";
+    const end_date = "2025-07-31";
+
+    // year/level 추출
+    const yearToUse = props.year ?? authStore.grade ?? 1;
+    const levelToUse = null;
+    console.log('요청 데이터', {year: yearToUse, level: levelToUse, start_date , end_date});
 
     const response = await fetchTimetableWithEvents({
       year: yearToUse,
@@ -76,36 +78,52 @@ async function loadTimetableData() {
       end_date,
     });
 
-    console.log("📢 응답 데이터:", response);
+    console.log('응답 데이터', response);
 
-    // 응답 데이터가 없는 경우 기본값 설정
+    // 구조분해 할당 or [] 처리
     const timetables = response.timetables ?? [];
     const events = response.events ?? [];
 
-    console.log("📢 불러온 시간표:", timetables);
-    console.log("📢 불러온 이벤트:", events);
+    console.log('불러온 시간표', timetables);
+    console.log('불러온 이벤트:', events);
 
-    // 빈 배열이라도 `forEach()` 실행 가능
-    const formattedTimetables = timetables.map((t) => ({
-      title: `[${t.subject_name}] ${t.professor_name}`,
-      start: getNextDayDate(t.day, t.start_period),
-      end: getNextDayDate(t.day, t.end_period),
-      backgroundColor: '#90caf9'
-    }));
+    // 정규 시간표 가공
+    const formattedTimetables = timetables.map(t => {
+      // day, start_period, end_period를 모두 넘김
+      const { start, end } = getNextDayDate(t.day, t.start_period, t.end_period);
 
-    const formattedEvents = events.map((e) => ({
-      title: `${getEventTypeName(e.event_type)}: ${e.subject_name}`,
-      start: e.event_date,
-      backgroundColor: getEventColor(e.event_type),
-    }));
+      return {
+        title: `[${t.subject?.name ?? '??'}` + (t.professor?.name ?? ""),
+        start,
+        end,
+        backgroundColor: "#90caf9",
+        extendedProps: {
+          timetable_id: t.id,
+          room: t.room ?? "",
+        },
+      };
+    });
 
+    // 같은 방식으로 이벤트 처리
+    const formattedEvents = events.map(e => {
+      return {
+        title: getEventTitle(e),
+        start: e.event_date,
+        backgroundColor: '#f48b41',
+        extendedProps: {
+          event_id: e.id,
+          description: e.description ?? "",
+        }
+      }
+    });
+
+    // pinia 스토어에 저장 + 캘린더 Events 지정
     timetableStore.setTimetableAndEvents(formattedTimetables, formattedEvents);
     calendarOptions.value.events = timetableStore.calendarEvents;
-
   } catch (error) {
-    console.error("❌ 시간표 및 이벤트 데이터 불러오기 실패:", error);
+    console.error("시간표 및 이벤트 데이터 불러오기 실패", error);
+    }
   }
-}
 
 // 🔹 교시별 시간표 매핑
 const periodTimeMap = {
@@ -121,29 +139,33 @@ const periodTimeMap = {
   10: { start: "18:00", end: "18:50" }
 };
 
-function getNextDayDate(day, period) {
-  const dayMap = { "월": 1, "화": 2, "수": 3, "목": 4, "금": 5};
+// 요일 + 교시 -> 날짜/시간
+function getNextDayDate(day, start_period, end_period) {
+  // 1) dayMap 확인
+  const dayMap = { "월":1, "화":2, "수":3, "목":4, "금":5 };
   const baseDate = new Date("2025-03-03");
-  const targetDateStart = new Date(baseDate);
-  const targetDateEnd = new Date(baseDate);
+  const startDate = new Date(baseDate);
+  const endDate = new Date(baseDate);
 
-  // 요일 반영
-  targetDateStart.setDate(baseDate.getDate() - dayMap[day] - 1);
-  targetDateEnd.setDate(baseDate.getDate() - dayMap[day] - 1);
+  // 2) 요일 반영
+  const offset = dayMap[day] ? dayMap[day] - 1 : 0;
+  startDate.setDate(baseDate.getDate() + (dayMap[day] - 1));
+  endDate.setDate(baseDate.getDate() + (dayMap[day] - 1));
 
-  // 시작 시간 설정
-  if (start_period in periodTimeMap){
-    const [startHour, startMinute] = periodTimeMap[start_period].start.split(":");
-    targetDateStart.setHours(startHour, startMinute, 0);
+  // 3) 교시 -> 시간 반영
+  if (start_period in periodTimeMap) {
+    const [sh, sm] = periodTimeMap[start_period].start.split(":");
+    startDate.setHours(sh, sm, 0);
   }
-
-  // 종료 시간 설정
   if (end_period in periodTimeMap) {
-    const [endHour, endMinute] = periodTimeMap[end_period].end.split(":");
-    targetDateEnd.setHours(endHour, endMinute, 0);
+    const [eh, em] = periodTimeMap[end_period].end.split(":");
+    endDate.setHours(eh, em, 0);
   }
 
-  return { start: targetDateStart.toISOString(), end: targetDateEnd.toISOString() };
+  return {
+    start: startDate.toISOString(),
+    end: endDate.toISOString()
+  };
 }
 
 /**

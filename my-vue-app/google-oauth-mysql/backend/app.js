@@ -17,6 +17,7 @@ const noticeRoutes = require('./routes/noticeRoutes');
 const subjectRoutes = require('./routes/subjectRoutes');
 const calendarRoutes = require('./routes/calendarRoutes');
 const timetableRoutes = require('./routes/timetableRoutes');
+const eventRoutes = require('./routes/eventRoutes'); // 이벤트 (보강/휴강/특강)
 // =======================
 // ✅ Express 앱 초기화
 // =======================
@@ -47,8 +48,8 @@ app.use('/api/notices', noticeRoutes);  // ✅ 공지사항 라우트
 app.use('/api/subjects', subjectRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // 파일 업로드 라우트
 app.use('/api/calendar', calendarRoutes); // 구글 캘린더 라우트
-app.use('/api/timetables', timetableRoutes)
-
+app.use('/api/timetables', timetableRoutes) // ✅ 정규 시간표 관리
+app.use('/api/events', eventRoutes); // ✅ 이벤트 관리 (보강/휴강/특강)
 // =======================
 // ✅ 에러 핸들러 (Global Error Handler)
 // =======================
