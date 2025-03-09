@@ -1,6 +1,4 @@
 const pool = require('../config/db');
-const { Timetable } = require('../models/timetable');  // 모델 불러오기
-
 /**
  * 학기별 정규 시간표 + 휴강/보강/특강 이벤트 조회
  * 프론트에서 학기(기간), 학년(year), 레벨(level)을 넘기면
@@ -9,6 +7,9 @@ const { Timetable } = require('../models/timetable');  // 모델 불러오기
  * @route GET /api/timetable-with-events
  * @query year, level, start_date, end_date
  */
+
+const { Timetable, Subject, User, Event } = require('../models');
+
 exports.getTimetableWithEvents = async (req, res) => {
     const { year, level, start_date, end_date } = req.query;
 
@@ -23,32 +24,29 @@ exports.getTimetableWithEvents = async (req, res) => {
         return res.status(400).json({ message: '올바른 학년을 선택해주세요 (1, 2, 3학년만 가능합니다.' });
     }
 
-    try {
-        // 1. 정규 시간표 조회
-        const [timetables] = await pool.query(`
-            SELECT
-                t.id, t.year, t.level, t.day, t.start_period, t.end_period, t.room,
-                s.name AS subject_name, u.name AS professor_name
-            FROM timetables t
-                     JOIN subjects s ON t.subject_id = s.id
-                     LEFT JOIN users u ON t.professor_id = u.id
-            WHERE t.year = ? AND t.level = ?
-        `, [year, level]);
+   try {
+        // Sequelize ORM을 활용한 시간표 조회
+       const timetables = await Timetable.findAll({
+           where: { year, level },
+           include: [
+               { model: Subject, attributes: ['name'], as: 'subject' },
+               { model: User, attributes: ['name'], as: 'Professor', required: false },
+           ]
+       });
 
-        // 2. 이벤트 조회
-        const [events] = await pool.query(`
-            SELECT
-                e.id, e.timetable_id, e.subject_id,
-                e.event_type, e.event_date, e.start_time, e.end_time,
-                e.description,
-                s.name AS subject_name
-            FROM timetable_events e
-                     JOIN subjects s ON e.subject_id = s.id
-            WHERE e.event_date BETWEEN ? AND ?
-        `, [start_date, end_date]);
+       // Sequelize ORM을 활용한 이벤트 조회
+       const events = await Event.findAll({
+           where: {
+               event_date: {
+                   [Op.between]: [start_date, end_date]
+               }
+           },
+           include: [
+               { model: Subject, attributes: ['name'], as: 'subject' },
+           ]
+       });
 
-        // 빈 배열이라도 응답 반환
-        res.json({ timetables: timetables ?? [], events: events ?? [] });
+       res.json({ timetables, events });
 
     } catch (error) {
         console.log("❌ 시간표 및 이벤트 조회 오류", error);
@@ -90,11 +88,10 @@ exports.updateTimetable = async (req, res) => {
     const { year, level, day, start_period, end_period, subject_id, room, professor_id } = req.body;
 
     try {
-        await pool.query(`
-            UPDATE timetables
-            SET year = ?, level = ?, day = ?, start_period = ?, end_period = ?, subject_id = ?, room = ?, professor_id = ?
-            WHERE id = ?
-        `, [year, level, day, start_period, end_period, subject_id, room, professor_id, id]);
+        await Timetable.update(
+            { year, level, day, start_period, end_period, subject_id, room, professor_id },
+            { where: { id } }
+        );
 
         res.status(200).json({ message: '시간표가 수정되었습니다.' });
     } catch (error) {
@@ -111,8 +108,13 @@ exports.deleteTimetable = async (req, res) => {
     const { id } = req.params;
 
     try {
-        await pool.query(`DELETE FROM timetables WHERE id = ?`, [id]);
-        res.status(200).json({ message: '시간표가 삭제되었습니다.'} );
+        const timetable = await Timetable.findByPk(id);
+        if (!timetable) {
+            return res.status(404).json({error: '해당 시간표를 찾을 수 없습니다.'})
+        }
+
+        await Timetable.destroy({where: {id}});
+        res.status(200).json({message: '시간표가 삭제되었습니다.'});
     } catch (error) {
         console.error('시간표 삭제 오류', error);
         res.status(500).json({ message: '서버 오류가 발생했씁니다.'});
