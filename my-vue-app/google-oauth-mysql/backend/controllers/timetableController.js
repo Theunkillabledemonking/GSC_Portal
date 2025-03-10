@@ -1,3 +1,5 @@
+
+// 정규 수업은 level이 Null, 이벤트(특강 등)는 level이 특정 문자열일 경우
 const pool = require('../config/db'); // MYSQL 연결 유지
 const { Op } = require('sequelize');
 const { Timetable, Event, Subject, User } = require('../models'); // Sequelize ORM 사용
@@ -75,20 +77,21 @@ exports.getTimetables = async (req, res) => {
 
 
 exports.getTimetableWithEvents = async (req, res) => {
-    const { year, level, start_date, end_date } = req.query;
+    const { year, start_date, end_date } = req.query;
 
-    // level이 undefined 또는 빈 문자열인 경우 기본값 null 할당
-    const levelValue = (level === undefined || level === "") ? null : level;
+    const levelParam = req.query.level;
+    const levelValue = (levelParam === undefined || levelParam === "") ? null : levelParam;
+
+    const specialLevels = ['N1', 'N2', 'N3', 'TOPIK4', 'TOPIK6'];
 
     try {
         const timetables = await Timetable.findAll({
             where: {
                 year,
                 // 정규 수업은 level이 null이어야 하므로, OR 조건을 사용
-                [Op.or]: [
-                    { level: levelValue },  // 만약 levelValue가 제공되면 그 값과 일치하는 데이터 (특강)
-                    { level: null }         // 정규 수업
-                ]
+                level: {
+                    [Op.in]: [null, ...specialLevels],
+                }
             },
             include: [
                 { model: Subject, attributes: ['name'], as: 'subject' },

@@ -106,7 +106,7 @@
 <script setup>
 import { ref, onMounted, watch } from "vue";
 import axios from "axios";
-import {createEvent, updateEvent, deleteEvent, createTimetable} from "@/services/timetableApi.js";
+import { createEvent, updateEvent, deleteEvent, createTimetable} from "@/services/timetableApi.js";
 import { useAuthStore} from "@/store/authStore.js";
 
 // Props & Emits
@@ -169,7 +169,7 @@ const handleSubmit = async () => {
   try {
     const payload = {
       year: props.year ?? authStore.grade ?? 1,
-      level: authStore.level ?? 1,
+      level: form.value.event_type === "normal" ? null : authStore.level ?? 1,
       subject_id: form.value.subject_id,
       day: form.value.day,               // 요일
       start_period: form.value.start_period,  // 시작 교시
@@ -183,9 +183,9 @@ const handleSubmit = async () => {
         alert("요일과 교시를 선택해주세요.");
         return;
       }
-      payload.day = form.value.day;
-      payload.start_period = form.value.start_period;
-      payload.end_period = form.value.end_period;
+      // payload.day = form.value.day;
+      // payload.start_period = form.value.start_period;
+      // payload.end_period = form.value.end_period;
     }
 
     console.log("보낼 데이터:", JSON.stringify(payload, null, 2));
@@ -195,7 +195,7 @@ const handleSubmit = async () => {
     closeModal();
   } catch (error) {
     console.error("시간표 등록 중 오류:", error);
-    alert('저장 실패: ' + error.response?.data?.error || error.message);
+    alert('저장 실패: ' + (error.response?.data?.error || error.message));
   }
 };
 

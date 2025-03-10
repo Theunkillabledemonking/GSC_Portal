@@ -56,6 +56,25 @@ const isModalOpen = ref(false);
 const selectedEvent = ref(null); // 수정 모드 데이터 저장
 const clickedDate = ref(''); // 신규 등록 시 날짜 지정
 
+// 🔹 교시별 시간표 매핑
+const periodTimeMap = {
+  1: { start: "09:00", end: "09:50" },
+  2: { start: "10:00", end: "10:50" },
+  3: { start: "11:00", end: "11:50" },
+  4: { start: "12:00", end: "12:50" },
+  5: { start: "13:00", end: "13:50" },
+  6: { start: "14:00", end: "14:50" },
+  7: { start: "15:00", end: "15:50" },
+  8: { start: "16:00", end: "16:50" },
+  9: { start: "17:00", end: "17:50" },
+  10: { start: "18:00", end: "18:50" }
+};
+
+// FullCalendar에서 요일을 0~6로 매핑
+function mayDayOfWeek(dateStr) {
+  const map = { "일": 0, "월": 1, "화": 2, "수":3, "목":4, "금":5, "토":6};
+  return map[dateStr] ?? 1 ;
+}
 
 /**
  * 시간표 및 이벤트 데이터 불러오기
@@ -88,34 +107,31 @@ async function loadTimetableData() {
     console.log('불러온 이벤트:', events);
 
     // 정규 시간표 가공
-    const formattedTimetables = timetables.map(t => {
-      // day, start_period, end_period를 모두 넘김
-      const { start, end } = getNextDayDate(t.day, t.start_period, t.end_period);
-
-      return {
-        title: `[${t.subject?.name ?? '??'}` + (t.professor?.name ?? ""),
-        start,
-        end,
-        backgroundColor: "#90caf9",
-        extendedProps: {
-          timetable_id: t.id,
-          room: t.room ?? "",
-        },
-      };
-    });
+    const formattedTimetables = timetables.map(t => ({
+      id: `t-${t.id}`,
+      title: `[${t.subject?.name?? '??'}] ${t.professor?.name ?? ''}`,
+      daysOfWeek: [mapDayOfWeek(t.day)],
+      startTime: periodTimeMap[t.start_period].start,
+      endTime: periodTimeMap[t.end_period].end,
+      backgroundColor: "#90caf9",
+      extendedProps: {
+        timetable_id: t.id,
+        room: t.room ?? ""
+      }
+    }));
 
     // 같은 방식으로 이벤트 처리
-    const formattedEvents = events.map(e => {
-      return {
-        title: getEventTitle(e),
-        start: e.event_date,
-        backgroundColor: '#f48b41',
-        extendedProps: {
-          event_id: e.id,
-          description: e.description ?? "",
-        }
+    const formattedEvents = events.map(e => ({
+      id: `e-${e.id}`,
+      title: `[${getEventTypeName(e.event_type)}] ${e.subject?.name ?? ''}`,
+      start: e.event_date + "T" + (e.start_time || "00:00:00"),
+      end: e.event_date + "T" + (e.end_time || "23:59:59"),
+      backgroundColor: getEventTypeName(e.event_type),
+      extendedProps: {
+        event_id: e.id,
+        description: e.description ?? ""
       }
-    });
+    }));
 
     // pinia 스토어에 저장 + 캘린더 Events 지정
     timetableStore.setTimetableAndEvents(formattedTimetables, formattedEvents);
@@ -125,48 +141,32 @@ async function loadTimetableData() {
     }
   }
 
-// 🔹 교시별 시간표 매핑
-const periodTimeMap = {
-  1: { start: "09:00", end: "09:50" },
-  2: { start: "10:00", end: "10:50" },
-  3: { start: "11:00", end: "11:50" },
-  4: { start: "12:00", end: "12:50" },
-  5: { start: "13:00", end: "13:50" },
-  6: { start: "14:00", end: "14:50" },
-  7: { start: "15:00", end: "15:50" },
-  8: { start: "16:00", end: "16:50" },
-  9: { start: "17:00", end: "17:50" },
-  10: { start: "18:00", end: "18:50" }
-};
-
-// 요일 + 교시 -> 날짜/시간
-function getNextDayDate(day, start_period, end_period) {
-  // 1) dayMap 확인
-  const dayMap = { "월":1, "화":2, "수":3, "목":4, "금":5 };
-  const baseDate = new Date("2025-03-03");
-  const startDate = new Date(baseDate);
-  const endDate = new Date(baseDate);
-
-  // 2) 요일 반영
-  const offset = dayMap[day] ? dayMap[day] - 1 : 0;
-  startDate.setDate(baseDate.getDate() + (dayMap[day] - 1));
-  endDate.setDate(baseDate.getDate() + (dayMap[day] - 1));
-
-  // 3) 교시 -> 시간 반영
-  if (start_period in periodTimeMap) {
-    const [sh, sm] = periodTimeMap[start_period].start.split(":");
-    startDate.setHours(sh, sm, 0);
+function getEventTypeName(type) {
+  switch (type) {
+    case "cancel":
+      return "휴강";
+    case "makeup":
+      return "보강";
+    case "special":
+      return "특강";
+    default:
+      return "이벤트";
   }
-  if (end_period in periodTimeMap) {
-    const [eh, em] = periodTimeMap[end_period].end.split(":");
-    endDate.setHours(eh, em, 0);
-  }
-
-  return {
-    start: startDate.toISOString(),
-    end: endDate.toISOString()
-  };
 }
+
+function getEventColor(type) {
+  switch (type) {
+    case "cancel":
+      return "#ef5350";
+    case "makeup":
+      return "#66bb6a";
+    case "special":
+      return "#ab47bc";
+    default:
+      return "#90caf9";
+  }
+}
+
 
 /**
  * 날짜 클릭 시
