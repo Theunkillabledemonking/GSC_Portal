@@ -7,22 +7,23 @@ const subjectController = require('./subjectController'); // 과목 컨트롤러
 
 console.log("timetable 모델 확인", Timetable);
 
+// 예시 변환 로직
+const periodTimeMap = {
+    1: { start: '09:00', end: '09:50' },
+    2: { start: '10:00', end: '10:50' },
+    3: { start: '11:00', end: '11:50' },
+    4: { start: '12:00', end: '12:50' },
+    5: { start: '13:00', end: '13:50' },
+    6: { start: '14:00', end: '14:50' },
+    7: { start: '15:00', end: '15:50' },
+    8: { start: '16:00', end: '16:50' },
+    9: { start: '17:00', end: '17:50' },
+    10: { start: '18:00', end: '18:50' },
+};
+
 
 // (임시) 교시 -> 시간 변환 함수 (원치 않으면 제거)
 function getClassTime(startPeriod, endPeriod) {
-    // 예시 변환 로직
-    const periodTimeMap = {
-        1: { start: '09:00', end: '09:50' },
-        2: { start: '10:00', end: '10:50' },
-        3: { start: '11:00', end: '11:50' },
-        4: { start: '12:00', end: '12:50' },
-        5: { start: '13:00', end: '13:50' },
-        6: { start: '14:00', end: '14:50' },
-        7: { start: '15:00', end: '15:50' },
-        8: { start: '16:00', end: '16:50' },
-        9: { start: '17:00', end: '17:50' },
-        10: { start: '18:00', end: '18:50' },
-    };
 
     if (!startPeriod || !endPeriod) {
         return { start_time: '', end_time: '' };
@@ -79,9 +80,6 @@ exports.getTimetables = async (req, res) => {
 exports.getTimetableWithEvents = async (req, res) => {
     const { year, start_date, end_date } = req.query;
 
-    const levelParam = req.query.level;
-    const levelValue = (levelParam === undefined || levelParam === "") ? null : levelParam;
-
     const specialLevels = ['N1', 'N2', 'N3', 'TOPIK4', 'TOPIK6'];
 
     try {
@@ -100,8 +98,66 @@ exports.getTimetableWithEvents = async (req, res) => {
             ]
         });
 
-        // (이벤트 관련 데이터 처리 예시는 필요에 따라 추가)
-        res.status(200).json({ timetables, events: [] });
+        console.log("📌 조회된 timetables:", timetables.length);
+        /// [2] 휴강/보강/특강 이벤트 조회 (특정 기간)
+        const events = await Event.findAll({
+            where: {
+                event_date: { [Op.between]: [start_date, end_date] }
+            }
+        });
+
+        console.log("📌 조회된 events:", events.length);
+
+        // 🚨 NULL 체크 (예외 발생 방지)
+        if (!timetables || !events) {
+            throw new Error("DB에서 데이터를 가져오는 중 문제가 발생했습니다.");
+        }
+
+        // [3] FullCalendar에 표시할 데이터 변환
+        let finalEvents = [];
+
+        // 🔹 (1) 정규 수업 추가 (휴강된 날짜 제외)
+        timetables.forEach((t) => {
+            const dayOfWeekMap = { "일": 0, "월": 1, "화": 2, "수": 3, "목": 4, "금": 5, "토": 6 };
+            const dayOfWeek = dayOfWeekMap[t.day];
+
+            const isCancelled = events.some(e =>
+                e.event_type === 'cancel' &&
+                e.timetable_id === t.id &&
+                e.event_date >= start_date &&
+                e.event_date <= end_date
+            );
+
+            if (!isCancelled) {
+                finalEvents.push({
+                    id: `t-${t.id}`,
+                    title: `[${t.subject?.name}] ${t.professor?.name || ''} (${t.room || ''})`,
+                    daysOfWeek: [dayOfWeek],
+                    startTime: periodTimeMap[t.start_period]?.start || "00:00",
+                    endTime: periodTimeMap[t.end_period]?.end || "23:59",
+                    backgroundColor: "#90caf9",
+                    extendedProps: { ...t.toJSON() }
+                });
+            }
+        });
+
+        // 🔹 (2) 보강 & 특강 추가
+        events.forEach(e => {
+            if (e.event_type === 'makeup' || e.event_type === 'special') {
+                finalEvents.push({
+                    id: `e-${e.id}`,
+                    title: `${e.event_type === 'makeup' ? '보강' : '특강'}: ${e.subject_name}`,
+                    start: `${e.event_date}T${e.start_time || "00:00"}`,
+                    end: `${e.event_date}T${e.end_time || "23:59"}`,
+                    backgroundColor: e.event_type === 'makeup' ? "#4caf50" : "#ff9800",
+                    extendedProps: { ...e }
+                });
+            }
+        });
+
+        console.log("📌 최종 생성된 fullCalendar 이벤트 개수:", finalEvents.length);
+
+        res.status(200).json({ timetables, events: finalEvents });
     } catch (error) {
         console.error("❌ 시간표 조회 오류:", error);
         res.status(500).json({ message: "서버 오류 발생" });

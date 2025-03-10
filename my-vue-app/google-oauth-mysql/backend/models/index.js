@@ -7,6 +7,7 @@ db.sequelize = sequelize;
 db.Sequelize = Sequelize;
 
 db.Timetable = require('./timetable')(sequelize, Sequelize.DataTypes);
+db.Event = require('./event');
 db.Subject = require('./subject')(sequelize, Sequelize.DataTypes);
 db.User = require('./user')(sequelize, Sequelize.DataTypes);
 

@@ -52,6 +52,7 @@ export const updateTimetable = async (id, timetableData) => {
     }
 };
 
+
 /**
  * 정규 시간표 삭제 API
  * @param {Number} id - 시간표 ID
@@ -61,46 +62,6 @@ export const deleteTimetable = async (id) => {
         await apiClient.delete(`/timetables/${id}`);
     } catch (error) {
         console.error('시간표 삭제 실패', error);
-        throw error;
-    }
-};
-
-/**
- * 이벤트(휴강/보강/특강) 등록 API
- * @param {Object} eventData - 이벤트 정보
- */
-export const createEvent = async (eventData) => {
-    try {
-        await apiClient.post('/timetables/events', eventData);
-    } catch (error) {
-        console.error('이벤트 등록 실패', error);
-        throw error;
-    }
-};
-
-/**
- * 이벤트(휴강/보강/특강) 수정 API
- * @param {Number} eventId - 이벤트 ID
- * @param {Object} eventData - 이벤트 정보
- */
-export const updateEvent = async (eventId, eventData) => {
-    try {
-        await apiClient.put(`/timetable/events/${eventId}`, eventData);
-    } catch (error) {
-        console.error('이벤트 수정 실패', error);
-        throw error;
-    }
-};
-
-/**
- * 이벤트(휴강/보강/특강) 삭제 API
- * @param {Number} eventId - 이벤트 ID
- */
-export const deleteEvent = async (eventId) => {
-    try {
-        await apiClient.delete(`/timetable/events/${eventId}`);
-    } catch (error) {
-        console.error('이벤트 삭제 실패', error);
         throw error;
     }
 };

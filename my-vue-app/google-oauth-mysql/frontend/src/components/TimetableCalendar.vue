@@ -99,15 +99,15 @@ function closeModal() {
  * 시간표 및 이벤트 데이터 불러오기
  */
 async function loadTimetableData() {
+  // 임의 범위 설정
+  const start_date = "2025-03-01";
+  const end_date = "2025-07-31";
+
+  // year/level 추출
+  const yearToUse = props.year ?? authStore.grade ?? 1;
+  const levelToUse = null;
+
   try {
-    // 임의 범위 설정
-    const start_date = "2025-03-01";
-    const end_date = "2025-07-31";
-
-    // year/level 추출
-    const yearToUse = props.year ?? authStore.grade ?? 1;
-    const levelToUse = null;
-
     console.log('요청 데이터', {year: yearToUse, level: levelToUse, start_date , end_date});
 
     // 1) API 호출 -> 원본 DB 데이터
@@ -128,10 +128,6 @@ async function loadTimetableData() {
     console.error("시간표 및 이벤트 데이터 불러오기 실패", error);
     }
   }
-
-
-
-
 
 // 마운트 시 & year 바뀔 때마다 재호출
 onMounted(() => {

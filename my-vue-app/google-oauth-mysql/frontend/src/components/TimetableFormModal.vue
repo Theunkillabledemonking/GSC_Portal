@@ -121,12 +121,8 @@
 <script setup>
 import { ref, onMounted, watch, computed } from "vue";
 import axios from "axios";
-import { createTimetable,
-  updateTimetable,
-  deleteTimetable,
-  createEvent,
-  updateEvent,
-  deleteEvent } from "@/services/timetableApi.js";
+import { createTimetable, updateTimetable, deleteTimetable} from "@/services/timetableApi.js";
+import { createEvent, updateEvent, deleteEvent } from "@/services/eventApi.js";
 import { useAuthStore} from "@/store/authStore.js";
 
 // Props & Emits
