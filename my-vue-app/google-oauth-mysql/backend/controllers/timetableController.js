@@ -89,9 +89,10 @@ exports.getTimetableWithEvents = async (req, res) => {
             where: {
                 year,
                 // 정규 수업은 level이 null이어야 하므로, OR 조건을 사용
-                level: {
-                    [Op.in]: [null, ...specialLevels],
-                }
+                [Op.or]: [
+                    { level: null },
+                    { level: { [Op.in]: specialLevels } }
+                ]
             },
             include: [
                 { model: Subject, attributes: ['name'], as: 'subject' },

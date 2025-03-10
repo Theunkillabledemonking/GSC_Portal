@@ -2,9 +2,9 @@
   <div class="modal-backdrop" v-if="isOpen">
     <div class="modal">
       <h3>{{ isEditMode ? '시간표 수정' : '시간표 등록' }}</h3>
-
+      <!-- 관리자/교수(role <= 2)만 등록 가능 -->
+      <template v-if="authStore.role <= 2">
       <form @submit.prevent="handleSubmit">
-
         <!-- 이벤트 타입 선택 -->
         <div class="form-group">
           <label>이벤트 종류</label>
@@ -17,7 +17,7 @@
         </div>
 
         <!-- 정규 수업일 경우 요일/교시 선택 -->
-        <template v-if="form.event_type === 'normal' || form.event_type === 'cancel' || form.event_type === 'makeup'">
+        <template v-if="['normal', 'cancel', 'makeup', 'special'].includes(form.event_type)">
           <div class="form-group">
             <label>요일 선택</label>
             <select v-model="form.day">
@@ -29,7 +29,7 @@
             </select>
           </div>
 
-          <div class="form-group">
+          <div class="form-group" v-if="['normal', 'cancel', 'makeup', 'special'].includes(form.event_type)">
             <label>교시 선택</label>
             <select v-model="form.start_period"  @change="getClassTime" required>
               <option v-for="p in 10" :key="p" :value="p">{{p}}교시</option>
@@ -93,34 +93,54 @@
 
         <!-- 버튼 -->
         <div class="modal-actions">
-          <button type="submit" class="save-btn">저장</button>
+          <button type="submit" class="save-btn">
+            {{ isEditMode ? "수정" : "저장"}}
+          </button>
           <button type="button" class="cancel-btn" @click="closeModal">취소</button>
-          <button v-if="isEditMode" type="button" class="delete-btn" @click="handleDelete">삭제</button>
+          <button
+              v-if="isEditMode"
+              type="button"
+              class="delete-btn"
+              @click="handleDelete"
+            >
+            삭제
+            </button>
         </div>
-
       </form>
+      </template>
+
+      <!-- 학생(role=3)은 권한 없음 -->
+      <template v-else>
+        <p>학생은 시간표 등록 권한이 없습니다.</p>
+        <button type="button" class="cancel-btn" @click="closeModal">닫기</button>
+      </template>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from "vue";
+import { ref, onMounted, watch, computed } from "vue";
 import axios from "axios";
-import { createEvent, updateEvent, deleteEvent, createTimetable} from "@/services/timetableApi.js";
+import { createTimetable,
+  updateTimetable,
+  deleteTimetable,
+  createEvent,
+  updateEvent,
+  deleteEvent } from "@/services/timetableApi.js";
 import { useAuthStore} from "@/store/authStore.js";
 
 // Props & Emits
 const props = defineProps({
   isOpen: Boolean,
+  isEditMode: Boolean,
   initialData: Object,
-  selectedDate: String,
   year: Number,
 });
 const emit = defineEmits(['close', 'saved', 'deleted']);
 
 // 상태
 const authStore = useAuthStore();
-const isEditMode = ref(false);
+const canEdit = computed(() => authStore.role <= 2);
 const subjects = ref([]);
 
 // 폼 데이터
@@ -154,7 +174,7 @@ const periodTimeMap = {
 };
 
 // 🔹 교시 선택 시 자동 시간 설정
-const getClassTime = () => {
+function getClassTime () {
   const { start_period, end_period } = form.value;
   if (start_period && end_period && start_period <= end_period) {
     form.value.start_time = periodTimeMap[start_period].start || "";
@@ -163,10 +183,52 @@ const getClassTime = () => {
     form.value.start_time = "";
     form.value.end_time = "";
   }
-};
+}
 
-const handleSubmit = async () => {
+// 모달 열릴 때 폼 초기화 or 기존데이터 채우기
+function initForm() {
+  if (props.isEditMode && props.initialData) {
+    // 수정 모드 -> 기존 데이터 세팅
+    form.value.id = props.initialData.id ?? null;
+    form.value.event_type = "normal";
+    form.value.day = props.initialData.day ?? '';
+    form.value.subject_id = props.initialData.subject ?? '';
+    form.value.start_period = props.initialData.start_period ?? null;
+    form.value.end_period = props.initialData.end_period ?? null;
+    form.value.room = props.initialData.room ?? '';
+    form.value.description = props.initialData.description ?? '';
+    getClassTime();
+  } else {
+    // 등록 모드 -> 폼 리셋
+    resetForm();
+  }
+}
+
+// 폼 리셋
+function resetForm() {
+  form.value = {
+    id: null,
+    event_type: "normal",
+    subject_id: '',
+    day: '',
+    start_period: null,
+    end_period: null,
+    start_time: '',
+    end_time: null,
+    room: '',
+    description: '',
+  }
+}
+
+async function handleSubmit() {
   try {
+    // 권한 체크
+    if (!canEdit.value) {
+      alert('시간표 등록 권한이 없습니다.');
+      return;
+    }
+
+    // 실제 등록할 payload
     const payload = {
       year: props.year ?? authStore.grade ?? 1,
       level: form.value.event_type === "normal" ? null : authStore.level ?? 1,
@@ -180,44 +242,56 @@ const handleSubmit = async () => {
 
     if (form.value.event_type === "normal") {
       if (!form.value.day || !form.value.start_period || !form.value.end_period) {
-        alert("요일과 교시를 선택해주세요.");
+        alert('요일과 교시를 선택해주세요');
         return;
       }
-      // payload.day = form.value.day;
-      // payload.start_period = form.value.start_period;
-      // payload.end_period = form.value.end_period;
     }
 
-    console.log("보낼 데이터:", JSON.stringify(payload, null, 2));
+    console.log("보낼 데이터", JSON.stringify(payload, null, 2));
 
-    await createTimetable(payload);
+    if (props.isEditMode && form.value.id) {
+      // 수정 모드: 기존 데이터로부터 timetable_id 할당
+      console.log("수정 payload", payload);
+      await updateTimetable(form.value.id, payload);
+    } else {
+      // 등록 모드
+      console.log("등록 payload:", payload);
+      await createTimetable(payload);
+    }
+    // 등록 완료 후 상위에 알림
     emit('saved');
     closeModal();
   } catch (error) {
     console.error("시간표 등록 중 오류:", error);
     alert('저장 실패: ' + (error.response?.data?.error || error.message));
   }
-};
+}
 
 // 삭제 버튼 클릭
-const handleDelete = async () => {
+async function handleDelete() {
   if (!confirm('정말로 삭제하시겠습니까?')) return;
   try {
-    await deleteEvent(form.value);
+    if (!form.value.id) {
+      alert('유효하지않는 ID');
+      return;
+    }
+    await deleteTimetable(form.value.id);
     emit('deleted');
     closeModal();
   } catch (error) {
+    console.error('삭제 오류', error);
     alert('삭제 실패:' + error.message);
   }
-};
+}
 
 // 모달 닫기
-const closeModal = () => {
+function closeModal() {
+  resetForm();
   emit('close');
-};
+}
 
 // 과목 목록 불러오기
-const loadSubject = async () => {
+async function loadSubject() {
   try {
     const yearToUse = props.year ?? authStore.grade ?? 1 ;
     console.log("과목 불러오기 요청 year:", yearToUse);
@@ -235,9 +309,32 @@ const loadSubject = async () => {
   }
 };
 
+// 모달 컴포넌트가 마운트되면 과목 목록 1회 불러오기
 onMounted(() => {
-  loadSubject();
+  if (props.isEditMode && props.initialData) {
+    form.value.id = props.initialData.id ?? null;
+    form.value.timetable_id = props.initialData.id;
+    form.value.day = props.initialData.day || "";
+    form.value.subject_id = props.initialData.subject_id || "";
+    form.value.room = props.initialData.room || "";
+    form.value.description = props.initialData.description || "";
+    form.value.start_period = props.initialData.start_period || null;
+    form.value.end_period = props.initialData.end_period || null;
+    form.value.event_type = "normal";
+    getClassTime();
+  }
 })
+
+// year가 바뀔 때마다 재호출 (교수/관리자가 다른 학년 클릭 시)
+watch(() => props.isOpen, (newVal) => {
+  if (newVal) {
+    initForm();
+    loadSubject();
+  } else {
+    loadSubject();
+  }
+
+});
 </script>
 
 <style scoped>

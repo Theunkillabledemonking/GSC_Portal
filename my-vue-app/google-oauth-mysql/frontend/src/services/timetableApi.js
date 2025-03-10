@@ -45,7 +45,7 @@ export const createTimetable = async (timetableData) => {
  */
 export const updateTimetable = async (id, timetableData) => {
     try {
-        await apiClient.put(`/timetable/${id}`, timetableData);
+        await apiClient.put(`/timetables/${id}`, timetableData);
     } catch (error) {
         console.error('시간표 수정 실패', error);
         throw error;
