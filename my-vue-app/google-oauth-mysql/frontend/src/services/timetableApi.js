@@ -11,7 +11,7 @@ export const fetchTimetableWithEvents = async ({ year, level, start_date, end_da
         const response = await apiClient.get('/timetables/timetable-with-events', {
             params: {
                 year,
-                level,
+                level: level !== null ? level : undefined,
                 start_date,
                 end_date
             }

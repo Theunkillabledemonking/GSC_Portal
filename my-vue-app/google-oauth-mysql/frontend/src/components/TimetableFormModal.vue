@@ -5,6 +5,11 @@
       <!-- 관리자/교수(role <= 2)만 등록 가능 -->
       <template v-if="authStore.role <= 2">
       <form @submit.prevent="handleSubmit">
+        <div class="form-group">
+          <label>날짜</label>
+          <input type="date" v-model="form.event_date" required />
+        </div>
+
         <!-- 이벤트 타입 선택 -->
         <div class="form-group">
           <label>이벤트 종류</label>
@@ -17,7 +22,7 @@
         </div>
 
         <!-- 정규 수업일 경우 요일/교시 선택 -->
-        <template v-if="['normal', 'cancel', 'makeup', 'special'].includes(form.event_type)">
+        <template v-if="form.event_type === 'normal'">
           <div class="form-group">
             <label>요일 선택</label>
             <select v-model="form.day">
@@ -29,7 +34,7 @@
             </select>
           </div>
 
-          <div class="form-group" v-if="['normal', 'cancel', 'makeup', 'special'].includes(form.event_type)">
+          <div class="form-group">
             <label>교시 선택</label>
             <select v-model="form.start_period"  @change="getClassTime" required>
               <option v-for="p in 10" :key="p" :value="p">{{p}}교시</option>
@@ -39,9 +44,20 @@
               <option v-for="p in 10" :key="p" :value="p">{{p}}교시</option>
             </select>
           </div>
+
+          <div class="form-group">
+            <label>교시 선택</label>
+            <select v-model="form.start_period" @change="getClassTime" required>
+              <option v-for="p in 10" :key="p" :value="p">{{p}}교시</option>
+            </select>
+            <span>~</span>
+            <select v-model="form.end_period" @change="getClassTime" required>
+              <option v-for="p in 10" :key="p" :value="p">{{p}}교시</option>
+            </select>
+          </div>
         </template>
 
-        <!-- 이벤트(휴강/보강/특강)일 경우 시작/종료 날짜 선택 -->
+        <!-- 이벤트(특강)일 경우 시작/종료 날짜 선택 -->
         <template v-else-if="form.event_type === 'special'">
           <div class="form-group">
             <label>시작 날짜</label>
@@ -71,7 +87,7 @@
           </select>
         </div>
 
-        <!-- 시간 선택 -->
+        <!-- 시간 선택 (정규/휴강/보강 등에서도 활용 가능) -->
         <div class="form-group">
           <label>시간 (시작 ~ 종료)</label>
           <div class="time-range">
@@ -141,6 +157,8 @@ const subjects = ref([]);
 
 // 폼 데이터
 const form = ref({
+  // (등록/수정 시 필요한 필드들)
+  id: null,
   timetable_id: null,
   subject_id: '',
   start_date: '',
@@ -151,8 +169,9 @@ const form = ref({
   room: '',
   description: '',
   day: '',
-  start_period: null, // 시작 교시
-  end_period: null,   // 끝나는 교시
+  start_period: null,
+  end_period: null,
+  level: null, // 이벤트일 경우 level이 들어올 수도 있음
 })
 
 // 🔹 교시별 시간표 매핑
@@ -184,15 +203,18 @@ function getClassTime () {
 // 모달 열릴 때 폼 초기화 or 기존데이터 채우기
 function initForm() {
   if (props.isEditMode && props.initialData) {
-    // 수정 모드 -> 기존 데이터 세팅
+    // 수정 모드 -> 기존값 채우기
     form.value.id = props.initialData.id ?? null;
-    form.value.event_type = "normal";
+    form.value.timetable_id = props.initialData.id ?? null;
+    form.value.event_date = props.initialData.event_date ?? '';
+    form.value.event_type = "normal"; // 기본적으로 '정규수업'으로 둠
+    form.value.subject_id = props.initialData.subject_id ?? '';
     form.value.day = props.initialData.day ?? '';
-    form.value.subject_id = props.initialData.subject ?? '';
-    form.value.start_period = props.initialData.start_period ?? null;
-    form.value.end_period = props.initialData.end_period ?? null;
     form.value.room = props.initialData.room ?? '';
     form.value.description = props.initialData.description ?? '';
+    form.value.start_period = props.initialData.start_period ?? null;
+    form.value.end_period = props.initialData.end_period ?? null;
+    // 필요하다면 start_date/end_date도 props.initialData에서 세팅
     getClassTime();
   } else {
     // 등록 모드 -> 폼 리셋
@@ -204,15 +226,19 @@ function initForm() {
 function resetForm() {
   form.value = {
     id: null,
+    timetable_id: null,
     event_type: "normal",
     subject_id: '',
     day: '',
     start_period: null,
     end_period: null,
     start_time: '',
-    end_time: null,
+    end_time: '',
     room: '',
     description: '',
+    start_date: '',
+    end_date: '',
+    level: null,
   }
 }
 
@@ -224,24 +250,34 @@ async function handleSubmit() {
       return;
     }
 
+    // level 값 보존
+    let existingLevel = props.initialData?.level ?? authStore.level ?? 1;
+
     // 실제 등록할 payload
     const payload = {
       year: props.year ?? authStore.grade ?? 1,
-      level: form.value.event_type === "normal" ? null : authStore.level ?? 1,
+      level: (form.value.event_type === "normal") ? null : (form.value.level ?? existingLevel),
       subject_id: form.value.subject_id,
-      day: form.value.day,               // 요일
-      start_period: form.value.start_period,  // 시작 교시
-      end_period: form.value.end_period,      // 종료 교시
+      day: form.value.day,
+      start_period: form.value.start_period,
+      end_period: form.value.end_period,
       room: form.value.room || "",
       description: form.value.description || "",
+      event_type: form.value.event_type,
+      timetable_id: form.value.timetable_id || null,
+
+      // cancel/makeup/special일 경우 사용자가 입력한 날짜
+      event_date: form.value.start_date || new Date().toISOString().split("T")[0],
+      start_date: form.value.start_date,
+      end_date: form.value.end_date,
+      start_time: form.value.start_time,
+      end_time: form.value.end_time,
     };
 
-    if (form.value.event_type === "normal") {
-      if (!form.value.day || !form.value.start_period || !form.value.end_period) {
-        alert('요일과 교시를 선택해주세요');
-        return;
-      }
-    }
+    // 수정 모드 일 경우 ID를 정확히 입력
+    // if (form.value.event_type === "cancel" || form.value.event_type === "makeup") {
+    //   payload.timetable_id = props.initialData?.id ?? null;
+    // }
 
     console.log("보낼 데이터", JSON.stringify(payload, null, 2));
 
@@ -254,6 +290,7 @@ async function handleSubmit() {
       console.log("등록 payload:", payload);
       await createTimetable(payload);
     }
+
     // 등록 완료 후 상위에 알림
     emit('saved');
     closeModal();
@@ -308,18 +345,9 @@ async function loadSubject() {
 // 모달 컴포넌트가 마운트되면 과목 목록 1회 불러오기
 onMounted(() => {
   if (props.isEditMode && props.initialData) {
-    form.value.id = props.initialData.id ?? null;
-    form.value.timetable_id = props.initialData.id;
-    form.value.day = props.initialData.day || "";
-    form.value.subject_id = props.initialData.subject_id || "";
-    form.value.room = props.initialData.room || "";
-    form.value.description = props.initialData.description || "";
-    form.value.start_period = props.initialData.start_period || null;
-    form.value.end_period = props.initialData.end_period || null;
-    form.value.event_type = "normal";
-    getClassTime();
+    initForm();
   }
-})
+});
 
 // year가 바뀔 때마다 재호출 (교수/관리자가 다른 학년 클릭 시)
 watch(() => props.isOpen, (newVal) => {

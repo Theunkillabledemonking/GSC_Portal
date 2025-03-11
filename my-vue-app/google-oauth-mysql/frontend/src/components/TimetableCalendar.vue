@@ -1,6 +1,10 @@
 <template>
   <div class="calendar-container">
-    <FullCalendar :options="calendarOptions" />
+    <FullCalendar
+        :options="calendarOptions"
+        @dateClick="handleDateClick"
+        @eventClick="handleEventClick"
+    />
 
     <TimetableFormModal
       :isOpen="isModalOpen"
@@ -27,9 +31,7 @@ import { useAuthStore } from "@/store/authStore.js";
 import TimetableFormModal from "@/components/TimetableFormModal.vue";
 
 // 학년 ( year ) 은 상위 컴포넌트에서 전달
-const props = defineProps({
-  year: Number
-})
+const props = defineProps({year: Number })
 
 // Setup & Props
 const authStore = useAuthStore();
@@ -60,32 +62,54 @@ const calendarOptions = ref({
 })
 
 /**
- * 날짜 클릭 시
- */
-function handleDateClick(info) {
-  isEditMode.value = false; // 등록모드
-  selectedEvent.value = null;
-  isModalOpen.value = true;
-}
-
-
-/**
  * 이벤트 클릭시
  */
 function handleEventClick(info) {
-  // extendedProps에 timetable_id, subject_id, day 등 필요한 필드를
-  // pinia 스토어에서 넣어둬야 모달에서 기존 데이터 확인 가능
+  const clickedDate = new Date(info.dateStr);
+  const clickedDay = ['일', '월', '화', '수', '목', '금', '토'][clickedDate.getDay()];
+  // 선택한 날짜에 해당하는 요일의 정규 과목 찾기
+  const existingTimetable = timetableStore.timetables.find(t => t.day === clickedDay);
+
+  if (!existingTimetable) {
+    alert("선택한 날짜에 정규 수업이 없습니다.");
+    return;
+  }
+  // const propsData = info.event.extendedProps;
+  // 모달을 등록 모드로 열면서 해당 과목 자동 선택
+  selectedEvent.value = {
+    timetable_id: existingTimetable.id,
+    subject_id: existingTimetable.subject_id,
+    day: existingTimetable.day,
+    start_period: existingTimetable.start_period,
+    end_period: existingTimetable.end_period,
+    room: existingTimetable.room,
+    event_type: "cancel", // 기본값: 휴강
+    event_date: info.dateStr, // 선택한 날짜
+  };
+
+  isEditMode.value = false;
+  isModalOpen.value = true;
+}
+
+/**
+ * 날짜 클릭 시
+ */
+function handleDateClick(info) {
   const propsData = info.event.extendedProps;
+
   selectedEvent.value = {
     id: propsData.id,
-    timetable_id: propsData.id,
-    day: propsData.day ?? '',
-    subject_id: propsData.subject ?? '',
-    room: propsData.room ?? '',
-    start_period: propsData.start_period ?? null,
-    end_period: propsData.end_period ?? null,
-    description: propsData.description ?? '',
+    timetable_id: propsData.timetable_id,
+    subject_id: propsData.subject_id,
+    day: propsData.day,
+    start_period: propsData.start_period,
+    end_period: propsData.end_period,
+    room: propsData.room,
+    description: propsData.description,
+    event_date: propsData.event_date,
+    event_type: propsData.event_type,
   };
+
   isEditMode.value = true;
   isModalOpen.value = true;
 }
@@ -121,7 +145,6 @@ async function loadTimetableData() {
 
     // 2) 스토어에 넘겨 이벤트 객체로 변환
     timetableStore.setTimetableAndEvents(response.timetables, response.events);
-
     // 3) FullCalendar에 반영
     calendarOptions.value.events = timetableStore.calendarEvents;
   } catch (error) {

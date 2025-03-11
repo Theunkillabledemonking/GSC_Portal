@@ -81,77 +81,65 @@ export const useTimetableStore = defineStore("timetable", {
             // 2) FullCalendar 이벤트 배열 초기화
             this.calendarEvents = [];
 
+            console.log("🟢 원본 시간표 데이터:", JSON.stringify(timetables, null, 2));
+            console.log("🟠 원본 이벤트 데이터:", JSON.stringify(events, null, 2));
+
             // 휴강 처리
             const cancelEvents = events
                 .filter(ev => ev.event_type === "cancel")
-                .map(ev => `${ev.event_date}-${ev.start_period}-${ev.end_period}`);
-
+                .map(ev => `${ev.timetable_id}-${ev.event_date}`);
 
             // 3) 정규 수업 -> 반복 이벤트로 변환
             timetables.forEach((t) => {
                 const dayOfWeek = mapDayOfWeek(t.day); // 월, 화 같은 요일을 날짜로 반환
-                const startTime =  periodTimeMap[t.start_period]?.start || "00:00";
-                const endTime = periodTimeMap[t.end_period]?.end || "09:50";
-                const eventKey = `${t.day}-${t.start_period}-${t.end_period}`;
+                const startTime = periodTimeMap[t.start_period]?.start || "00:00";
+                const endTime = periodTimeMap[t.end_period]?.end || "23:59";
 
-                if (!cancelEvents.includes(eventKey)) {
-                    this.calendarEvents.push({
-                        // FullCalendar 이벤트를 구분하기 위한 식별자
-                        id: `t-${t.id}`,
-                        // 캘린더에 표시될 제목
-                        title: `[정규] ${t.subject?.name ?? '??'} (${t.room ?? ''})`,
-                        // 반복 이벤트 설정
-                        daysOfWeek: [dayOfWeek],
-                        // 하루 중 시작, 종료 시각
-                        startTime,
-                        endTime,
-                        // 스타일
-                        backgroundColor: "#90caf9", // 기본 시간표 색상
-                        // 그외 필요한 정보 extendedProps에 넣어두기
-                        extendedProps: {
-                            id: t.id,              // ⭐ DB PK
-                            day: t.day,            // 월, 화, 수 ...
-                            subject_id: t.subject_id,
-                            start_period: t.start_period,
-                            end_period: t.end_period,
-                            room: t.room,
-                            description: t.description ?? '',
-                            event_type: 'normal',
-                        },
-                    });
+                // t.id를 포함하여 특정 시간표만 `cancel` 처리
+                const eventKey = `${t.id}-${t.day}-${t.start_period}-${t.end_period}`;
+                const isCancelled = cancelEvents.includes(eventKey);
+
+                // 🚨 level이 null이거나 잘못된 값일 경우 기본값 유지
+                if (t.level === null || t.level === undefined) {
+                    t.level = "default";
                 }
+
+                const backgroundColor = isCancelled ? "#d3d3d3" : "#90caf9"; // 회색(휴강) or 정규
+                const titlePrefix = isCancelled ? "[휴강]" : "[정규]";
+
+                console.log(`📢 시간표 ID: ${t.id}, 휴강 여부: ${isCancelled}`);
+
+                // ✅ 여기서 오류 수정: `if` 문 내부 닫힘 위치 조정
+                this.calendarEvents.push({
+                    id: `t-${t.id}`,
+                    title: `${titlePrefix} ${t.subject?.name ?? '??'} (${t.room ?? ''})`,
+                    daysOfWeek: [dayOfWeek],
+                    startTime,
+                    endTime,
+                    backgroundColor,
+                    extendedProps: {
+                        ...t,
+                        event_type: isCancelled ? "cancel" : "normal",
+                    },
+                });
             });
 
             // 4) 이벤트 (휴강, 이벤트, 특강) -> 단발성 이벤트로 변환
             events.forEach(e => {
-                // e.event_date = "2025-03-15"
-                // e..event_time = "10:00:00", e.end_time = "11:00:00"
-                const startDateTime = e.event_date + "T" + (e.start_time || "00:00");
-                const endDateTime = e.event_date + "T" + (e.end_time || "10:00");
-                const color         = getEventColor(e.event_type);
-
-                this.calendarEvents.push({
-                    id: `e-${e.id}`,
-                    title: `[${getEventTypeName(e.event_type)}] ${e.subject_name ?? ""}`,
-                    start: startDateTime,
-                    end: endDateTime,
-                    backgroundColor: color,
-                    extendedProps: {
-                        event_id: e.id,
-                        event_type: e.event_type,
-                        description: e.description ?? '',
-                        subject_id: e.subject_id,
-                    },
-                });
+                if (e.event_type === "makeup" || e.event_type === "special") {
+                    this.calendarEvents.push({
+                        id: `e-${e.id}`,
+                        title: `[${getEventTypeName(e.event_type)}] ${e.subject_name ?? ""}`,
+                        start: `${e.event_date}T${e.start_time || "00:00"}`,
+                        end: `${e.event_date}T${e.end_time || "23:59"}`,
+                        backgroundColor: getEventColor(e.event_type),
+                        extendedProps: { ...e },
+                    });
+                }
             });
-            console.log("📅 최종 Calendar 데이터:", this.calendarEvents);  // 🔹 디버깅용 로그
-            // // 휴강 이벤트와 겹치는 정규수업 제거
-            // const cancelDates = new Set(
-            //     events
-            //         .filter(ev => ev.event_type === "cancel")
-            //         .map(ev => ev.event_date)
-            // );
+
+            console.log("📅 최종 Calendar 데이터:", JSON.stringify(this.calendarEvents, null, 2));
+
         },
     },
 });
-
