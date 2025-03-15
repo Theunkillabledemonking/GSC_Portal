@@ -1,162 +1,50 @@
-// Pinia의 defineStore을 가져옵니다.
-// defineStore는 스토어를 정의하는 Pinia의 함수입니다.
 import { defineStore } from "pinia";
-
-// 사용자 인증 관련 API 함수를 가져옵니다.
-// googleLogin: Google 로그인 요청 함수
-// registerUser: 회원가입 요청 함수
 import { googleLogin, registerUser } from "../services/authService";
-import axios from "axios";
+import apiClient from "../services/apiClient"; // ✅ apiClient 사용
 
-const VITE_BASE_URL = import.meta.env.VITE_API_URL;
-
-// 'auth'라는 이름의 스토어를 정의합니다.
-// 이 스토어는 인증과 관련된 상태 및 액션을 관리합니다.
-export const useAuthStore = defineStore('auth', {
-
-    // ========================
-    // ✅ 1. State (상태 정의)
-    // ========================
-    // 'state'는 스토어가 관리하는 데이터를 정의합니다.
-    // 함수 형태로 작성하여 상태가 초기화될 때마다 새로운 객체를 반환합니다.
+export const useAuthStore = defineStore("auth", {
     state: () => ({
-        status: null,   // 사용자 승인 상태 (0: 대기, 1: 승인, 2: 거부)
-        token: localStorage.getItem("accessToken") || null,    // JWT 액세스 토큰 (사용자 인증에 사용됨)
-        role: Number(localStorage.getItem("role")) || null,     // 사용자 권한 (1: 관리자, 2: 교수, 3: 학생)
-        grade: null,    // 사용자 학년 (1, 2, 3)
-        level: null,     // 사용자 레벨 (N3=3, N2=2, N1=1, TOPIK 6=6, TOPIK 4=4)
+        status: null,
+        token: localStorage.getItem("accessToken") || null,
+        role: Number(localStorage.getItem("role")) || null,
+        grade: null,
+        level: null,
         name: null
     }),
 
-    // ========================
-    // ✅ 2. Getters (상태 확인)
-    // ========================
     getters: {
         isAuthenticated: (state) => !!state.token,
     },
 
-    // =========================
-    // ✅ 3. Actions (액션 정의)
-    // =========================
-    // `actions`는 상태를 변경하거나 비동기 작업을 처리합니다.
     actions: {
-        /**
-         * ✅ Google 로그인 처리
-         * 사용자가 Google 로그인을 하면 API를 호출하여 상태와 토큰을 업데이트합니다.
-         * 1: 승인 완료 -> 토큰 저장 및 로그인 성공
-         * 0: 승인 대기 -> 대기 메시지 출력
-         * 2: 승인 거부 -> 실패 메시지 출력
-         * 3: 신규 사용자 -> 회원가입 페이지로 리다이렉트
-         * @param {string} code - Google OAuth에서 받은 인증 코드
-         */
         async loginWithGoogle(code) {
             try {
-                // 1. Google 로그인 API 호출 (authService.js의 googleLogin 함수 사용)
-                const response = await googleLogin(code);
+                // ✅ Google OAuth 콜백 처리 요청
+                const response = await apiClient.get(`/api/auth/google/callback?code=${code}`);
 
-                // 2. 서버 응답에서 사용자 승인 상태를 업데이트
-                this.status = response.status;
+                // ✅ JWT 토큰 및 사용자 정보 저장
+                this.token = response.data.token;
+                this.role = response.data.role;
+                this.is_verified = response.data.is_verified;
 
-                // 3. 사용자가 승인 상태(1)일 때만 토큰과 정보를 저장
-                if (response.status === 1) {
-                    this.token = response.accessToken; // JWT 액세스 토큰 저장
-                    this.role = response.role;         // 사용자 권한 저장
-                    this.grade = response.grade;       // 사용자 학년 저장
-                    this.level = response.level;       // 사용자 레벨 저장
-                    this.name = response.name;
+                localStorage.setItem("accessToken", response.data.token);
+                localStorage.setItem("role", response.data.role);
 
-                    // ✅ `localStorage`에 토큰 저장 (자동 로그인 유지)
-                    localStorage.setItem("accessToken", response.accessToken);
-                    localStorage.setItem("role", response.role);
-                } else if (response.status === 0) {
-                    // 승인 대기 중
-                    // alert('승인 대기 중입니다. 관리자의 승인을 기다려주세요.');
-                } else if (response.status === 2) {
-                    // 승인 거부
-                    //alert('승인 거부된 사용자입니다. 관리자에게 문의주십시오.');
-                } else if (response.status === 3) {
-                    // 최초 사용자라면 Register 페이지로 이동
-                    window.location.href = `/register?email=${response.email}&name=${response.name}`;
-                } else {
-                    // 그 외 알 수 없는 상태
-                    alert('알 수 없는 상태입니다. status=' + this.status);
+                // ✅ 승인된 사용자면 대시보드로 이동
+                if (this.is_verified === 1) {
+                    useRouter().push("/dashboard");
                 }
             } catch (error) {
-                console.log('로그인 오류:', error);
-                alert('로그인 중 오류가 발생했습니다.');
+                console.error("🚨 Google 로그인 실패:", error);
             }
         },
 
-        /**
-         * 로그아웃 (토큰 제거)
-         */
         logout() {
             this.token = null;
             this.role = null;
-            this.grade = null;
-            this.level = null;
-            this.name = null;
-
-            // localStorage 데이터 삭제
             localStorage.removeItem("accessToken");
             localStorage.removeItem("role");
-
-            // 로그아웃 후 새로고침
             window.location.reload();
         },
-
-        /**
-         * 새로고침 후 로그인 상태 복구
-         */
-        restoreSession() {
-            this.token = localStorage.getItem("accessToken") || null;
-            this.role = Number(localStorage.getItem("role")) || null;
-
-            // ✅ 토큰이 있다면 자동으로 사용자 정보 불러오기
-            if (this.token) {
-                this.fetchUserInfo();
-            }
-        },
-
-        async fetchUserInfo() {
-            try {
-                const token = localStorage.getItem("accessToken");
-                if (!token) {
-                    console.warn('토큰이 없습니다.');
-                }
-
-                const response = await axios.get(`${VITE_BASE_URL}/user/me`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-
-                this.role = response.data.role;
-                this.grade = response.data.grade;
-                this.level = response.data.level;
-                this.name = response.data.name;
-                this.status = response.data.status;
-
-                console.log('사용자 정보 불러오기 성공:', response.data);
-            } catch (error) {
-                console.log('사용자 정보 불러오기 오류:', error);
-            }
-        },
-
-        /**
-         * ✅ 사용자 회원가입 처리
-         * 사용자가 Google 로그인 후 추가 정보를 입력하면 API를 호출하여 등록합니다.
-         * @param {Object} userData - 사용자 데이터 (이메일, 이름, 학번, 전화번호, 학년, 레벨 등)
-         */
-        async register(userData) {
-            try {
-                // 1. 회원가입 API 호출 (authService.js의 registerUser 함수 사용)
-                await registerUser(userData);
-
-                // 2. 회원가입이 완료되면 승인 대기 상태(0)로 설정
-                this.status = 0;
-            } catch (error) {
-                console.error("회원가입 처리 중 오류 발생: ", error);
-                alert('회원가입 처리 중 오류가 발생했습니다.');
-            }
-        }
     }
 });

@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
+import { useAuthStore } from "@/store/authStore.js";
 
 import HomeView from '@/views/HomeView.vue';
 import LoginView from '@/views/Login/LoginView.vue';
@@ -15,7 +16,6 @@ import NoticeEditView from "@/views/Notices/NoticeEditView.vue";
 import SubjectManage from "@/components/admin/SubjectManage.vue";
 import TimetableView from "@/views/TimetableView.vue";
 
-import { useAuthStore } from "@/store/authStore.js";
 import CalendarWithEvents from "@/components/specific/CalendarWithEvents.vue";
 
 const routes = [
@@ -45,9 +45,15 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
     const authStore = useAuthStore();
-    if (to.meta.requiresAuth && !authStore.token) {
+    if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+        console.warn("로그인 필요! 로그인 페이지로 이동");
         next('/login');
-    } else {
+    }// 관리자 권한 검사
+    else if (to.meta.requiresAdmin && authStore.role !== 1) {
+        console.warn("🚨 관리자 권한이 필요합니다!");
+        next("/dashboard"); // 권한 없으면 대시보드로 리다이렉트
+    }
+    else {
         next();
     }
 });

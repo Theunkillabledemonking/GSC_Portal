@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import * as subjectApi from "@/services/subjectApi";
+import * as subjectApi from "@/services/subjectService";
 
 export const useSubjectStore = defineStore("subjectStore", {
     state: () => ({

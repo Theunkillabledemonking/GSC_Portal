@@ -26,7 +26,7 @@ import interactionPlugin from "@fullcalendar/interaction";
 import timeGridPlugin from "@fullcalendar/timegrid";
 
 import { useTimetableStore } from "@/store/timetableStore.js";
-import { fetchTimetableWithEvents } from "@/services/timetableApi.js";
+import { fetchTimetableWithEvents } from "@/services/timetableService.js";
 import { useAuthStore } from "@/store/authStore.js";
 import TimetableFormModal from "@/components/TimetableFormModal.vue";
 

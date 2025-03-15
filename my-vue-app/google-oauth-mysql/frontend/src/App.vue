@@ -1,7 +1,7 @@
 <script setup>
 import { useAuthStore } from '@/store/authStore';
 import Navbar from '@/components/common/Navbar.vue';
-import GoogleLoginButton from '@/components/specific/GoogleLoginButton.vue';
+import GoogleLoginButton from '@/components/GoogleLoginButton.vue';
 
 const authStore = useAuthStore();
 </script>

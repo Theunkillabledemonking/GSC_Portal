@@ -1,4 +1,4 @@
-// services/calendarService.js
+// services
 const { calendar, CALENDAR_ID } = require('../config/googleAPI');
 
 exports.createEvent = async (eventData) => {

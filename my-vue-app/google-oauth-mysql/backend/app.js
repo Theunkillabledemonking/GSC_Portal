@@ -5,6 +5,8 @@
 // 모듈 및 패키지 불러오기
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
+const cookieParser= require("cookie-parser");
 require('dotenv').config(); // ✅ 환경 변수 로드
 
 // =======================
@@ -28,15 +30,9 @@ const app = express();
 // =======================
 
 // 1. CORS 설정 (Vue 프론트엔드만 허용)
-app.use(cors({
-    origin: process.env.VITE_FRONTEND_URL, // ✅ Vue 프론트엔드 URL
-    credentials: true                      // ✅ 쿠키 전송 허용
-}));
-
-// 2. JSON 요청 본문 파싱
+app.use(cors({ origin: process.env.VITE_FRONTEND_URL, credentials: true }));
 app.use(express.json());
-
-const path = require('path');
+app.use(cookieParser());
 
 // =======================
 // ✅ 라우터 등록
@@ -52,6 +48,9 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
 app.use('/api/calendar', calendarRoutes); // 구글 캘린더 라우트
 app.use('/api/timetables', timetableRoutes) // ✅ 정규 시간표 관리
 app.use('/api/events', eventRoutes); // ✅ 이벤트 관리 (보강/휴강/특강)
+
+
+
 // =======================
 // ✅ 에러 핸들러 (Global Error Handler)
 // =======================

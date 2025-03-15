@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const db = require("../config/db");
+const pool = require("../config/db");
 const { getGoogleTokens, getGoogleUser } = require("../services/googleService");
 require("dotenv").config();
 
@@ -12,9 +12,14 @@ exports.googleCallback = async (req, res) => {
     const { code } = req.query;
     if (!code) return res.status(400).json({ message: "인가 코드가 없습니다." });
 
+    console.log("📌 Google Callback 실행 - 받은 인증 코드:", code);
+    console.log("📌 사용된 REDIRECT_URI:", process.env.REDIRECT_URL); // 🚨 실제 사용된 값 확인
+
     try {
         // ✅ Google API에서 Access Token 및 Refresh Token 요청
         const { access_token, refresh_token } = await getGoogleTokens(code);
+        console.log("✅ Access Token:", access_token);
+        console.log("✅ Refresh Token:", refresh_token);
 
         // ✅ Access Token으로 사용자 정보 요청
         const userInfo = await getGoogleUser(access_token);
@@ -30,7 +35,7 @@ exports.googleCallback = async (req, res) => {
         }
 
         // ✅ DB에서 사용자 확인
-        const [results] = await db.promise().query("SELECT * FROM users WHERE email = ?", [userInfo.email]);
+        const [results] = await pool.promise().query("SELECT * FROM users WHERE email = ?", [userInfo.email]);
         let user = results[0];
 
         if (results.length === 0) {
@@ -46,7 +51,7 @@ exports.googleCallback = async (req, res) => {
         const jwtToken = jwt.sign(
             {
                 email: user.email,
-                role: user.role || "student",
+                role: user.role || 3,
                 is_verified: Boolean(user.verified) || false,
             },
             JWT_SECRET,
@@ -63,13 +68,17 @@ exports.googleCallback = async (req, res) => {
 
         return res.send(`
             <script>
-                window.opener.postMessage({
-                  token: "${jwtToken}", 
-                  googleAccessToken: "${access_token}",
-                  email: "${user.email}",
-                  role: "${user.role || "student"}",
-                }, "http://localhost:5173");
-                window.close();
+                if (window.opener) {
+                    window.opener.postMessage({
+                      token: "${jwtToken}", 
+                      googleAccessToken: "${access_token}",
+                      email: "${user.email}",
+                      role: "${user.role || 3}",
+                    }, "http://localhost:5173");
+                    window.close();
+                } else {
+                    window.location.href = "http://localhost:5173/dashboard";
+                }
             </script>
         `);
     } catch (err) {
