@@ -68,7 +68,8 @@ exports.checkStatus = (req, res, next) => {
     const allowedPaths = ["/auth/me"];
 
     if (allowedPaths.includes(req.path)) {
-        next();
+        return next();
+        //return next(); 추천
     }
 
     if (!req.user || typeof req.user.status !== "number") {

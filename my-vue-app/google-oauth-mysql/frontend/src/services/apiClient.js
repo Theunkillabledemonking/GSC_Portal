@@ -35,19 +35,20 @@ apiClient.interceptors.response.use(response => {
     if (error.response?.status === 401) {
         console.warn("⚠️ 토큰 만료됨! refresh-token 요청 시도 중...");
         const authStore = useAuthStore();
-        try {
-            const refreshResponse = await axios.post(`${API_BASE_URL}/auth/refresh-token`, {
-                refreshToken: authStore.refreshToken,
-            });
-
-            authStore.setToken(refreshResponse.data.accessToken);  // 새로운 JWT 저장
-            error.config.headers.Authorization = `Bearer ${refreshResponse.data.accessToken}`;
-            return axios(error.config);  // 실패한 요청 다시 보내기
-        } catch (refreshError) {
-            console.error("🚨 refresh-token 요청 실패:", refreshError.response?.data || refreshError.message);
-            authStore.logout();
-            return Promise.reject(refreshError);
-        }
+        authStore.logout();
+        // try {
+        //     const refreshResponse = await axios.post(`${API_BASE_URL}/auth/refresh-token`, {
+        //         refreshToken: authStore.refreshToken,
+        //     });
+        //
+        //     authStore.setToken(refreshResponse.data.accessToken);  // 새로운 JWT 저장
+        //     error.config.headers.Authorization = `Bearer ${refreshResponse.data.accessToken}`;
+        //     return axios(error.config);  // 실패한 요청 다시 보내기
+        // } catch (refreshError) {
+        //     console.error("🚨 refresh-token 요청 실패:", refreshError.response?.data || refreshError.message);
+        //     authStore.logout();
+        //     return Promise.reject(refreshError);
+        // }
     }
     return Promise.reject(error);
 });

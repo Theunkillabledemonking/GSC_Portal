@@ -26,25 +26,21 @@ exports.googleCallback = async (req, res) => {
 
         // ✅ 학교 이메일 검증
         if (!userInfo.email.endsWith("@g.yju.ac.kr")) {
-            return res.send(`
-               <script>
-                window.opener.postMessage({ error: "유효한 이메일이 아닙니다." }, "http://localhost:5173");
-                window.close();
-               </script>
-            `);
+            return res.redirect(`${process.env.VITE_FRONTEND_URL}/login?error=invalid_email`);
         }
 
         // ✅ DB에서 사용자 확인
         const [results] = await pool.promise().query("SELECT * FROM users WHERE email = ?", [userInfo.email]);
-        let user = results[0];
 
         if (results.length === 0) {
-            return res.send(`
-                <script>
-                    window.opener.postMessage({ needRegister: true, email: "${userInfo.email}" }, "http://localhost:5173");
-                    window.close();
-                </script>
-            `);
+            return res.redirect(`${process.env.VITE_FRONTEND_URL}/register?email=${userInfo.email}`)
+        }
+
+        const user = results[0];
+
+        // ✅ 승인 상태(status) 체크 (1: 승인 완료, 0: 승인 대기, 2: 승인 거부)
+        if (user.status === 2) {
+            return res.redirect(`${process.env.VITE_FRONTEND_URL}/login?error=rejected`);
         }
 
         // ✅ JWT Access Token 발급
@@ -52,9 +48,13 @@ exports.googleCallback = async (req, res) => {
             {
                 email: user.email,
                 role: user.role || 3,
-                is_verified: Boolean(user.verified) || false,
+                is_verified: Boolean(user.verified),
+                name: user.name,
+                grade: user.grade,
+                level: user.level,
+                status: user.status
             },
-            JWT_SECRET,
+            process.env.JWT_SECRET,
             { expiresIn: "2h" }
         );
 
@@ -66,22 +66,12 @@ exports.googleCallback = async (req, res) => {
             maxAge: 7 * 24 * 60 * 60 * 1000 // 7일
         });
 
-        return res.send(`
-            <script>
-                if (window.opener) {
-                    window.opener.postMessage({
-                      token: "${jwtToken}", 
-                      googleAccessToken: "${access_token}",
-                      email: "${user.email}",
-                      role: "${user.role || 3}",
-                    }, "http://localhost:5173");
-                    window.close();
-                } else {
-                    window.location.href = "http://localhost:5173/dashboard";
-                }
-            </script>
-        `);
+        // ✅ **프론트엔드로 리다이렉트하여 토큰 전달**
+        return res.redirect(
+            `${process.env.VITE_FRONTEND_URL}/oauth/success?token=${jwtToken}&role=${user.role}&name=${encodeURIComponent(user.name)}&grade=${user.grade}&level=${user.level}&status=${user.status}`
+        );
+
     } catch (err) {
-        return res.status(500).json({ message: "Google 로그인 실패", error: err.message });
+        return res.redirect(`${process.env.VITE_FRONTEND_URL}/login?error=${encodeURIComponent(err.message)}`);
     }
 };

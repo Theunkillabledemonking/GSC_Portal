@@ -21,32 +21,33 @@ const handleGoogleLogin = async () => {
   }
 };
 
-// ✅ Google 로그인 콜백 데이터 처리
-onMounted(() => {
-  window.addEventListener("message", (event) => {
-    if (event.origin !== "http://localhost:5173") return;
-
-    const data = event.data;
-
-    if (data.token) {
-      // ✅ 토큰을 로컬스토리지 및 Pinia 스토어에 저장
-      localStorage.setItem("accessToken", data.token);
-      localStorage.setItem("role", data.role);
-      authStore.token = data.token;
-      authStore.role = data.role;
-
-      alert("✅ 로그인 성공!");
-
-      // ✅ 대시보드로 이동
-      router.push("/dashboard");
-    } else if (data.needRegister) {
-      alert("📝 회원가입이 필요합니다!");
-      router.push(`/register?email=${data.email}`);
-    } else if (data.error) {
-      alert(`❌ 로그인 실패: ${data.error}`);
-    }
-  });
-});
+//
+// // ✅ Google 로그인 콜백 데이터 처리
+// onMounted(() => {
+//   window.addEventListener("message", (event) => {
+//     if (event.origin !== "http://localhost:5173") return;
+//
+//     const data = event.data;
+//
+//     if (data.token) {
+//       // ✅ 토큰을 로컬스토리지 및 Pinia 스토어에 저장
+//       localStorage.setItem("accessToken", data.token);
+//       localStorage.setItem("role", data.role);
+//       authStore.token = data.token;
+//       authStore.role = data.role;
+//
+//       alert("✅ 로그인 성공!");
+//
+//       // ✅ 대시보드로 이동
+//       router.push("/dashboard");
+//     } else if (data.needRegister) {
+//       alert("📝 회원가입이 필요합니다!");
+//       router.push(`/register?email=${data.email}`);
+//     } else if (data.error) {
+//       alert(`❌ 로그인 실패: ${data.error}`);
+//     }
+//   });
+//});
 </script>
 
 <template>
