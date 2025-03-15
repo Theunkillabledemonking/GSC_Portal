@@ -1,5 +1,5 @@
 const express = require('express');
-const { hasRole, verifyToken} = require('../middlewares/authMiddleware');
+const { hasRole, verifyToken} = require('../auth/authMiddleware');
 const {
     createNotices,
     getNotices,

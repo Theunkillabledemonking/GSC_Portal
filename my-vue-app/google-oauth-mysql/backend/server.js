@@ -11,7 +11,7 @@ require('dotenv').config(); // ✅ 환경 변수 로드
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, async () => {
-    console.log(`🚀 서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
+    console.log(`🚀 서버 실행 중: ${process.env.SERVER_URL || 'http://localhost'}:${PORT}`);
 
     // 데이터베이스 연결 테스트
     try {
@@ -20,5 +20,6 @@ app.listen(PORT, async () => {
         connection.release();
     } catch (error) {
         console.error('❌ 데이터베이스 연결 실패:', error.message);
+        process.exit(1); // 서버 종료
     }
 });

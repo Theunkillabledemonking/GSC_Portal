@@ -2,7 +2,7 @@
 const express = require('express');
 
 // JWT 인증 및 권한 검증을 위한 미들웨어를 불러옵니다.
-const { verifyToken, hasRole } = require('../middlewares/authMiddleware');
+const { verifyToken, hasRole } = require('../auth/authMiddleware');
 
 // 관리자 컨트롤러 불러오기
 const { getUsers, updateUserStatus, updateUserRole, getPendingUsers } = require('../controllers/adminController');

@@ -1,5 +1,5 @@
 const express = require('express');
-const { verifyToken, hasRole } = require('../middlewares/authMiddleware');
+const { verifyToken, hasRole } = require('../auth/authMiddleware');
 const {
     getSubjects,
     createSubject,

@@ -46,7 +46,9 @@ app.use('/api/user', userRoutes);       // ✅ 사용자 라우트 (사용자 �
 app.use('/api/admin', adminRoutes);     // ✅ 관리자 라우트 (승인 및 권한 관리)
 app.use('/api/notices', noticeRoutes);  // ✅ 공지사항 라우트
 app.use('/api/subjects', subjectRoutes);
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // 파일 업로드 라우트
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+    extensions: ['png', 'jpg', 'jpeg', 'pdf']
+}));
 app.use('/api/calendar', calendarRoutes); // 구글 캘린더 라우트
 app.use('/api/timetables', timetableRoutes) // ✅ 정규 시간표 관리
 app.use('/api/events', eventRoutes); // ✅ 이벤트 관리 (보강/휴강/특강)
