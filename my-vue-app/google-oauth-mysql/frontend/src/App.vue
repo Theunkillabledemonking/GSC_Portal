@@ -10,16 +10,31 @@ const isAuthenticated = computed(() => !!authStore.token);
 <template>
   <div id="app">
     <!-- 로그인한 경우에만 NavBar 표시 -->
-    <Navbar v-if="isAuthenticated" />
-
-    <router-view />
+    <Navbar class="navbar" v-if="isAuthenticated" />
+    <div class="content">
+      <router-view />
+    </div>
   </div>
 </template>
 
 <style scoped>
 #app {
   text-align: center;
-  margin-top: 100px;
+}
+
+.navbar {
+  position: fixed;  /* ✅ 화면 최상단 고정 */
+  top: 0;
+  left: 0;
+  width: 100%;
+  background-color: #1E3A8A;
+  padding: 15px 20px;
+  color: white;
+  z-index: 1000;
+}
+
+.content {
+  padding-top: 80px;
 }
 
 button {
