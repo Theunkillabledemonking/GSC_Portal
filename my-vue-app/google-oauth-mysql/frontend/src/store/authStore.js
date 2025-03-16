@@ -1,68 +1,61 @@
 import { defineStore } from "pinia";
-import apiClient from "../services/apiClient"; // ✅ apiClient 사용
+import apiClient from "../services/apiClient";
+import { useRouter } from "vue-router";
 
 export const useAuthStore = defineStore("auth", {
     state: () => ({
-        status: Number(localStorage.getItem("status")) || null,  // ✅ 승인 상태 (0: 대기, 1: 승인 완료, 2: 거부)
         token: localStorage.getItem("accessToken") || null,
+        user: JSON.parse(localStorage.getItem("user")) || null,
         role: Number(localStorage.getItem("role")) || null,
-        is_verified: null,
-        grade: localStorage.getItem("grade") || null,  // ✅ 학년 추가
-        level: localStorage.getItem("level") || null,  // ✅ 한국어/일본어 레벨 추가
-        name: localStorage.getItem("name") || null,  // ✅ 학생 이름 추가
+        name: localStorage.getItem("name") || null,
+        grade: localStorage.getItem("grade") || null,
+        level: localStorage.getItem("level") || null,
+        status: Number(localStorage.getItem("status")) || null
     }),
 
     getters: {
-        isAuthenticated: (state) => !!state.token,
+        isAuthenticated: (state) => !!state.token, // 로그인 여부 확인
     },
 
     actions: {
-        async loginWithGoogle(code) {
+        async register(userData) {
             try {
-                // ✅ Google OAuth 콜백 요청
-                const response = await apiClient.get(`/api/auth/callback?code=${code}`);
+                const response = await apiClient.post("/auth/register", userData);
+                const { status } = response.data;
 
-                // ✅ 서버에서 받은 로그인 데이터 구조 분해 할당
-                const { token, role, is_verified, name, grade, level, status } = response.data;
-
-                // ✅ Pinia Store에 저장
-                this.token = token;
-                this.role = role;
-                this.is_verified = is_verified;
-                this.name = name;  // ✅ 학생 이름 저장
-                this.grade = grade;  // ✅ 학년 저장
-                this.level = level;  // ✅ 한국어/일본어 레벨 저장
-                this.status = status;  // ✅ 승인 상태 저장
-
-                // ✅ LocalStorage에도 저장하여 새로고침해도 유지
-                localStorage.setItem("accessToken", token);
-                localStorage.setItem("role", role);
-                localStorage.setItem("name", name);
-                localStorage.setItem("grade", grade);
-                localStorage.setItem("level", level);
-                localStorage.setItem("status", status);
-
-                // ✅ 승인 상태에 따른 처리
-                if (status === 1) {
-                    // 승인 완료 → 대시보드로 이동
-                    useRouter().push("/dashboard");
-                } else if (status === 2) {
-                    // 승인 거부 → 로그인 페이지로 이동
-                    alert("❌ 승인 거부된 사용자입니다.");
-                    useRouter().push("/login");
+                if (status === 0) {
+                    // ✅ 회원가입 성공, 하지만 승인 대기 상태
+                    return { success: true, status };
                 } else {
-                    // 승인 대기 → 알림 후 로그인 페이지 유지
-                    alert("⏳ 관리자 승인 대기 중입니다.");
-                    useRouter().push("/login");
+                    return { success: false, message: "회원가입 상태 오류!" };
                 }
-
             } catch (error) {
-                console.error("🚨 Google 로그인 실패:", error);
+                console.error("🚨 회원가입 실패:", error);
+                return { success: false, message: error.response?.data?.message || "회원가입 실패" };
             }
         },
 
+        // ✅ 로그인 처리 (LocalStorage에 저장)
+        login(token, role, name, grade, level, status) {
+            this.token = token;
+            this.role = role;
+            this.name = name;
+            this.grade = grade;
+            this.level = level;
+            this.status = status;
+
+            localStorage.setItem("accessToken", token);
+            localStorage.setItem("role", role);
+            localStorage.setItem("name", name);
+            localStorage.setItem("grade", grade);
+            localStorage.setItem("level", level);
+            localStorage.setItem("status", status);
+        },
+
+        // ✅ 로그아웃 처리
         logout() {
             this.token = null;
+            this.user = null;
             this.role = null;
             this.name = null;
             this.grade = null;
@@ -70,13 +63,25 @@ export const useAuthStore = defineStore("auth", {
             this.status = null;
 
             localStorage.removeItem("accessToken");
+            localStorage.removeItem("user");
             localStorage.removeItem("role");
             localStorage.removeItem("name");
             localStorage.removeItem("grade");
             localStorage.removeItem("level");
             localStorage.removeItem("status");
 
-            window.location.reload();
+
+            window.location.href = "/login";
         },
+
+        // ✅ 앱 시작 시 자동 로그인 (새로고침 후에도 유지)
+        initializeAuth() {
+            this.token = localStorage.getItem("accessToken") || null;
+            this.role = Number(localStorage.getItem("role")) || null;
+            this.name = localStorage.getItem("name") || null;
+            this.grade = localStorage.getItem("grade") || null;
+            this.level = localStorage.getItem("level") || null;
+            this.status = Number(localStorage.getItem("status")) || null;
+        }
     }
 });

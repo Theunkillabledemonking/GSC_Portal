@@ -12,7 +12,7 @@ const googleAuthUrl = ref(null);
 const handleGoogleLogin = async () => {
   try {
     // ✅ 백엔드에서 Google OAuth URL 가져오기
-    const response = await apiClient.get("/api/auth/google");
+    const response = await apiClient.get("/auth/google");
 
     // ✅ 해당 URL로 이동하여 Google 로그인 진행
     window.location.href = response.data.authUrl;

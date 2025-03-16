@@ -11,4 +11,4 @@ const pool = mysql.createPool({
     queueLimit: 0
 });
 
-module.exports = pool; // ✅ 기존 코드 유지
+module.exports = pool;

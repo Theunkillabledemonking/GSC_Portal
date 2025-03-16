@@ -10,12 +10,17 @@ const router = useRouter();
 // 사용자 정보 제출 함수
 const handleSubmit = async (userData) => {
   try {
-    await authStore.register(userData);
-    alert('회원가입 완료. 승인 대기 중입니다.');
-    router.push('/login');
+    const { success } = await authStore.register(userData);
+
+    if (success) {
+      alert("⏳ 관리자 승인이 필요합니다. 가입이 완료되었습니다!");
+      router.push("/login");
+    } else {
+      alert("회원가입 처리 중 오류가 발생했습니다.");
+    }
   } catch (error) {
-    console.log('회원가입 오류:', error);
-    alert('회원가입 처리 중 오류가 발생했습니다.');
+    console.log("회원가입 오류:", error);
+    alert("회원가입 처리 중 오류가 발생했습니다.");
   }
 };
 </script>

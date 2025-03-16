@@ -1,24 +1,20 @@
 <script setup>
 import { computed } from "vue";
 import { useAuthStore } from "@/store/authStore.js";
-import { useRouter } from "vue-router";
 
 const authStore = useAuthStore();
-const router = useRouter();
-
 const isAdmin = computed(() => Number(authStore.role) === 1); // 관리자
 const isProfessor = computed(() => Number(authStore.role) === 2); // 교수
-const isStudent = computed(() => Number(authStore.role) === 3); // 학생
 
-const handleLogout = () => {
-  authStore.token = null; // 토큰 삭제
-  localStorage.removeItem('token'); // 로컬 스토리지 삭제
-  router.push('/login');
+const isAuthenticated = computed(() => !!authStore.token);
+
+const logout = () => {
+  authStore.logout();
 }
 </script>
 
 <template>
-  <nav class="navbar">
+  <nav v-if="isAuthenticated" class="navbar">
     <router-link to="/" class="logo">永進專門大學校</router-link>
 
     <ul class="nav-links">
@@ -39,7 +35,7 @@ const handleLogout = () => {
       </template>
     </ul>
 
-    <button class="logout-button" @click="handleLogout">로그아웃</button>
+    <button class="logout-button" @click="logout">로그아웃</button>
   </nav>
 </template>
 
