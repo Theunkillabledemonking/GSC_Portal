@@ -1,43 +1,70 @@
-// Pinia 스토어 (공지사항 상태 관리)
 import { defineStore } from "pinia";
-import { fetchNotices, fetchNoticeById, createNotice, updateNotice, deleteNotice} from "@/services/noticeService.js";
+import { fetchNotices, fetchNoticeById, createNotice, updateNotice, deleteNotice } from "@/services/noticeService";
 
-export const useNoticeStore = defineStore('notice', {
+export const useNoticeStore = defineStore("notices", {
     state: () => ({
-        notices: [], // 공지사항 목록
-        selectedNotice: null, // 선택된 공지사항 상세 정보
+        notices: [],
+        notice: null,
+        filters: {
+            grade: null,
+            level: null,
+            subject_id: null,
+        }
     }),
 
     actions: {
-        // 공지사항 목록 불러오기
+        // ✅ 공지사항 목록 불러오기 (필터 적용)
         async loadNotices() {
-            const notices = await fetchNotices();
-            this.notices = notices.sort((a, b) => b.is_important - a.is_important); // 중요 공지를 맨 위로 정렬
+            try {
+                this.notices = await fetchNotices(this.filters);
+            } catch (error) {
+                console.error("공지사항 로드 실패:", error);
+            }
         },
 
-        // 공지사항 상세 불러오기
+        // ✅ 공지사항 상세 조회 (조회수 증가)
         async loadNotice(id) {
-            console.log(`📡 공지사항 상세 요청: ${id}`);  // 디버깅용 로그 추가
-            this.selectedNotice = await fetchNoticeById(id);
-            console.log('📩 불러온 공지:', this.selectedNotice); // 응답 확인
+            try {
+                this.notice = await fetchNoticeById(id);
+            } catch (error) {
+                console.error("공지사항 상세 조회 실패:", error);
+            }
         },
 
-        // 공지사항 등록
-        async addNotice(noticeData) {
-            await createNotice(noticeData);
-            await this.loadNotices(); // 목록 새로고침
+        // ✅ 공지사항 작성
+        async addNotice(noticeData, files) {
+            try {
+                await createNotice(noticeData, files);
+                await this.loadNotices(); // 목록 새로고침
+            } catch (error) {
+                console.error("공지사항 작성 실패:", error);
+            }
         },
 
-        // 공지사항 수정
-        async editNotice(id, noticeData) {
-            await updateNotice(id, noticeData);
-            await this.loadNotices(); // 목록 새로고침
+        // ✅ 공지사항 수정
+        async editNotice(id, noticeData, files) {
+            try {
+                await updateNotice(id, noticeData, files);
+                await this.loadNotices();
+            } catch (error) {
+                console.error("공지사항 수정 실패:", error);
+            }
         },
 
-        // 공지사항 삭제
+        // ✅ 공지사항 삭제
         async removeNotice(id) {
-            await deleteNotice(id);
-            await this.loadNotices(); // 목록 새로고침
+            try {
+                await deleteNotice(id);
+                this.notices = this.notices.filter(notice => notice.id !== id);
+            } catch (error) {
+                console.error("공지사항 삭제 실패:", error);
+            }
+        },
+
+        // ✅ 필터 변경
+        setFilters(filters) {
+            this.filters = { ...this.filters, ...filters };
+            this.loadNotices();
         }
     }
 });

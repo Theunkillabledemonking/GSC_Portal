@@ -1,24 +1,21 @@
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const multer = require("multer");
+const path = require("path");
 
-const uploadDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
-
+// ✅ 파일 저장 경로 및 파일명 설정
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, uploadDir);
+        cb(null, "uploads/");
     },
     filename: (req, file, cb) => {
-        const originalname = Buffer.from(file.originalname, 'latin1').toString('utf8');  // 한글깨짐 방지
-        const safeName = originalname.replace(/[^a-zA-Z0-9가-힣_.-]/g, '_');  // 특수문자 제거
-        const uniqueName = Date.now() + '-' + safeName;
-        req.originalFileName = safeName;  // 원본 파일명 보존
-        cb(null, uniqueName);
+        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
     }
 });
 
-const upload = multer({ storage });
+// ✅ 여러 개의 파일 업로드 가능하게 변경
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB 제한
+});
+
 module.exports = upload;

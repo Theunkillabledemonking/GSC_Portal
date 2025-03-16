@@ -1,6 +1,6 @@
 const express = require("express");
-const { googleCallback, registerUser } = require("../auth/authController");
-const { verifyToken } = require("../auth/authMiddleware");
+const { googleCallback, registerUser } = require("../controllers/authController");
+const { verifyToken } = require("../middlewares/authMiddleware");
 
 const router = express.Router();
 

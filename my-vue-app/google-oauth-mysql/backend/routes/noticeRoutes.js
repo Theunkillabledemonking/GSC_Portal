@@ -1,30 +1,24 @@
-const express = require('express');
-const { hasRole, verifyToken} = require('../auth/authMiddleware');
-const {
-    createNotices,
-    getNotices,
-    getNoticeById,
-    updateNotice,
-    deleteNotice,
-} = require('../controllers/noticeController');
-
+const express = require("express");
 const router = express.Router();
+const noticeController = require("../controllers/noticeController");
+const { verifyToken, hasRole } = require("../middlewares/authMiddleware");
 
-const upload = require('../middlewares/uploadMiddleware');
+// ✅ 공지사항 목록 조회
+router.get("/", noticeController.getNotices);
 
-// 공지사항 등록 API (POST /api/notices)
-router.post("/", verifyToken, hasRole(2), upload.single('attachment'), createNotices);
+// ✅ 공지사항 상세 조회
+router.get("/:id", noticeController.getNoticeById);
 
-// 공지사항 조회 ( 전체 조회 & 학생은 본인 학년 공지만)
-router.get('/', verifyToken, getNotices);
+// ✅ 공지사항 등록 (관리자 & 교수만 가능)
+router.post("/", verifyToken, hasRole(2), noticeController.createNotice);
 
-// 공지사항 상세 조회
-router.get('/:id', verifyToken, getNoticeById);
+// ✅ 공지사항 수정 (본인 글만, 관리자 전체)
+router.put("/:id", verifyToken, noticeController.updateNotice);
 
-// 공지사항 수정 (교수는 본인 글만, 관리자는 모두 가능)
-router.put("/:id", verifyToken, hasRole(2), upload.single('attachment'), updateNotice);
+// ✅ 공지사항 삭제
+router.delete("/:id", verifyToken, noticeController.deleteNotice);
 
-// 공지사항 삭제 (교수는 본인 글만, 관리자는 모두 가능)
-router.delete('/:id', verifyToken, hasRole(2), deleteNotice);
+// ✅ 첨부파일 다운로드 추가
+router.get("/:id/download/:fileId", verifyToken, noticeController.downloadAttachment);
 
 module.exports = router;

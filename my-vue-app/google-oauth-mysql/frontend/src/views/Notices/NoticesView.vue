@@ -3,21 +3,25 @@
     <h2>📢 공지사항</h2>
 
     <!-- 🔍 검색 기능 -->
-    <input v-model="searchQuery" type="text" placeholder="검색할 공지 제목 입력..." class="search-box" />
+    <input v-model="searchQuery" type="text" placeholder="검색할 공지 제목, 작성자, 내용..." class="search-box" />
 
-    <!-- 🎚️ 학년 필터 버튼 -->
-    <!-- 학년 필터 -->
-    <!-- 관리자(role=1), 교수(role=2)만 보이도록 v-if="authStore.role <= 2" -->
+    <!-- 🎚️ 학년 필터 (관리자, 교수만 보임) -->
     <div class="filters" v-if="authStore.role <= 2">
       <button @click="filterNotices('all')" :class="{ active: selectedGrade === 'all' }">전체</button>
-      <button @click="filterNotices(1)" :class="{ active: selectedGrade === 1 }">1학년</button>
-      <button @click="filterNotices(2)" :class="{ active: selectedGrade === 2 }">2학년</button>
-      <button @click="filterNotices(3)" :class="{ active: selectedGrade === 3 }">3학년</button>
+      <button v-for="grade in [1, 2, 3]" :key="grade" @click="filterNotices(grade)" :class="{ active: selectedGrade === grade }">
+        {{ grade }}학년
+      </button>
     </div>
 
-    <!-- 학년 필터가 'all'이 아닌 경우에만, 그리고 role<=2일 때만 노출 -->
+    <!-- ✅ 레벨 필터 (학년과 관계없이 선택 가능) -->
+    <select v-model="selectedLevel">
+      <option value="">🔍 모든 레벨</option>
+      <option v-for="level in levels" :key="level" :value="level">{{ level }}</option>
+    </select>
+
+    <!-- ✅ 과목 필터 (선택된 학년의 과목만 표시) -->
     <select v-if="authStore.role <= 2 && selectedGrade !== 'all'" v-model="selectedSubject">
-      <option value="">전체</option>
+      <option value="">🔍 전체 과목</option>
       <option v-for="subject in subjects" :key="subject.id" :value="subject.id">
         {{ subject.name }}
       </option>
@@ -34,6 +38,7 @@
         <th>제목</th>
         <th>학년</th>
         <th>과목</th>
+        <th>레벨</th>
         <th>작성자</th>
         <th>작성 날짜</th>
         <th>조회수</th>
@@ -50,6 +55,7 @@
         </td>
         <td>{{ notice.grade ? `${notice.grade}학년` : '전체' }}</td>
         <td>{{ notice.subject_name || '-' }}</td>
+        <td>{{ notice.level || '-' }}</td>
         <td>{{ notice.author }}</td>
         <td>{{ formatDate(notice.created_at) }}</td>
         <td>{{ notice.views }}</td>
@@ -57,35 +63,33 @@
       </tbody>
     </table>
 
-    <p v-else>공지사항이 없습니다.</p>
+    <p v-else>📌 해당하는 공지사항이 없습니다.</p>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
-import axios from 'axios';
 import { useNoticeStore } from '@/store/noticeStore.js';
 import { useAuthStore } from '@/store/authStore.js';
 import { useRouter } from "vue-router";
+import axios from "axios";
 
 const noticeStore = useNoticeStore();
 const authStore = useAuthStore();
 const router = useRouter();
 
 const selectedGrade = ref('all');
-const searchQuery = ref('');
-const subjects = ref([]);
+const selectedLevel = ref('');
 const selectedSubject = ref('');
+const searchQuery = ref('');
+const subjects = ref([]); // ✅ 과목 목록 추가
+const specialSubjects = ref([]); // ✅ 특강 과목 목록 추가
 
-onMounted(() => {
-  // 로그인한 유저 정보에 따라 백엔드에서 notices를 가져옴
-  // 관리자/교수는 전체가 오고, 학생은 자기 학년 공지만
-  noticeStore.loadNotices();
-});
 
-// 학년 바뀌면 해당 학년의 과목 목록 가져오기
+const levels = ["N3", "N2", "N1", "TOPIK4", "TOPIK6"]; // ✅ 레벨 리스트
+
+// ✅ 학년이 변경될 때만 해당 학년의 과목을 불러옴
 watch(selectedGrade, async (newGrade) => {
-  // 학생은 학년 필터 자체를 안 쓰므로 role<=2 조건을 체크
   if (authStore.role > 2) return;
 
   if (newGrade === 'all') {
@@ -93,58 +97,79 @@ watch(selectedGrade, async (newGrade) => {
     selectedSubject.value = '';
     return;
   }
+
   try {
-    const res = await axios.get(`/api/subjects/year/${newGrade}`);
+    const res = await axios.get(`/api/subjects/year/${newGrade}`, {
+      headers: { Authorization: `Bearer ${authStore.token}` },
+    }); // ✅ 선택한 학년의 과목 가져오기
+
     subjects.value = res.data.subjects;
     selectedSubject.value = '';
   } catch (error) {
-    console.log('과목 목록 불러오기 실패:', error);
+    console.log("과목 목록 불러오기 실패:", error);
     subjects.value = [];
   }
 });
 
+onMounted(async () => {
+  try {
+    // ✅ 공지사항과 특강 데이터를 동시에 가져오기
+    const [noticesRes, specialSubjectsRes] = await Promise.all([
+      noticeStore.loadNotices(),
+      axios.get("/api/subjects/special", {
+        headers: { Authorization: `Bearer ${authStore.token}` }
+      })
+    ]);
 
+    // ✅ 특강 과목 목록 저장
+    specialSubjects.value = specialSubjectsRes.data.specialLectures || [];
+
+  } catch (error) {
+    console.error("데이터 불러오기 오류:", error);
+  }
+});
+
+// ✅ 필터링된 공지사항 목록
 const filteredNotices = computed(() => {
-  // 백엔드에서 가져온 전체(혹은 제한된) 공지들
   let filtered = noticeStore.notices;
 
-  // ① 관리자(role=1) 또는 교수(role=2)일 때만 학년/과목 필터 적용
-  if (authStore.role <= 2) {
-    if (selectedGrade.value !== 'all') {
-      const gradeVal = Number(selectedGrade.value);
-      filtered = filtered.filter(n => Number(n.grade) === gradeVal);
-
-      if (selectedSubject.value) {
-        const subjectVal = Number(selectedSubject.value);
-        filtered = filtered.filter(n => Number(n.subject_id) === subjectVal);
-      }
-    }
+  // ✅ 학년 필터링
+  if (selectedGrade.value !== 'all') {
+    filtered = filtered.filter(n => Number(n.grade) === Number(selectedGrade.value));
   }
-  // ② 검색어 필터 (학생도 공지 검색은 가능하다고 가정)
+
+  // ✅ 레벨 필터링 (특강 과목 포함)
+  if (selectedLevel.value) {
+    filtered = filtered.filter(n => n.level === selectedLevel.value || n.level === null);
+  }
+
+  // ✅ 과목 필터링 (특강 포함)
+  if (selectedSubject.value) {
+    filtered = filtered.filter(n => n.subject_id === Number(selectedSubject.value) || specialSubjects.value.some(s => s.id === n.subject_id));
+  }
+
+  // ✅ 검색 필터링 (제목, 작성자, 내용)
   if (searchQuery.value) {
-    filtered = filtered.filter(n => n.title.includes(searchQuery.value));
+    filtered = filtered.filter(n =>
+        n.title.includes(searchQuery.value) ||
+        n.author.includes(searchQuery.value) ||
+        n.content.includes(searchQuery.value)
+    );
   }
 
   return filtered;
 });
-
-
-// 그 다음에 filteredNotices를 watch해서 디버깅 로그 찍기
-watch(filteredNotices, (newVal) => {
-  console.log("최종 필터 결과:", newVal);
-}, { immediate: true, deep: true });
-
-// 학년 필터 변경
+// ✅ 학년 필터 변경
 const filterNotices = (grade) => {
   selectedGrade.value = grade;
 };
 
-// 날짜 포맷 함수
+// ✅ 날짜 포맷 함수
 const formatDate = (date) => {
   return new Date(date).toLocaleString();
 };
 
-// 공지 등록 페이지 이동
+// ✅ 공지 등록 페이지 이동
 const goToCreateNotice = () => {
   router.push('/notices/create');
 };
@@ -154,7 +179,6 @@ const goToCreateNotice = () => {
 .notices {
   padding: 20px;
 }
-
 .search-box {
   width: 100%;
   padding: 10px;
@@ -162,51 +186,37 @@ const goToCreateNotice = () => {
   border: 1px solid #ccc;
   border-radius: 5px;
 }
-
 .filters {
   margin-bottom: 15px;
 }
-
 .filters button {
   margin-right: 10px;
   padding: 5px 10px;
   cursor: pointer;
 }
-
 .filters .active {
   background-color: #ff6666;
   color: white;
 }
-
-.important {
-  color: red;
-  font-weight: bold;
-}
-
 .create-btn {
   background-color: #4caf50;
   color: white;
   padding: 10px;
   border: none;
   cursor: pointer;
-  margin-bottom: 10px;
 }
-
 .create-btn:hover {
   background-color: #45a049;
 }
-
 table {
   width: 100%;
   border-collapse: collapse;
 }
-
 th, td {
   border: 1px solid #ddd;
   padding: 8px;
   text-align: center;
 }
-
 th {
   background-color: #f4f4f4;
 }
