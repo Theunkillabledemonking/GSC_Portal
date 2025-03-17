@@ -82,6 +82,7 @@ const uploadedFiles = ref([]);
 const subjects = ref([]);
 const levels = ["N3", "N2", "N1", "TOPIK4", "TOPIK6"]; // ✅ 레벨 리스트
 
+
 // ✅ 학년 변경 시 과목 자동 불러오기
 const loadSubjectsByGrade = async () => {
   if (!form.value.grade) {
@@ -89,17 +90,20 @@ const loadSubjectsByGrade = async () => {
     return;
   }
   try {
-    const res = await axios.get(`/api/subjects/year/${form.value.grade}`);
+    console.log(`학년 변경 감지: ${form.value.grade}`);
+    const res = await axios.get(`/api/subjects/year/${form.value.grade}`, {
+      headers: { Authorization: `Bearer ${authStore.token}` }
+    });
     subjects.value = res.data.subjects;
   } catch (error) {
     console.log('과목 불러오기 실패', error);
     subjects.value = [];
   }
 };
-
 // ✅ 기존 데이터 로드 (수정 모드)
 watch(() => props.initialData, (newData) => {
   if (props.isEdit && newData) {
+    console.log("기존 데이터 로드:", newData);
     form.value = {
       title: newData.title || '',
       content: newData.content || '',
@@ -117,8 +121,10 @@ watch(() => props.initialData, (newData) => {
   }
 }, { immediate: true });
 
+
 // ✅ 학년 변경 감지 후 과목 자동 로드
 watch(() => form.value.grade, (newGrade) => {
+  console.log(`학년 변경됨 ${newGrade}`);
   loadSubjectsByGrade();
 });
 
@@ -155,6 +161,7 @@ const handleSubmit = () => {
     data.append('attachments', file);
   });
 
+  console.log("제출 데이터:", Object.fromEntries(data));
   emit("submit", data);
 };
 </script>
