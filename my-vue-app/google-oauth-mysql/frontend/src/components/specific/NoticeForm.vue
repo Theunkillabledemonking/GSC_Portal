@@ -60,6 +60,9 @@
 <script setup>
 import { ref, defineProps, defineEmits, watch, onMounted } from "vue";
 import axios from 'axios';
+import {useAuthStore} from "@/store/authStore.js";
+
+const authStore = useAuthStore();
 
 const props = defineProps({
   isEdit: Boolean,
@@ -89,6 +92,7 @@ const loadSubjectsByGrade = async () => {
     subjects.value = [];
     return;
   }
+  console.log("📌 현재 토큰:", authStore.token); // 🚨 디버깅용 로그 추가
   try {
     console.log(`학년 변경 감지: ${form.value.grade}`);
     const res = await axios.get(`/api/subjects/year/${form.value.grade}`, {
@@ -100,20 +104,12 @@ const loadSubjectsByGrade = async () => {
     subjects.value = [];
   }
 };
+
 // ✅ 기존 데이터 로드 (수정 모드)
 watch(() => props.initialData, (newData) => {
   if (props.isEdit && newData) {
     console.log("기존 데이터 로드:", newData);
-    form.value = {
-      title: newData.title || '',
-      content: newData.content || '',
-      grade: newData.grade ?? '',
-      subject_id: newData.subject_id ?? '',
-      level: newData.level ?? '',
-      is_important: newData.is_important === 1 ? 1 : 0,
-      files: []
-    };
-
+    form.value = {...newData, files: []};
     // 학년이 선택되어 있으면 과목 불러오기
     if (form.value.grade) {
       loadSubjectsByGrade();
@@ -149,23 +145,20 @@ const removeFile = (index) => {
 // ✅ 폼 제출
 const handleSubmit = () => {
   const data = new FormData();
-  data.append('title', form.value.title);
-  data.append('content', form.value.content);
-  data.append('subject_id', form.value.subject_id ?? '');
-  data.append('grade', form.value.grade ?? '');
-  data.append('level', form.value.level ?? '');
-  data.append('is_important', form.value.is_important);
-
-  // ✅ 파일 추가 (최대 5개)
+  for (const key in form.value) {
+    if (form.value[key]) {
+      data.append(key, form.value[key]); // ✅ 빈 값은 추가하지 않도록 수정
+    }
+  }
   uploadedFiles.value.forEach(file => {
-    data.append('attachments', file);
+    data.append("attachments", file);
   });
 
-  console.log("제출 데이터:", Object.fromEntries(data));
+  console.log("📌 제출 데이터 확인:", Object.fromEntries(data)); // 🚨 디버깅 로그 추가
+
   emit("submit", data);
 };
 </script>
-
 <style scoped>
 .notice-form {
   padding: 20px;

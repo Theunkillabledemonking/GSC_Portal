@@ -26,6 +26,8 @@ export const createNotice = async (noticeData, files = []) => {
         formData.append("attachments", file);
     });
 
+    console.log("FormData 전송 확인:", Object.fromEntries(formData));
+
     const response = await apiClient.post("/notices", formData, {
         headers: { "Content-Type": "multipart/form-data" },
     });

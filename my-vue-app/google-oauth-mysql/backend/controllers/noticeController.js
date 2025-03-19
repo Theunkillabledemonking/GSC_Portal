@@ -121,7 +121,11 @@ exports.getNoticeById = async (req, res) => {
  */
 exports.createNotice = async (req, res) => {
     try {
-        const { title, content, grade, is_important, notify_kakao, subject_id, important_until } = req.body;
+
+        console.log("📌 받은 요청 데이터:", req.body);
+        console.log("📌 업로드된 파일들:", req.files);
+
+        const { title, content, grade, is_important, subject_id, important_until } = req.body;
         const author_id = req.user.id;
 
         const query = `

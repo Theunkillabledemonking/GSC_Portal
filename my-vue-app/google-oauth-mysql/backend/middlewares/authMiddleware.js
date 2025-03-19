@@ -9,7 +9,7 @@ const jwt = require('jsonwebtoken');
 // 요청 헤더에 포함된 JWT를 검증합니다.
 exports.verifyToken = (req, res, next) => {
     // 1. 요청 헤더에서 'authorization' 값을 가져옵니다.
-    console.log('verify token', req.headers);
+    console.log('verify token', req.headers.authorization);
     const token = req.headers.authorization;
 
     // 2. 토큰이 없으면 403 상태 코드와 메시지를 반환합니다.
