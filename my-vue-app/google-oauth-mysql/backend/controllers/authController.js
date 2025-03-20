@@ -17,6 +17,7 @@ const findUserByEmail = async (email) => {
 const generateJWT = (user) => {
     return jwt.sign(
         {
+            id: user.id,
             email: user.email,
             role: user.role || 3,
             is_verified: Boolean(user.verified),

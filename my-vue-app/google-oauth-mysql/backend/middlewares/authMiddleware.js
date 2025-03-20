@@ -22,6 +22,7 @@ exports.verifyToken = (req, res, next) => {
         // - 'Bearer [토큰값]' 형식으로 전달되므로, 'Bearer ' 이후의 실제 토큰 값을 추출합니다.
         const decoded = jwt.verify(token.split(" ")[1], process.env.JWT_SECRET);
         // 4. 검증된 토큰의 payload 정보를 요청 객체 (req)에 추가됩니다.
+        console.log("📌 [Decoded Token]:", decoded);
         req.user = decoded;
         // 5. 다음 미들웨어로 넘어갑니다.
         next();
@@ -48,15 +49,14 @@ exports.hasRole = (role) => {
 
         console.log(`🔎 [hasRole] 요청한 사용자 role: ${req.user?.role}, 필요한 role: ${role}`);
 
-        // 1. 요청된 사용자의 권한이 파라미터로 받은 권한보다 작거나 같으면 접근 허용
-        if (req.user.role <= role) {
-            next(); // 다음 미들웨어 또는 라우트 핸들러로 넘어감
+         if (req.user.role <= role) {
+            next();
         } else {
-            // 2. 권한이 부족하면 403 상태 코드와 메시지를 반환
             res.status(403).json({ message: '접근 권한이 없습니다.' });
         }
     };
 };
+
 
 // -------------------------------------------
 // 3. 승인 상태 확인 미들웨어 (checkStatus)
