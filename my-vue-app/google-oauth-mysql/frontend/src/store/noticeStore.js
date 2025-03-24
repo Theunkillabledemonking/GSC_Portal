@@ -5,6 +5,7 @@ export const useNoticeStore = defineStore("notices", {
     state: () => ({
         notices: [],
         notice: null,
+        selectedNotice: null,
         filters: {
             grade: null,
             level: null,
@@ -25,7 +26,8 @@ export const useNoticeStore = defineStore("notices", {
         // ✅ 공지사항 상세 조회 (조회수 증가)
         async loadNotice(id) {
             try {
-                this.notice = await fetchNoticeById(id);
+                const data = await fetchNoticeById(id);
+                this.selectedNotice = data; // ✅ selectedNotice에 저장
             } catch (error) {
                 console.error("공지사항 상세 조회 실패:", error);
             }

@@ -21,15 +21,17 @@
         <td>{{ notice.views }}</td>
         <th>첨부파일</th>
         <td>
-          <template v-if="isImage(notice.attachment)">
-            <img :src="notice.attachment_url" alt="첨부 이미지" style="max-width: 150px; max-height: 150px;" />
-          </template>
-          <template v-else>
-            <a :href="notice.attachment_url" target="_blank">
-              {{ notice.original_filename || getFileName(notice.attachment) || '첨부파일 다운로드' }}
-            </a>
-          </template>
-          <span v-if="!notice.attachment">없음</span>
+          <<template v-if="notice.attachments && notice.attachments.length">
+          <div v-for="file in notice.attachments" :key="file.id">
+            <template v-if="isImage(file.name)">
+              <img :src="file.url" :alt="file.name" style="max-width: 150px; max-height: 150px;" />
+            </template>
+            <template v-else>
+              <a :href="file.url" target="_blank">{{ file.name }}</a>
+            </template>
+          </div>
+        </template>
+          <span v-else>없음</span>
         </td>
       </tr>
       <tr>
@@ -81,9 +83,11 @@ const loadNoticeData = async () => {
 
 // ✅ 처음 마운트될 때 데이터 불러오기
 onMounted(() => {
-  loadNoticeData();
+  const id = route.params.id;
+  if (id) {
+    noticeStore.loadNotice(id);
+  }
 });
-
 
 
 
