@@ -21,16 +21,16 @@
         <td>{{ notice.views }}</td>
         <th>첨부파일</th>
         <td>
-          <<template v-if="notice.attachments && notice.attachments.length">
-          <div v-for="file in notice.attachments" :key="file.id">
-            <template v-if="isImage(file.name)">
-              <img :src="file.url" :alt="file.name" style="max-width: 150px; max-height: 150px;" />
-            </template>
-            <template v-else>
-              <a :href="file.url" target="_blank">{{ file.name }}</a>
-            </template>
-          </div>
-        </template>
+          <template v-if="notice.attachments && notice.attachments.length">
+            <div v-for="file in notice.attachments" :key="file.id" style="margin-bottom: 5px">
+              <template v-if="isImage(file.name)">
+                <img :src="file.url" :alt="file.name" style="max-width: 150px;" />
+              </template>
+              <template v-else>
+                <a :href="file.url" target="_blank">{{ file.name }}</a>
+              </template>
+            </div>
+          </template>
           <span v-else>없음</span>
         </td>
       </tr>
@@ -73,9 +73,12 @@ const notice = computed(() => noticeStore.selectedNotice);
 
 // 공지사항 수정 가능
 const canEdit = computed(() => {
-  return authStore.role === 1 || (authStore.role === 2 && notice.value?.author_id === authStore.userId)
-})
-
+  const noticeData = notice.value;
+  if (!noticeData) return false;
+  if (authStore.role === 1) return true;
+  if (authStore.role === 2 && noticeData.author_id === authStore.userId) return true;
+  return false;
+});
 // ✅ 공지사항 불러오기 함수
 const loadNoticeData = async () => {
   await noticeStore.loadNotice(route.params.id);

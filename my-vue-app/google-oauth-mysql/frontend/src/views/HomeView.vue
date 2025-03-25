@@ -29,8 +29,7 @@ onMounted(() => {
 <template>
   <div class="home">
     <!-- 로그인 상태에 따라 다른 버튼 표시 -->
-    <button v-if="!authStore.token" @click="goToLogin">로그인</button>
-    <button v-else @click="goToMainDashBoard">메인으로 이동</button>
+    <button @click="goToMainDashBoard">메인으로 이동</button>
   </div>
 </template>
 

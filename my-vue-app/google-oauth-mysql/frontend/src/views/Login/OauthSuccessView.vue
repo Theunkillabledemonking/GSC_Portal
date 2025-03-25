@@ -28,7 +28,7 @@ onMounted(() => {
 
     if (Number(status) === 1) {
       console.log("✅ 승인 완료, 대시보드로 이동");
-      router.push("/dashboard");
+      router.push("/main-dashboard");
     } else if (Number(status) === 2) {
       console.log("❌ 승인 거부됨, 로그인 페이지로 이동");
       alert("❌ 승인 거부된 사용자입니다.");

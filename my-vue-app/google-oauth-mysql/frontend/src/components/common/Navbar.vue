@@ -14,7 +14,7 @@ const logout = () => {
 
 <template>
   <nav v-if="isAuthenticated" class="navbar">
-    <router-link to="/" class="logo">永進專門大學校</router-link>
+    <router-link to="/main-dashboard" class="logo">永進專門大學校</router-link>
 
     <ul class="nav-links">
       <li><router-link to="/notices">공지사항</router-link></li>

@@ -129,7 +129,6 @@ async function loadTimetableData() {
 
   // year/level 추출
   const yearToUse = props.year ?? authStore.grade ?? 1;
-  const levelToUse = null;
 
   try {
     console.log('요청 데이터', {year: yearToUse, level: levelToUse, start_date , end_date});

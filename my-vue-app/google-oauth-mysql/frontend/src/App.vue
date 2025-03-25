@@ -4,13 +4,13 @@ import Navbar from '@/components/common/Navbar.vue';
 import { computed } from "vue";
 
 const authStore = useAuthStore();
-const isAuthenticated = computed(() => !!authStore.token);
+// const isAuthenticated = computed(() => !!authStore.token);
 </script>
 
 <template>
   <div id="app">
     <!-- 로그인한 경우에만 NavBar 표시 -->
-    <Navbar class="navbar" v-if="isAuthenticated" />
+    <Navbar v-if="authStore.isAuthenticated" />
     <div class="content">
       <router-view />
     </div>

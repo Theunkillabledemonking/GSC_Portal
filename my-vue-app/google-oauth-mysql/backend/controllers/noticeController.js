@@ -71,7 +71,7 @@ exports.getNoticeById = async (req, res) => {
 
         const noticeQuery = `
             SELECT
-                n.id, n.title, n.content, n.grade, n.subject_id,
+                n.id, n.title, n.content, n.grade, n.subject_id, n.author_id,
                 u.name AS author, n.created_at, n.updated_at,
                 n.is_important, n.notify_kakao, n.views,
                 s.name AS subject_name
@@ -93,9 +93,11 @@ exports.getNoticeById = async (req, res) => {
             "SELECT id, file_url, original_filename FROM notice_attachments WHERE notice_id = ?",
             [id]
         );
+
+        // ✅ 여기에서 BASE_URL을 붙여서 완전한 다운로드 링크로 만들어줌
         notice.attachments = attachments.map(file => ({
             id: file.id,
-            url: `${BASE_URL}${file.file_url}`,
+            url: `${BASE_URL}${file.file_url}`,  // ✅ URL은 여기서만 조립
             name: file.original_filename
         }));
 
@@ -240,7 +242,7 @@ exports.deleteNotice = async (req, res) => {
 };
 
 /**
- * ✅ 첨부파일 다운로드 (모든 사용자 가능)
+ * ✅ 파일 다운로드
  */
 exports.downloadAttachment = async (req, res) => {
     try {
@@ -255,13 +257,15 @@ exports.downloadAttachment = async (req, res) => {
         }
 
         const file = attachments[0];
-        const filePath = path.join(__dirname, "../uploads", path.basename(file.file_url));
+        // 실제 저장된 파일명
+        const storedFilename = path.basename(file.file_url);
+        // 다운로드 시 보여줄 파일명(한글 포함)
+        const downloadName = file.original_filename;
 
-        if (fs.existsSync(filePath)) {
-            res.download(filePath, file.original_filename);
-        } else {
-            res.status(404).json({ message: "파일이 존재하지 않습니다." });
-        }
+        const filePath = path.join(__dirname, "../uploads", storedFilename);
+
+        // 두 번째 인자로 original_filename을 넘기면 정상 한글 파일명으로 다운로드됨
+        res.download(filePath, downloadName);
     } catch (error) {
         console.error("파일 다운로드 오류:", error);
         res.status(500).json({ message: "서버 오류" });
@@ -275,14 +279,21 @@ exports.downloadAttachment = async (req, res) => {
  */
 const saveAttachments = async (files, notice_id) => {
     if (!files || files.length === 0) return;
+
+    const attachmentParams = files.map(file => {
+        const originalName = file.cleanedOriginal || file.originalname;  // ✅ 변경 포인트!
+        const filename = file.storedFilename || file.filename;
+
+        console.log("✅ 실제 저장된 파일명:", filename);
+        console.log("✅ 다운로드용 원래 이름:", originalName);
+
+        return [notice_id, filename, originalName];
+    });
+
     const attachmentQuery = `
         INSERT INTO notice_attachments (notice_id, file_url, original_filename)
         VALUES ?
     `;
-    const attachmentParams = files.map(file => [
-        notice_id,
-        `${BASE_URL}${file.filename}`,
-        file.originalname
-    ]);
+
     await pool.query(attachmentQuery, [attachmentParams]);
 };

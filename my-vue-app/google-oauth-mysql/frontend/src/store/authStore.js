@@ -4,12 +4,13 @@ import apiClient from "../services/apiClient";
 export const useAuthStore = defineStore("auth", {
     state: () => ({
         token: localStorage.getItem("accessToken") || null,
-        user: JSON.parse(localStorage.getItem("user")) || null,
-        role: Number(localStorage.getItem("role")) || null,
+        // user 객체를 localStorage에서 JSON으로 불러옴
+        user: localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user")) : null,
+        role: localStorage.getItem("role") ? Number(localStorage.getItem("role")) : null,
         name: localStorage.getItem("name") || null,
         grade: localStorage.getItem("grade") || null,
         level: localStorage.getItem("level") || null,
-        status: Number(localStorage.getItem("status")) || null
+        status: localStorage.getItem("status") ? Number(localStorage.getItem("status")) : null,
     }),
 
     getters: {
@@ -35,24 +36,26 @@ export const useAuthStore = defineStore("auth", {
         },
 
         // ✅ 로그인 처리 (LocalStorage에 저장)
-        login(token, role, name, grade, level, status) {
+        login(token, user) {
             this.token = token;
-            this.role = role;
-            this.name = name;
-            this.grade = grade;
-            this.level = level;
-            this.status = status;
+            this.user = user;
+            this.role = user.role;
+            this.name = user.name;
+            this.grade = user.grade;
+            this.level = user.level;
+            this.status = user.status;
 
             localStorage.setItem("accessToken", token);
-            localStorage.setItem("role", role);
-            localStorage.setItem("name", name);
-            localStorage.setItem("grade", grade);
-            localStorage.setItem("level", level);
-            localStorage.setItem("status", status);
+            localStorage.setItem("user", JSON.stringify(user));
+            localStorage.setItem("role", user.role);
+            localStorage.setItem("name", user.name);
+            localStorage.setItem("grade", user.grade);
+            localStorage.setItem("level", user.level);
+            localStorage.setItem("status", user.status);
         },
 
         // ✅ 로그아웃 처리
-        logout() {
+        logout(shouldRedirect = true) {
             this.token = null;
             this.user = null;
             this.role = null;
@@ -61,26 +64,32 @@ export const useAuthStore = defineStore("auth", {
             this.level = null;
             this.status = null;
 
-            localStorage.removeItem("accessToken");
-            localStorage.removeItem("user");
-            localStorage.removeItem("role");
-            localStorage.removeItem("name");
-            localStorage.removeItem("grade");
-            localStorage.removeItem("level");
-            localStorage.removeItem("status");
+            localStorage.clear();
 
-
-            window.location.href = "/login";
+            if (shouldRedirect) {
+                window.location.href = "/login"; // 또는 router.push('/login')도 가능
+            }
         },
 
-        // ✅ 앱 시작 시 자동 로그인 (새로고침 후에도 유지)
+        // 앱 초기화 시 localStorage에서 정보를 불러옵니다.
         initializeAuth() {
             this.token = localStorage.getItem("accessToken") || null;
-            this.role = Number(localStorage.getItem("role")) || null;
-            this.name = localStorage.getItem("name") || null;
-            this.grade = localStorage.getItem("grade") || null;
-            this.level = localStorage.getItem("level") || null;
-            this.status = Number(localStorage.getItem("status")) || null;
-        }
-    }
+            const storedUser = localStorage.getItem("user");
+            if (storedUser) {
+                this.user = JSON.parse(storedUser);
+                this.role = this.user.role;
+                this.name = this.user.name;
+                this.grade = this.user.grade;
+                this.level = this.user.level;
+                this.status = this.user.status;
+            } else {
+                // user 객체가 없을 경우 개별 항목으로 불러오기
+                this.role = localStorage.getItem("role") ? Number(localStorage.getItem("role")) : null;
+                this.name = localStorage.getItem("name") || null;
+                this.grade = localStorage.getItem("grade") || null;
+                this.level = localStorage.getItem("level") || null;
+                this.status = localStorage.getItem("status") ? Number(localStorage.getItem("status")) : null;
+            }
+        },
+    },
 });
