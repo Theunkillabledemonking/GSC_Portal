@@ -18,23 +18,31 @@ onMounted(() => {
   console.log("📌 현재 경로:", route.fullPath);
   console.log("📌 쿼리 데이터:", route.query);
 
+
   const { token, role, name, grade, level, status } = route.query;
 
   if (token) {
     console.log("✅ 토큰 감지됨:", token);
 
-    // ✅ 로그인 상태 저장
-    authStore.login(token, role, name, grade, level, status);
+    const user = {
+      role: Number(role),
+      name,
+      grade: Number(grade),
+      level,
+      status: Number(status),
+      email: '', // 필요시 추가
+    };
 
-    if (Number(status) === 1) {
+    console.log("🧪 login 파라미터:", token, user);
+    authStore.login(token, user);
+
+    if (user.status === 1) {
       console.log("✅ 승인 완료, 대시보드로 이동");
       router.push("/main-dashboard");
-    } else if (Number(status) === 2) {
-      console.log("❌ 승인 거부됨, 로그인 페이지로 이동");
+    } else if (user.status === 2) {
       alert("❌ 승인 거부된 사용자입니다.");
       router.push("/login");
     } else {
-      console.log("⏳ 승인 대기 중, 로그인 페이지 유지");
       alert("⏳ 관리자 승인 대기 중입니다.");
       router.push("/login");
     }

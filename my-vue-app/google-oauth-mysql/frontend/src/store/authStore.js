@@ -40,6 +40,7 @@ export const useAuthStore = defineStore("auth", {
             this.token = token;
             this.user = user;
             this.role = user.role;
+            console.log('🧪 login 파라미터:', token, user);
             this.name = user.name;
             this.grade = user.grade;
             this.level = user.level;
