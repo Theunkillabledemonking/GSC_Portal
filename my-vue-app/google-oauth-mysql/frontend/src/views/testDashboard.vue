@@ -1,99 +1,161 @@
 <template>
-  <div class="dashboard-wrapper">
-    <!-- 상단 네비게이션 스타일 -->
-    <header class="dashboard-header">
-      <h1>GSC 포털</h1>
-      <p>{{ pages[pageIndex] }}</p>
-    </header>
+  <div class="dashboard-container">
+    <div class="content-wrapper">
+      <!-- 왼쪽 화살표 -->
+      <button class="nav-arrow left" @click="prevPage">‹</button>
 
-    <!-- 콘텐츠 -->
-    <div class="dashboard-content">
-      <component :is="currentComponent" />
+      <!-- 컴포넌트 콘텐츠 -->
+      <div class="content-area">
+        <div class="section-header">
+          <span class="title">
+            {{ titles[currentPage] }}
+            <button class="plus-btn" @click="goToDetail(currentPage)">＋</button>
+          </span>
+        </div>
+        <component :is="pages[currentPage]" />
+      </div>
+
+      <!-- 오른쪽 화살표 -->
+      <button class="nav-arrow right" @click="nextPage">›</button>
     </div>
 
-    <!-- 페이지 네비게이션 -->
-    <div class="pager">
-      <button @click="prevPage" :disabled="pageIndex === 0">‹</button>
-      <span v-for="(page, i) in pages" :key="i" :class="{ active: pageIndex === i }" @click="goTo(i)">
-        {{ i + 1 }}
+    <!-- 하단 페이지 번호 -->
+    <div class="pagination">
+      <span
+          v-for="(page, index) in pages"
+          :key="index"
+          :class="['page-number', { active: currentPage === index }]"
+          @click="goToPage(index)"
+      >
+        {{ index + 1 }}
       </span>
-      <button @click="nextPage" :disabled="pageIndex === pages.length - 1">›</button>
     </div>
   </div>
 </template>
+
 <script setup>
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
+import NoticeSummary from '@/components/summaries/NoticeSummary.vue'
+import TimetableSummary from '@/components/summaries/TimetableSummary.vue'
+import CalendarSummary from '@/components/summaries/CalendarSummary.vue'
 
-// 페이지 정보
-const pageIndex = ref(0)
-const pages = ['공지사항', '시간표', '일정']
+const pages = [NoticeSummary, TimetableSummary, CalendarSummary]
+const titles = ['📢 최근 공지사항', '📘 이번주 수업 요약', '📅 이번달 일정 요약']
+const currentPage = ref(0)
 
-// 페이지 컴포넌트 연결
-import NoticeView from '@/views/Notices/NoticesView.vue';
-import TimetableView from '@/views/TimetableView.vue';
-import CalendarView from '@/components/TimetableCalendar.vue';
-
-const currentComponent = computed(() => {
-  return [NoticeView, TimetableView, CalendarView][pageIndex.value]
-})
-
-// 페이지 이동 함수
-const prevPage = () => {
-  if (pageIndex.value > 0) pageIndex.value--
-}
+// 무한 루프
 const nextPage = () => {
-  if (pageIndex.value < pages.length - 1) pageIndex.value++
+  currentPage.value = (currentPage.value + 1) % pages.length
 }
-const goTo = (index) => {
-  pageIndex.value = index
+const prevPage = () => {
+  currentPage.value = (currentPage.value - 1 + pages.length) % pages.length
+}
+const goToPage = (index) => {
+  currentPage.value = index
+}
+
+// 더보기 버튼 동작 (각 컴포넌트별 라우팅 혹은 팝업 등으로 확장 가능)
+const goToDetail = (index) => {
+  alert(`페이지 ${index + 1} 상세보기로 이동합니다.`)
 }
 </script>
 
 
 <style scoped>
-.dashboard-wrapper {
-  padding: 40px;
-  background: #f9f9f9;
-  min-height: 100vh;
+.dashboard-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
-.dashboard-header {
+.content-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(100vh - 120px); /* 네비게이션 바 제외한 높이 */
+  position: relative;
+}
+
+.nav-arrow {
+  font-size: 36px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 20px;
+  font-weight: bold;
+  color: #333;
+  transition: 0.3s ease;
+}
+.nav-arrow:hover {
+  color: #007bff;
+}
+
+.content-area {
+  min-height: 80vh;
+  width: 100%;
+  max-width: 800px;
+  padding: 30px;
+  margin: 0 20px;
+  background: #f9f9f9;
+  border-radius: 15px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-header {
+  width: 100%;
   text-align: center;
   margin-bottom: 20px;
 }
 
-.pager {
-  display: flex;
-  justify-content: center;
+.section-header .title {
+  font-size: 24px;
+  font-weight: bold;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-top: 20px;
 }
 
-.pager span {
-  cursor: pointer;
-  padding: 6px 10px;
-  border-radius: 5px;
-  background: #e0e0e0;
-  font-weight: bold;
-}
-
-.pager span.active {
-  background: #4caf50;
-  color: white;
-}
-
-.pager button {
-  padding: 6px 10px;
+.plus-btn {
+  background: #333;
+  color: #fff;
   border: none;
-  background: #007bff;
-  color: white;
-  border-radius: 5px;
+  font-size: 16px;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
   cursor: pointer;
+  line-height: 22px;
+  text-align: center;
+  padding: 0;
+  transition: background 0.3s ease;
 }
-.pager button:disabled {
-  background: #ccc;
-  cursor: not-allowed;
+.plus-btn:hover {
+  background: #007bff;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 30px;
+}
+
+.page-number {
+  margin: 0 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  border-radius: 6px;
+  background: #eee;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.page-number.active {
+  background: #333;
+  color: white;
 }
 </style>
-
