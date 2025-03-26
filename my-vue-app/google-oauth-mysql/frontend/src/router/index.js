@@ -5,6 +5,7 @@ import HomeView from '@/views/HomeView.vue';
 import LoginView from '@/views/Login/LoginView.vue';
 import OauthSuccessView from "@/views/Login/OauthSuccessView.vue";
 import RegisterView from '@/views/Login/RegisterView.vue';
+import AdminView from '@/views/AdminView.vue';
 
 import TestDashboard from "@/views/testDashboard.vue";
 import DashboardView from '@/views/DashboardView.vue';
@@ -25,6 +26,7 @@ const routes = [
     { path: '/login', name: 'Login', component: LoginView },
     { path: '/register', name: 'Register', component: RegisterView },
     { path: '/oauth/success', name: 'OauthSuccess', component: OauthSuccessView },
+    { path: '/admin', name: 'AdminView', component: AdminView, meta: { requiresAuth: true, adminOnly: true} },
 
     { path: '/test-dashboard', name: TestDashboard, component: TestDashboard, meta: { requiresAuth: true } },
     { path: '/main-dashboard', name: 'MainDashboard', component: MainDashboardView, meta: { requiresAuth: true } },

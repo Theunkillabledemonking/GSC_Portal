@@ -1,53 +1,18 @@
 <script setup>
 import { useAuthStore } from '@/store/authStore';
 import Navbar from '@/components/common/Navbar.vue';
-import { computed } from "vue";
 
 const authStore = useAuthStore();
-// const isAuthenticated = computed(() => !!authStore.token);
 </script>
 
 <template>
-  <div id="app">
-    <!-- 로그인한 경우에만 NavBar 표시 -->
+  <div class="min-h-screen bg-idolGray font-idol text-center">
+    <!-- ✅ 로그인한 경우에만 NavBar 표시 -->
     <Navbar v-if="authStore.isAuthenticated" />
-    <div class="content">
+
+    <!-- ✅ 상단 여백 확보 (navbar 고정 때문에) -->
+    <div class="pt-20 max-w-7xl mx-auto px-4 py-6">
       <router-view />
     </div>
   </div>
 </template>
-
-<style scoped>
-#app {
-  text-align: center;
-}
-
-.navbar {
-  position: fixed;  /* ✅ 화면 최상단 고정 */
-  top: 0;
-  left: 0;
-  width: 100%;
-  background-color: #1E3A8A;
-  padding: 15px 20px;
-  color: white;
-  z-index: 1000;
-}
-
-.content {
-  padding-top: 80px;
-}
-
-button {
-  margin-top: 20px;
-  background-color: #4285F4;
-  color: white;
-  border: none;
-  padding: 10px 15px;
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-button:hover {
-  background-color: #357AE8;
-}
-</style>

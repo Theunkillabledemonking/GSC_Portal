@@ -1,14 +1,14 @@
 <template>
   <div class="calendar">
     <div class="calendar-header">
-      <button @click="changeMonth(-1)">&lt;</button>
+      <button class="nav-button" @click="changeMonth(-1)">&#9664;</button>
       <h2>{{ currentYear }}년 {{ currentMonth + 1 }}월</h2>
-      <button @click="changeMonth(1)">&gt;</button>
+      <button class="nav-button" @click="changeMonth(1)">&#9654;</button>
     </div>
 
     <div class="weekdays">
       <div
-          v-for="dayLabel in ['일','월','화','수','목','금','토']"
+          v-for="dayLabel in ['일', '월', '화', '수', '목', '금', '토']"
           :key="dayLabel"
           class="weekday"
       >
@@ -42,10 +42,7 @@
 <script setup>
 import { ref, watch, nextTick, defineExpose } from 'vue';
 
-// 부모에서 날짜 클릭 시 사용할 이벤트
 const emit = defineEmits(['dateSelected', 'monthChanged']);
-
-// 부모로부터 전달받는 월별 이벤트 데이터
 const props = defineProps({
   monthlyEvents: {
     type: Object,
@@ -58,16 +55,12 @@ const currentMonth = ref(new Date().getMonth());
 const days = ref([]);
 const dayRefs = ref({});
 
-// (1) 달력 날짜 계산 함수
 function loadDays() {
-  // 이전 참조 초기화
   dayRefs.value = {};
   const firstDay = new Date(currentYear.value, currentMonth.value, 1).getDay();
   const totalDays = new Date(currentYear.value, currentMonth.value + 1, 0).getDate();
-
-  // 앞쪽 빈칸 생성
   const blanks = Array(firstDay).fill({ day: '', date: '' });
-  // 실제 날짜 배열 생성
+
   const realDays = Array.from({ length: totalDays }, (_, i) => {
     const dNum = i + 1;
     const dateStr = `${currentYear.value}-${String(currentMonth.value + 1).padStart(2, '0')}-${String(dNum).padStart(2, '0')}`;
@@ -75,21 +68,15 @@ function loadDays() {
   });
 
   days.value = [...blanks, ...realDays];
-  // (필요 시 콘솔 로그로 확인)
-  // console.log("days =>", days.value);
 }
 
-// currentYear, currentMonth 변경 시 날짜 재계산 및 부모에 변경 알림
 watch([currentYear, currentMonth], () => {
   loadDays();
   emit('monthChanged', { year: currentYear.value, month: currentMonth.value });
 }, { immediate: true });
 
 function selectDate(date) {
-  if (date) {
-    // 날짜 선택 시 부모로 알림
-    emit('dateSelected', date);
-  }
+  if (date) emit('dateSelected', date);
 }
 
 function changeMonth(offset) {
@@ -103,90 +90,116 @@ function changeMonth(offset) {
   }
 }
 
-// 각 날짜 셀의 DOM 참조 저장
 function setDayRef(date, el) {
   if (date && el) {
     dayRefs.value[date] = el;
   }
 }
 
-// 부모에서 호출할 수 있도록 특정 날짜로 스크롤하는 함수
 async function scrollToDate(date) {
   if (!date) return;
   await nextTick();
-  dayRefs.value[date]?.scrollIntoView({
-    behavior: 'smooth',
-    block: 'center'
-  });
+  dayRefs.value[date]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
-
-// 부모가 이 함수에 접근할 수 있도록 노출
 defineExpose({ scrollToDate });
 </script>
 
 <style scoped>
 .calendar {
-  width: 100%;
-  text-align: center;
-  border: 1px solid #ddd;
-  padding: 10px;
-  box-sizing: border-box;
+  max-width: 800px;
+  margin: 40px auto;
+  padding: 20px;
+  background: linear-gradient(to right, #f8f9fd, #e3e9f4);
+  border-radius: 20px;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.05);
 }
 
 .calendar-header {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 10px;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.calendar-header h2 {
+  font-size: 24px;
+  font-weight: bold;
+  color: #333;
+}
+
+.calendar-header button {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: #f0f1f6;
+  border-radius: 50%;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.calendar-header button:hover {
+  background: #d6d9e0;
 }
 
 .weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  background: #eee;
+  text-align: center;
   font-weight: 600;
+  margin-bottom: 10px;
 }
 
 .weekday {
-  padding: 8px;
-  text-align: center;
-  border: 1px solid #ddd;
+  padding: 10px 0;
+  color: #999;
+}
+
+.weekday:first-child {
+  color: #e74c3c; /* 일요일만 빨간색 */
 }
 
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 5px;
+  gap: 4px;
 }
 
 .calendar-cell {
-  border: 1px solid #ddd;
+  min-height: 80px;
+  background: white;
+  border-radius: 12px;
   padding: 8px;
-  height: 70px;
-  background: #fff;
-  overflow-y: auto;
-  cursor: pointer;
+  box-shadow: inset 0 0 0 1px #eee;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
   transition: background 0.2s;
 }
 
 .calendar-cell:hover {
-  background: #f1f1f1;
+  background: #f6f8fc;
 }
 
 .day-number {
-  font-size: 1.0rem;
-  margin-bottom: 4px;
+  font-size: 14px;
+  color: #333;
+  align-self: flex-start;
 }
 
 .event-squares {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px;
+  gap: 3px;
+  margin-top: 4px;
 }
 
 .square {
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
 }
 
 .color-1 { background: #f44336; }
@@ -194,6 +207,25 @@ defineExpose({ scrollToDate });
 .color-3 { background: #ffeb3b; }
 .color-4 { background: #4caf50; }
 .color-5 { background: #2196f3; }
-.color-6 { background: #9c27b0; }
-.color-7 { background: #e91e63; }
+.color-6 { background: #3f51b5; }
+.color-7 { background: #9c27b0; }
+
+@media screen and (max-width: 768px) {
+  .calendar-header h2 {
+    font-size: 24px;
+  }
+
+  .nav-button {
+    font-size: 24px;
+  }
+
+  .weekday,
+  .calendar-cell {
+    padding: 10px;
+  }
+
+  .day-number {
+    font-size: 16px;
+  }
+}
 </style>
