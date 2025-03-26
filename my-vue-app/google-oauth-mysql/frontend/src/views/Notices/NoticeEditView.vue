@@ -19,8 +19,8 @@ const loaded = ref(false);
 
 // 기존 공지사항 데이터 불러오기
 onMounted(async() => {
-  await noticeStore.loadNotice(route.params.id);
-  notice.value = noticeStore.notices;
+  const fetched = await noticeStore.loadNotice(route.params.id);
+  notice.value = fetched;
   loaded.value = true;
 });
 

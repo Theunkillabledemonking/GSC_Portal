@@ -65,7 +65,9 @@
     </div>
 
     <!-- 등록 버튼 -->
-    <button class="submit-btn" @click="handleSubmit">✨ 등록하기</button>
+    <button class="submit-btn" @click="handleSubmit">
+      {{ isEdit ? '✏️ 수정하기' : '✨ 등록하기' }}
+    </button>
   </div>
 </template>
 
@@ -137,10 +139,19 @@ watch(
     () => props.initialData,
     (newData) => {
       if (props.isEdit && newData) {
-        form.value = { ...newData };
-        // 기존 파일은 다시 업로드받아야 하므로 uploadedFiles는 비움
-        uploadedFiles.value = [];
-        // 학년 존재 시 과목 목록 로드
+        form.value = {
+          title: newData.title || "",
+          content: newData.content || "",
+          grade: newData.grade || "",
+          subject_id: newData.subject_id || "",
+          level: newData.level || "",
+          important_until: newData.important_until || null
+        };
+
+        // 🟣 중요 공지값도 반영!
+        isImportant.value = !!newData.is_important;
+
+        uploadedFiles.value = []; // 기존 파일은 따로 처리 필요
         if (form.value.grade) {
           loadSubjectsByGrade();
         }
@@ -148,7 +159,6 @@ watch(
     },
     { immediate: true }
 );
-
 // ✅ 학년 변경 감지 후 과목 자동 로드
 watch(
     () => form.value.grade,
@@ -164,6 +174,10 @@ onMounted(async () => {
   } else {
     console.log("🚨 토큰이 없음. localStorage에서 가져옴.");
     authStore.token = localStorage.getItem("token");
+  }
+
+  if (props.isEdit && props.initialData?.is_important) {
+    isImportant.value = true;
   }
 
   try {
@@ -207,24 +221,32 @@ const handleSubmit = () => {
   const validLevels = ["ALL", "N1", "N2", "N3", "TOPIK4", "TOPIK6"];
 
   if (!validLevels.includes(form.value.level)) {
-    form.value.level = "ALL";  // ✅ 기본값을 "ALL"로 설정
+    form.value.level = "ALL";
   }
 
   if (!validLevels.includes(form.value.level)) {
     alert("잘못된 레벨 값입니다.");
     return;
   }
+
   const data = {
     ...form.value,
     files: uploadedFiles.value,
-    grade: form.value.grade ? Number(form.value.grade) : 0, // null이면 기본값 0
-    subject_id: form.value.subject_id ? Number(form.value.subject_id) : 0, // null이면 기본값 0
+    grade: form.value.grade ? Number(form.value.grade) : 0,
+    subject_id: form.value.subject_id ? Number(form.value.subject_id) : 0,
     level: form.value.level,
     author_id: authStore.user?.id || null,
-    is_important: form.value.isImportant ? 1 : 0,
-    important_until: form.value.isImportant ? form.value.important_until || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0] : null
+    is_important: isImportant.value ? 1 : 0,
+    important_until: isImportant.value
+        ? form.value.important_until || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
+        : null
   };
-  emit("submitted", data);
+
+  if (props.isEdit) {
+    emit("updated", data); // ✨ 수정 모드
+  } else {
+    emit("submitted", data); // ✨ 생성 모드
+  }
 };
 
 </script>

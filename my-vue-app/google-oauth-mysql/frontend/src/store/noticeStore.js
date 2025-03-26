@@ -4,7 +4,6 @@ import { fetchNotices, fetchNoticeById, createNotice, updateNotice, deleteNotice
 export const useNoticeStore = defineStore("notices", {
     state: () => ({
         notices: [],
-        notice: null,
         selectedNotice: null,
         filters: {
             grade: null,
@@ -28,8 +27,10 @@ export const useNoticeStore = defineStore("notices", {
             try {
                 const data = await fetchNoticeById(id);
                 this.selectedNotice = data; // ✅ selectedNotice에 저장
+                return data;
             } catch (error) {
                 console.error("공지사항 상세 조회 실패:", error);
+                return null;
             }
         },
 
