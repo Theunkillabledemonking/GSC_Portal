@@ -1,74 +1,80 @@
 <template>
-  <div class="notice-card">
-    <h2 class="title">📢 공지사항 등록</h2>
+  <section class="notice-form-container bg-white/70 backdrop-blur-md border border-white/30 rounded-2xl shadow-xl max-w-3xl mx-auto p-8 mt-16">
+    <h2 class="text-2xl font-bold text-idolPink mb-6 text-center">
+      {{ isEdit ? '공지사항 수정' : '공지사항 등록' }}
+    </h2>
 
-    <!-- 📌 기본 정보 -->
-    <div class="section">
-      <label for="title">📝 제목</label>
-      <input v-model="form.title" id="title" placeholder="공지 제목을 입력해주세요" />
+    <!-- 제목 -->
+    <div class="mb-5">
+      <label class="form-label">제목</label>
+      <input v-model="form.title" type="text" class="form-input" placeholder="공지 제목을 입력해주세요" />
     </div>
 
-    <div class="section">
-      <label for="content">💬 내용</label>
-      <textarea v-model="form.content" id="content" placeholder="공지 내용을 작성해주세요" rows="5" />
+    <!-- 내용 -->
+    <div class="mb-5">
+      <label class="form-label">내용</label>
+      <textarea v-model="form.content" class="form-textarea" rows="6" placeholder="공지 내용을 입력해주세요"></textarea>
     </div>
 
-    <!-- 🎓 대상 정보 -->
-    <div class="section">
-      <h3 class="section-title">🎯 대상 정보</h3>
-      <div class="triple-input">
-        <div>
-          <label>학년</label>
-          <select v-model="form.grade">
-            <option value="">전체</option>
-            <option value="1">1학년</option>
-            <option value="2">2학년</option>
-            <option value="3">3학년</option>
-          </select>
-        </div>
-        <div>
-          <label>과목</label>
-          <select v-model="form.subject_id">
-            <option value="">전체</option>
-            <option v-for="subject in subjects" :key="subject.id" :value="subject.id">
-              {{ subject.name }}
-            </option>
-          </select>
-        </div>
-        <div>
-          <label>레벨</label>
-          <select v-model="form.level">
-            <option value="">전체</option>
-            <option v-for="level in levels" :key="level">{{ level }}</option>
-          </select>
-        </div>
+    <!-- 학년 / 과목 / 레벨 -->
+    <div class="flex flex-col md:flex-row gap-4 mb-6">
+      <div class="flex-1">
+        <label class="form-label">학년</label>
+        <select v-model="form.grade" class="form-select">
+          <option value="">전체</option>
+          <option value="1">1학년</option>
+          <option value="2">2학년</option>
+          <option value="3">3학년</option>
+        </select>
+      </div>
+
+      <div class="flex-1">
+        <label class="form-label">과목</label>
+        <select v-model="form.subject_id" class="form-select">
+          <option value="">전체</option>
+          <option v-for="subject in subjects" :key="subject.id" :value="subject.id">{{ subject.name }}</option>
+        </select>
+      </div>
+
+      <div class="flex-1">
+        <label class="form-label">레벨</label>
+        <select v-model="form.level" class="form-select">
+          <option value="">전체</option>
+          <option v-for="level in levels" :key="level">{{ level }}</option>
+        </select>
       </div>
     </div>
 
-    <!-- 🌟 중요 및 파일 -->
-    <div class="section">
-      <label class="checkbox">
+    <!-- 중요 공지 -->
+    <div class="mb-4">
+      <label class="inline-flex items-center space-x-2 text-sm font-medium">
         <input type="checkbox" v-model="isImportant" @change="handleImportantChange" />
-        중요 공지 (⭐)
+        <span>중요 공지</span>
       </label>
-
-      <div v-if="isImportant" class="important-date">
-        <label for="important_until">만료 날짜:</label>
-        <input type="date" v-model="form.important_until" id="important_until" />
-      </div>
-
-      <div class="upload-wrap">
-        <label for="file-upload" class="file-btn">📎 파일 선택</label>
-        <input id="file-upload" type="file" multiple @change="handleFileChange" :disabled="uploadedFiles.length >= 5" hidden />
-        <p class="file-info">선택된 파일: {{ uploadedFiles.length }}개</p>
+      <div v-if="isImportant" class="mt-2">
+        <label class="form-label">만료일</label>
+        <input type="date" v-model="form.important_until" class="form-input" />
       </div>
     </div>
 
-    <!-- 등록 버튼 -->
-    <button class="submit-btn" @click="handleSubmit">
-      {{ isEdit ? '✏️ 수정하기' : '✨ 등록하기' }}
-    </button>
-  </div>
+    <!-- 파일 업로드 -->
+    <div class="mb-6">
+      <label class="form-label block mb-2">파일 업로드 (최대 5개)</label>
+      <input id="file-upload" type="file" multiple hidden @change="handleFileChange" />
+      <label for="file-upload" class="file-upload-button">파일 선택</label>
+      <p class="text-sm text-gray-500 mt-1">선택된 파일: {{ uploadedFiles.length }}개</p>
+    </div>
+
+    <!-- 🔽 등록/취소 버튼 영역 -->
+    <div class="mt-8 flex justify-center gap-4">
+      <button @click="$router.back()" class="btn-cancel">
+        ← 돌아가기
+      </button>
+      <button @click="handleSubmit" class="btn-idol px-6">
+        {{ isEdit ? '수정하기' : '등록하기' }}
+      </button>
+    </div>
+  </section>
 </template>
 
 <script setup>
@@ -251,168 +257,66 @@ const handleSubmit = () => {
 
 </script>
 
-<style scoped>.notice-card {
-  background: #fff;
-  padding: 40px;
-  max-width: 720px;
-  margin: 40px auto;
-  border-radius: 18px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.07);
+<style scoped>
+.notice-form-container {
   font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
 }
 
-.title {
-  font-size: 24px;
-  font-weight: 800;
-  text-align: center;
-  margin-bottom: 30px;
-  color: #333;
-}
-
-.section {
-  margin-bottom: 24px;
-}
-
-.section-title {
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 10px;
-  color: #555;
-}
-
-label {
-  font-weight: 600;
+/* 공통 라벨 */
+.form-label {
   display: block;
-  margin-bottom: 6px;
-  color: #666;
-}
-
-input,
-textarea,
-select {
-  width: 100%;
-  padding: 12px 16px;
-  font-size: 15px;
-  border: 1px solid #e0e0e0;
-  border-radius: 12px;
-  background: #f9f9fb;
-  transition: border 0.2s ease;
-}
-
-input:focus,
-textarea:focus,
-select:focus {
-  border-color: #f272ba;
-  background: #fff;
-  outline: none;
-}
-
-textarea {
-  resize: vertical;
-  min-height: 120px;
-}
-
-.triple-input {
-  display: flex;
-  gap: 12px;
-}
-
-.triple-input > div {
-  flex: 1;
-}
-
-.checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 500;
-  margin-top: 10px;
-}
-
-.important-date {
-  margin-top: 10px;
-}
-
-.file-label {
-  margin-top: 18px;
-  font-weight: 500;
-}
-
-.file-list {
-  list-style: none;
-  padding-left: 0;
-  margin-top: 10px;
-}
-
-.file-list li {
-  background: #f0f0f5;
-  padding: 8px 12px;
-  margin-bottom: 8px;
-  border-radius: 10px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.file-list button {
-  background: #ff5e6c;
-  border: none;
-  color: white;
-  border-radius: 6px;
-  padding: 4px 8px;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.submit-btn {
-  width: 100%;
-  background: linear-gradient(135deg, #f272ba, #ce8ef7);
-  color: white;
-  padding: 14px 0;
-  font-size: 16px;
-  font-weight: bold;
-  border-radius: 14px;
-  border: none;
-  cursor: pointer;
-  transition: 0.2s;
-  margin-top: 30px;
-}
-
-.submit-btn:hover {
-  background: linear-gradient(135deg, #ec5aa9, #b17be3);
-  transform: scale(1.02);
-}
-.triple-input select {
-  height: 48px;
-  font-size: 15px;
-}
-
-.upload-wrap {
-  margin-top: 16px;
-  text-align: left;
-}
-
-.file-btn {
-  display: inline-block;
-  background: linear-gradient(135deg, #f272ba, #ce8ef7);
-  color: white;
-  padding: 10px 18px;
   font-weight: 600;
   font-size: 14px;
+  margin-bottom: 6px;
+  color: #444;
+}
+
+/* 인풋/셀렉트/텍스트에어리어 */
+.form-input,
+.form-select,
+.form-textarea {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 14px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  background-color: #f9f9fb;
+  transition: border-color 0.2s ease;
+}
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: #f272ba;
+  background-color: #fff;
+}
+
+.btn-cancel {
+  background-color: #e5e5e5;
+  color: #333;
+  padding: 10px 18px;
+  border-radius: 12px;
+  font-weight: 500;
+  font-size: 14px;
+  transition: background 0.2s ease;
+}
+.btn-cancel:hover {
+  background-color: #d4d4d4;
+}
+
+/* 파일 업로드 버튼 */
+.file-upload-button {
+  display: inline-block;
+  padding: 10px 18px;
+  background: linear-gradient(135deg, #f272ba, #ce8ef7);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s ease-in-out;
 }
-
-.file-btn:hover {
+.file-upload-button:hover {
   background: linear-gradient(135deg, #ec5aa9, #b17be3);
 }
-
-.file-info {
-  font-size: 13px;
-  color: #555;
-  margin-top: 6px;
-}
-
-
 </style>
