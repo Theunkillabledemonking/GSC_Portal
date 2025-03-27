@@ -1,51 +1,69 @@
 <template>
   <div class="calendar-with-events">
-    <!-- (A) 왼쪽 패널: 날짜별 이벤트 목록 -->
-    <div class="left-panel">
-      <h3>📅 월 전체 일정 목록</h3>
 
-      <div v-if="isLoading" class="loading-message">
-        <span>🔄 일정 데이터를 불러오는 중이에요...</span>
-      </div>
+    <!-- 왼쪽 패널 -->
+    <div class="left-panel glass-soft shadow-md">
+      <!-- 왼쪽 일정 목록 -->
+      <h3 class="text-idolPurple text-xl font-bold mb-6 flex items-center gap-2">
+        📅 <span>월 전체 일정 목록</span>
+      </h3>
 
-      <div
-          v-for="(events, date) in monthlyEvents"
-          :key="date"
-          class="date-section"
-          :data-date="date"
-          :class="{ selected: date === selectedDate }"
-          :ref="el => setLeftRef(date, el)"
-          @click="scrollToDate(date)"
-      >
-        <strong>{{ date }}</strong>
-        <div
-            v-for="(event, idx) in events"
-            :key="event.id"
-            class="event-item"
-            @click.stop="handleEventClick(date, event)"
-        >
-          {{ event.summary || '제목 없음' }}<br />
-          <small>{{ event.description || '설명 없음' }}</small>
+      <transition name="fade">
+        <div v-if="isLoading" class="text-center text-idolPurple font-semibold py-8 flex flex-col items-center gap-2">
+          <span class="animate-spin text-2xl">🔄</span>
+          <span>일정 데이터를 불러오는 중이에요...</span>
         </div>
+      </transition>
+
+      <transition-group name="event-fade" tag="div">
+        <div
+            v-for="(events, date) in monthlyEvents"
+            :key="date"
+            :ref="el => setLeftRef(date, el)"
+            :class="['date-section', { selected: date === selectedDate }]"
+            @click="scrollToDate(date)"
+        >
+          <strong class="block font-semibold text-sm text-gray-600 mb-2">{{ date }}</strong>
+
+          <transition-group name="event-fade-inner" tag="div">
+            <div
+                v-for="event in events"
+                :key="event.id"
+                class="event-item"
+                @click.stop="handleEventClick(date, event)"
+            >
+              <p class="truncate font-medium text-idolPurple">{{ event.summary || '제목 없음' }}</p>
+              <small class="block text-xs text-gray-500">{{ event.description || '설명 없음' }}</small>
+            </div>
+          </transition-group>
+        </div>
+      </transition-group>
       </div>
-    </div>
 
-    <!-- (B) 오른쪽 패널: 달력 및 기타 모달 -->
+
+    <!-- 오른쪽 패널 -->
     <div class="right-panel">
-      <CalendarView
-          ref="calendarRef"
-          :monthlyEvents="monthlyEvents"
-          @dateSelected="handleDateSelected"
-          @monthChanged="handleMonthChanged"
-      />
 
-      <!-- 관리자/교수용 버튼 -->
-      <div v-if="userRole === 1 || userRole === 2" class="admin-buttons">
-        <button class="new-event-btn" @click="openModalForNew">
+      <!-- 달 전환 애니메이션 -->
+      <transition name="month-slide" mode="out-in">
+        <div :key="yearMonthKey">
+          <CalendarView
+              ref="calendarRef"
+              :monthlyEvents="monthlyEvents"
+              @dateSelected="handleDateSelected"
+              @monthChanged="handleMonthChanged"
+          />
+        </div>
+      </transition>
+
+      <!-- 신규 일정 추가 버튼 -->
+      <div class="flex justify-end mt-6">
+        <button class="btn-idol" @click="openModalForNew">
           신규 일정 추가
         </button>
       </div>
 
+      <!-- EventModal 표시 -->
       <EventModal
           v-if="modalVisible"
           :isEdit="isEditMode"
@@ -53,81 +71,96 @@
           :selectedEvent="selectedEvent"
           @close="modalVisible = false"
       />
-    </div>
-  </div>
+    </div><!-- /.right-panel -->
+
+  </div><!-- /.calendar-with-events -->
 </template>
 
+
 <script setup>
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import CalendarView from './CalendarView.vue';
 import EventModal from './EventModal.vue';
 import { listEvents } from '@/services/calendarApi.js';
 
-// 사용자 역할 (예: 1=관리자, 2=교수, 3=학생)
 const userRole = ref(2);
-
-// 월별 이벤트 및 선택된 날짜, 모달 관련 데이터
 const monthlyEvents = ref({});
 const selectedDate = ref(null);
 const modalVisible = ref(false);
 const isEditMode = ref(false);
 const selectedDay = ref(null);
 const selectedEvent = ref(null);
-
 const calendarRef = ref(null);
 const dayRefsLeft = ref({});
 const isLoading = ref(false);
 
+const currentYear = ref(new Date().getFullYear());
+const currentMonth = ref(new Date().getMonth());
 
-// 왼쪽 패널의 날짜 항목 DOM 저장
+// 예: "2025-03" 이런 식으로 key 생성
+const yearMonthKey = computed(() => {
+  return `${currentYear.value}-${String(currentMonth.value + 1).padStart(2, '0')}`;
+});
+
 function setLeftRef(date, el) {
   if (date && el) {
     dayRefsLeft.value[date] = el;
   }
 }
 
-// 특정 달의 이벤트 로드
-async function loadMonthlyEvents(year, month) {
-  const start = new Date(year, month, 1).toISOString();
-  const end = new Date(year, month + 1, 0).toISOString();
-  const events = await listEvents(start, end);
+const eventCache = ref({});
 
-  const grouped = {};
-  for (const e of events) {
-    const dateKey = e.start.dateTime?.split('T')[0] || e.start.date;
-    if (!grouped[dateKey]) grouped[dateKey] = [];
-    grouped[dateKey].push(e);
+async function loadMonthlyEvents(year, month) {
+  const key = `${year}-${String(month + 1).padStart(2, '0')}`;
+  isLoading.value = true;
+
+  if (eventCache.value[key]) {
+    console.log('[캐시 HIT]', key);
+    monthlyEvents.value = {...eventCache.value[key]};
+    isLoading.value = false;
+    return;
   }
-  monthlyEvents.value = grouped;
+
+  try {
+    const start = new Date(year, month, 1).toISOString();
+    const end = new Date(year, month + 1, 0).toISOString();
+    const events = await listEvents(start, end);
+
+    const grouped = {};
+    for (const e of events) {
+      const dateKey = e.start.dateTime?.split('T')[0] || e.start.date;
+      if (!grouped[dateKey]) grouped[dateKey] = [];
+      grouped[dateKey].push(e);
+    }
+
+    eventCache.value[key] = grouped;
+    monthlyEvents.value = grouped;
+  } catch (err) {
+    console.error('❌ 일정 로딩 실패', err);
+    monthlyEvents.value = {}; // 💡 항상 빈 객체라도 넣어야 달력이 깨지지 않음
+  } finally {
+    isLoading.value = false;
+  }
 }
 
-// 페이지 로드 시 현재 달의 이벤트 조회
 onMounted(async () => {
   const now = new Date();
   await loadMonthlyEvents(now.getFullYear(), now.getMonth());
 });
 
-// 날짜 클릭 시: 오른쪽 달력과 왼쪽 패널 모두 스크롤 이동
 function scrollToDate(date) {
   selectedDate.value = date;
-  if (!date) return;
-
-  // 오른쪽 달력 컴포넌트의 scrollToDate 호출
   calendarRef.value?.scrollToDate(date);
-
-  // 왼쪽 패널의 해당 날짜 요소로 스크롤 (DOM 업데이트 후 실행)
   nextTick(() => {
     const targetEl = dayRefsLeft.value[date];
     if (targetEl) {
-      targetEl.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center'
-      });
+      targetEl.classList.add('flash-highlight');
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => targetEl.classList.remove('flash-highlight'), 1000);
     }
   });
 }
 
-// 이벤트 클릭 시 처리 (관리자/교수는 모달, 그 외는 스크롤)
 function handleEventClick(date, event) {
   if (userRole.value === 1 || userRole.value === 2) {
     isEditMode.value = true;
@@ -139,156 +172,85 @@ function handleEventClick(date, event) {
   }
 }
 
-// 달력에서 날짜 선택 시
 function handleDateSelected(date) {
   scrollToDate(date);
 }
 
-// 달력의 월 변경 시 해당 달의 이벤트 로드
 function handleMonthChanged({ year, month }) {
-  loadMonthlyEvents(year, month);
+    selectedDate.value = null; // 이전 날짜 제거
+    loadMonthlyEvents(year, month);
 }
 
-// "신규 일정 추가" 버튼 클릭 시 모달 열기
 function openModalForNew() {
   isEditMode.value = false;
   selectedDay.value = { date: '' };
   selectedEvent.value = null;
   modalVisible.value = true;
 }
+
 </script>
 
 <style scoped>
-/* 공통 배경 및 폰트 */
-body {
-  background: linear-gradient(to bottom right, #fce4ec, #f3e5f5); /* 연핑크~연보라 */
-  margin: 0;
-  font-family: 'Noto Sans KR', sans-serif;
-}
-
-header {
-  background: linear-gradient(to right, #d63384, #9c27b0); /* 딥핑크~퍼플 */
-  color: white;
-}
-
-/* 메인 레이아웃 */
 .calendar-with-events {
-  display: flex;
-  gap: 30px;
-  padding: 30px;
-  background: linear-gradient(to bottom right, #fff0f5, #f3e5f5);
-  border-radius: 16px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
-  box-sizing: border-box;
+  @apply flex gap-6 px-8 py-10 bg-idolGray rounded-xl;
 }
 
-/* 왼쪽 일정 목록 패널 */
 .left-panel {
-  flex: 1.2;
-  max-height: 80vh;
-  overflow-y: auto;
-  background: #ffffff;
-  padding: 20px;
-  border-radius: 16px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-  border-left: 8px solid #d63384; /* 강조 딥핑크 */
+  @apply w-5/12 max-h-[80vh] overflow-y-auto p-5 rounded-2xl border-l-[6px] border-idolPink bg-white/60 backdrop-blur-md;
 }
 
-.left-panel h3 {
-  font-size: 18px;
-  font-weight: bold;
-  color: #9c27b0; /* 퍼플 계열 */
-  margin-bottom: 16px;
+.right-panel {
+  @apply w-7/12 bg-white rounded-2xl p-6 border border-gray-200 shadow-lg;
 }
 
 .date-section {
-  margin-bottom: 14px;
-  padding: 10px;
-  border-left: 4px solid transparent;
-  border-radius: 10px;
-  background: #fff;
-  transition: 0.2s ease;
-  opacity: 0;
-  transform: translateY(10px);
-  animation: fadeInUp 0.3s ease forwards;
+  @apply mb-6 px-4 py-3 rounded-xl bg-white hover:bg-pink-50 transition cursor-pointer border border-transparent;
 }
-
 .date-section.selected {
-  background: #f8bbd0; /* 연핑크 하이라이트 */
-  border-left-color: #c2185b;
+  @apply border-pink-300 bg-pink-100/40 shadow-inner;
 }
 
 .event-item {
-  background: linear-gradient(to right, #f06292, #ba68c8); /* 부드러운 핑크퍼플 그라데이션 */
-  color: #fff;
-  padding: 10px 14px;
-  margin: 6px 0;
-  border-radius: 8px;
-  font-size: 14px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-  transition: transform 0.2s ease, background-color 0.2s ease;
+  @apply bg-white/50 border border-white/30 text-sm text-gray-800 px-3 py-2 my-2 rounded-xl shadow-sm hover:bg-white/70 transition;
 }
 
-.event-item:hover {
-  transform: scale(1.05);
-  background: linear-gradient(to right, #ec407a, #ab47bc); /* 살짝 더 진하게 */
+.flash-highlight {
+  animation: flashBg 1s ease-in-out;
 }
 
-/* 오른쪽 달력 패널 */
-.right-panel {
-  flex: 2;
-  background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-  padding: 20px;
+@keyframes flashBg {
+  0% { background-color: rgba(255, 226, 243, 0.8); }
+  100% { background-color: transparent; }
 }
 
-/* 버튼 영역 */
-.admin-buttons {
-  text-align: center;
-  margin-top: 20px;
+/* 이벤트 항목 리스트 애니메이션 */
+.event-fade-enter-active,
+.event-fade-leave-active,
+.event-fade-inner-enter-active,
+.event-fade-inner-leave-active {
+  transition: all 0.3s ease;
+}
+.event-fade-enter-from,
+.event-fade-inner-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.event-fade-leave-to,
+.event-fade-inner-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 
-.new-event-btn {
-  background: linear-gradient(to right, #f06292, #ba68c8); /* 버튼도 같은 톤으로 */
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  font-weight: bold;
-  font-size: 14px;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: 0.3s ease;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+/* 로딩용 fade */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
-.new-event-btn:hover {
-  background: linear-gradient(to right, #ec407a, #ab47bc);
-  transform: scale(1.05);
-}
-
-/* 로딩 메시지 */
-.loading-message {
-  position: absolute;
-  top: 40%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-weight: bold;
-  font-size: 16px;
-  color: #ba68c8;
-  animation: fadein 0.6s ease-in-out infinite alternate;
-}
-
-/* 애니메이션 */
-@keyframes fadeInUp {
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadein {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
 </style>
+
+

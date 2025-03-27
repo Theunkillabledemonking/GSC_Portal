@@ -47,6 +47,10 @@ const props = defineProps({
   monthlyEvents: {
     type: Object,
     default: () => ({})
+  },
+  isActive: {
+    type: Boolean,
+    default: true
   }
 });
 

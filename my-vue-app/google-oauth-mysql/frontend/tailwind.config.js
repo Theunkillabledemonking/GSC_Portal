@@ -1,13 +1,13 @@
-/** @type {import('tailwindcss').Config} */
+// tailwind.config.js
 export default {
   content: [
     "./index.html",
-    "./src/**/*.{vue,js,ts,jsx,tsx}", // ✅ .vue 추가!
+    "./src/**/*.{vue,js,ts,jsx,tsx}",
+    './src/assets/**/*.css',
   ],
   theme: {
     extend: {
       colors: {
-        // 아이마스 감성 컬러
         idolPink: '#f272ba',
         idolPurple: '#a259ff',
         idolBlue: '#5b9fff',
@@ -17,10 +17,9 @@ export default {
       },
       borderColor: theme => ({
         ...theme('colors'),
-        idolPurple: '#a259ff', // 반드시 이렇게 등록해야 @apply 가능!
+        idolPurple: '#a259ff',
       }),
       backgroundImage: {
-        // 그라데이션 스타일
         'idol-gradient': 'linear-gradient(to right, #f272ba, #a259ff)',
         'idol-gradient-soft': 'linear-gradient(to right, #f8bbd0, #e1bee7)',
       },
