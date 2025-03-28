@@ -152,7 +152,7 @@ exports.getNoticeById = async (req, res) => {
             content,
             author_id,
             gradeValue,
-            level || "ALL",
+            level ?? null,
             subjectId,
             isImportantValue,
             expirationDate
