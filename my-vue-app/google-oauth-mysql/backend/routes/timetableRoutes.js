@@ -4,7 +4,7 @@ const timetableController = require('../controllers/timetableController');
 
 // ✅ GET /api/timetables/timetable-with-events
 //    year, start_date, end_date 쿼리로 받아서 FullCalendar 형태 데이터 반환
-router.get('/timetable-with-events', timetableController.getTimetableWithEvents);
+router.get('/full', timetableController.getTimetableWithEvents);
 
 // ✅ 정규 시간표 CRUD
 router.get('/', timetableController.getTimetables); // 모든 정규 시간표 조회

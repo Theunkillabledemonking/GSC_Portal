@@ -1,27 +1,54 @@
 import { defineStore } from "pinia";
-import * as subjectApi from "@/services/subjectService";
+import * as subjectApi from "@/services/subjectService.js";
+import {getAllSubjects} from "@/services/subjectService.js";
 
 export const useSubjectStore = defineStore("subjectStore", {
     state: () => ({
-        subjects: [],
+        all: [],
+        byYear: [],
+        special: [],
     }),
     actions: {
-        async loadSubjects() {
-            const { subjects } = await subjectApi.getSubjects();
-            this.subjects = subjects;
+        async loadAllSubjects() {
+            const { subjects } = await subjectApi.getAllSubjects();
+            this.all = subjects;
         },
+
+        async loadSubjectsByYear(year) {
+            if (!this.byYear[year]) {
+                const { subjects } = await subjectApi.getSubjectsByYear(year);
+                this.byYear[year] = subjects;
+            }
+            return this.byYear[year];
+        },
+
+        async loadSpecialSubjects() {
+            const { specialLectures } = await subjectApi.getSpecialLectures();
+            this.special = specialLectures;
+        },
+
         async addSubject(subject) {
             await subjectApi.createSubject(subject);
-            await this.loadSubjects();
-
+            this.clearCache();
+            await this.loadAllSubjects(); // 기본 전체 로딩
         },
+
         async updateSubject(subject) {
             await subjectApi.updateSubject(subject);
-            await this.loadSubjects();
+            this.clearCache();
+            await this.loadAllSubjects();
         },
+
         async deleteSubject(id) {
             await subjectApi.deleteSubject(id);
-            await this.loadSubjects();
+            this.clearCache();
+            await this.loadAllSubjects();
+        },
+
+        clearCache() {
+            this.byYear = {};
+            this.special = [];
         }
     }
+
 });

@@ -1,5 +1,5 @@
 // controllers/timetableController.js
-
+const axios = require("axios"); // 공휴일 요청 API 요청
 const pool = require('../config/db');
 const subjectController = require('./subjectController');
 
@@ -17,10 +17,9 @@ exports.getTimetables = async (req, res) => {
 
     try {
         const [timetables] = await pool.query(`
-            SELECT t.*, s.name AS subject_name, u.name AS professor_name
+            SELECT t.*, s.name AS subject_name,  s.professor_name
             FROM timetables t
             LEFT JOIN subjects s ON t.subject_id = s.id
-            LEFT JOIN users u ON t.professor_id = u.id
             ${level ? 'WHERE t.level = ?' : ''}
             ORDER BY t.day, t.start_period
         `, level ? [level] : []);
@@ -46,24 +45,41 @@ exports.getTimetables = async (req, res) => {
 // 📅 FullCalendar 데이터 통합 (정규 + 이벤트)
 exports.getTimetableWithEvents = async (req, res) => {
     const { year, start_date, end_date, level } = req.query;
+
     try {
+        // 1. ✅ 공휴일 가져오기
+        const holidayRes = await axios.get(`${process.env.KOREA_HOLIDAY_API_URL}`, {
+            params: {
+                ServiceKey: process.env.KOREA_HOLIDAY_KEY,
+                year,
+                month: '',
+                _type: 'json'
+            }
+        });
+
+        const holidays = (holidayRes.data.response?.body?.items?.item || [])
+            .map(item => item.locdate.toString().replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
+
+        // 2. ✅ 정규 수업
         const [timetables] = await pool.query(`
-            SELECT t.*, s.name AS subject_name
-            FROM timetables t
-            LEFT JOIN subjects s ON t.subject_id = s.id
-            WHERE t.year = ?
-            ${level ? 'AND t.level = ?' : ''}
-        `, level ? [year, level] : [year]);
+      SELECT t.*, s.name AS subject_name
+      FROM timetables t
+      LEFT JOIN subjects s ON t.subject_id = s.id
+      WHERE t.year = ?
+      ${level ? 'AND t.level = ?' : ''}
+    `, level ? [year, level] : [year]);
 
         const [periods] = await pool.query(`SELECT * FROM period_time_map`);
         const periodMap = Object.fromEntries(periods.map(p => [p.period, p]));
 
+        // 3. ✅ 이벤트
         const [events] = await pool.query(`
-            SELECT * FROM timetable_events
-            WHERE event_date BETWEEN ? AND ?
-            ${level ? 'AND level = ?' : ''}
-        `, level ? [start_date, end_date, level] : [start_date, end_date]);
+      SELECT * FROM timetable_events
+      WHERE event_date BETWEEN ? AND ?
+      ${level ? 'AND level = ?' : ''}
+    `, level ? [start_date, end_date, level] : [start_date, end_date]);
 
+        // 4. ✅ FullCalendar-compatible events
         const finalEvents = [];
 
         for (const t of timetables) {
@@ -98,7 +114,9 @@ exports.getTimetableWithEvents = async (req, res) => {
             }
         }
 
-        res.json({ timetables, events: finalEvents });
+        // 5. ✅ 최종 응답
+        res.json({ timetables, events: finalEvents, holidays });
+
     } catch (err) {
         console.error('❌ getTimetableWithEvents 오류:', err);
         res.status(500).json({ message: '서버 오류 발생' });
@@ -110,15 +128,16 @@ exports.createTimetable = async (req, res) => {
     const {
         year, level, subject_id, room, description,
         day, start_period, end_period,
-        event_type, event_date, timetable_id
+        event_type, event_date, timetable_id,
+        professor_name
     } = req.body;
 
     try {
         if (!event_type || event_type === 'normal') {
             const [result] = await pool.query(`
-                INSERT INTO timetables (year, level, subject_id, room, description, day, start_period, end_period)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            `, [year, level || null, subject_id, room || '', description || '', day, start_period, end_period]);
+                INSERT INTO timetables (year, level, subject_id, room, description, day, start_period, end_period, professor_name)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [year, level || null, subject_id, room || '', description || '', day, start_period, end_period, professor_name || '']);
 
             return res.status(201).json({ message: '정규 수업 등록 완료', id: result.insertId });
         }
@@ -149,18 +168,18 @@ exports.updateTimetable = async (req, res) => {
     const { id } = req.params;
     const {
         year, level, subject_id, room, description,
-        day, start_period, end_period, professor_id
+        day, start_period, end_period, professor_name
     } = req.body;
 
     try {
         const [result] = await pool.query(`
             UPDATE timetables
             SET year = ?, level = ?, subject_id = ?, room = ?, description = ?,
-                day = ?, start_period = ?, end_period = ?, professor_id = ?
+                day = ?, start_period = ?, end_period = ?, professor_name = ?
             WHERE id = ?
         `, [
             year, level || null, subject_id, room || '', description || '',
-            day, start_period, end_period, professor_id || null, id
+            day, start_period, end_period, professor_name || null, id
         ]);
 
         if (result.affectedRows === 0) {

@@ -42,7 +42,7 @@ export const useAuthStore = defineStore("auth", {
             this.role = user.role;
             console.log('🧪 login 파라미터:', token, user);
             this.name = user.name;
-            this.grade = user.grade;
+            this.grade = Number(user.grade);
             this.level = user.level;
             this.status = user.status;
 
@@ -50,7 +50,7 @@ export const useAuthStore = defineStore("auth", {
             localStorage.setItem("user", JSON.stringify(user));
             localStorage.setItem("role", user.role);
             localStorage.setItem("name", user.name);
-            localStorage.setItem("grade", user.grade);
+            localStorage.setItem("grade", String(user.grade));
             localStorage.setItem("level", user.level);
             localStorage.setItem("status", user.status);
         },

@@ -6,6 +6,8 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const morgan = require('morgan');
+const fs = require('fs');
 const cookieParser= require("cookie-parser");
 require('dotenv').config(); // ✅ 환경 변수 로드
 
@@ -20,6 +22,7 @@ const subjectRoutes = require('./routes/subjectRoutes');
 const calendarRoutes = require('./routes/calendarRoutes');
 const timetableRoutes = require('./routes/timetableRoutes');
 const eventRoutes = require('./routes/eventRoutes'); // 이벤트 (보강/휴강/특강)
+const holidayRoutes = require('./routes/holidayRoutes');
 // =======================
 // ✅ Express 앱 초기화
 // =======================
@@ -48,8 +51,14 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
 app.use('/api/calendar', calendarRoutes); // 구글 캘린더 라우트
 app.use('/api/timetables', timetableRoutes) // ✅ 정규 시간표 관리
 app.use('/api/events', eventRoutes); // ✅ 이벤트 관리 (보강/휴강/특강)
+app.use('/api/holidays', holidayRoutes);
 
+const accessLogStream = fs.createWriteStream(
+    path.join(__dirname, 'logs', 'access.log'),
+    { flags: 'a' } // append 모드
+);
 
+app.use(morgan('combined', { stream: accessLogStream }));
 
 // =======================
 // ✅ 에러 핸들러 (Global Error Handler)

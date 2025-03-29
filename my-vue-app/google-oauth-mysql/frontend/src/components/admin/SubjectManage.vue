@@ -4,7 +4,7 @@ import { useSubjectStore } from "@/store/subjectStore.js";
 import { storeToRefs } from "pinia";
 
 const subjectStore = useSubjectStore();
-const { subjects } = storeToRefs(subjectStore);
+const { all } = storeToRefs(subjectStore);
 
 const newSubject = ref({
   name: "",
@@ -20,7 +20,7 @@ const onSpecialLectureToggle = (subject) => {
 };
 
 onMounted(() => {
-  subjectStore.loadSubjects();
+  subjectStore.loadAllSubjects();
 })
 
 const addSubject = async () => {
@@ -107,7 +107,7 @@ const deleteSubject = async (id) => {
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(subject, index) in subjects" :key="subject.id">
+        <tr v-for="(subject, index) in all" :key="subject.id">
           <td>{{ index + 1 }}</td>
           <td>
             <input v-model="subject.name" />

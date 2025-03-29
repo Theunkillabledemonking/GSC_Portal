@@ -8,7 +8,7 @@ import apiClient from "@/services/apiClient.js";
  */
 export const fetchTimetableWithEvents = async ({ year, level, start_date, end_date }) => {
     try {
-        const response = await apiClient.get('/timetables/timetable-with-events', {
+        const response = await apiClient.get('/timetables/full', {
             params: {
                 year,
                 level: level !== null ? level : undefined,
@@ -17,13 +17,35 @@ export const fetchTimetableWithEvents = async ({ year, level, start_date, end_da
             }
         });
 
-        // 응답 데이터 반환
-        return response.data;
+        const { timetables = [], events = [], holidays = [] } = response.data || {};
+
+        return { timetables, events, holidays }
+
     } catch (error) {
         console.error('시간표 및 이벤트 조회 실패', error);
-        throw error; // 상위 컴포넌트에서 에러 처리
+        return { timetables: [], events: [], holidays: [] };
     }
 };
+
+/**
+ * 단순 정규 시간표만 조회 (목록 리스트용)
+ * @param {number} year
+ * @param {string} level
+ * @returns {Promise<{ timetables: Array }>}
+ */
+export const fetchTimetables = async (year, level) => {
+    try {
+        const res = await apiClient.get('/timetables', {
+            params: { level, year }
+        });
+        return res.data?.timetables || [];
+
+    } catch (error) {
+        console.error('정규 시간표 조회 실패', error);
+        return [];
+    }
+};
+
 
 /**
  * 정규 시간표 등록 API

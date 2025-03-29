@@ -1,39 +1,6 @@
 const pool = require('../config/db');
 
 /**
- * ✅ 학년별 과목 조회
- */
-exports.getSubjectsByYear = async (req, res) => {
-    const { year } = req.params;
-    const userRole = req.user.role;
-    const userGrade = req.user.grade;
-
-    if (![1, 2, 3].includes(Number(year))) {
-        return res.status(400).json({ message: "올바른 학년을 선택해주세요 (1, 2, 3학년만 가능)." });
-    }
-
-    try {
-        // ✅ 학생(3)은 자신의 학년 과목만 조회 가능, 교수(2) 및 관리자(1)는 모든 학년 조회 가능
-        if (userRole === 3 && Number(year) !== userGrade) {
-            return res.status(403).json({ message: "본인의 학년만 조회할 수 있습니다." });
-        }
-
-        const query = `
-            SELECT id, name, year, level 
-            FROM subjects 
-            WHERE year = ? AND is_special_lecture = 0 
-            ORDER BY name ASC
-        `;
-        const [subjects] = await pool.query(query, [year]);
-        res.status(200).json({ subjects });
-    } catch (error) {
-        console.error("학년별 과목 조회 실패:", error);
-        res.status(500).json({ message: "서버 오류가 발생했습니다." });
-    }
-};
-
-
-/**
  * ✅ 특강(레벨별) 과목 조회 (레벨이 있는 사용자만 조회 가능)
  */
 exports.getSpecialLectures = async (req, res) => {
@@ -59,6 +26,25 @@ exports.getSpecialLectures = async (req, res) => {
         res.status(500).json({ message: "서버 오류가 발생했습니다." });
     }
 };
+
+/**
+ * ✅ 학년별 과목 조회 (정규 과목만)
+ */
+exports.getSubjectsByYear = async (req, res) => {
+    const { year } = req.params;
+
+    try {
+        const [subjects] = await pool.query(
+            `SELECT * FROM subjects WHERE is_special_lecture = 0 AND year = ? ORDER BY name ASC`,
+            [year]
+        );
+        res.status(200).json({ subjects });
+    } catch (err) {
+        console.error("❌ 학년별 과목 조회 실패:", err);
+        res.status(500).json({ message: "서버 오류가 발생했습니다." });
+    }
+};
+
 
 /**
  * ✅ 전체 과목 목록 조회

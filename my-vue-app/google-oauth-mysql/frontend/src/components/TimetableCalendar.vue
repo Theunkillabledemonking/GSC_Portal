@@ -29,9 +29,17 @@ import { useTimetableStore } from "@/store/timetableStore.js";
 import { fetchTimetableWithEvents } from "@/services/timetableService.js";
 import { useAuthStore } from "@/store/authStore.js";
 import TimetableFormModal from "@/components/TimetableFormModal.vue";
+import { getSemesterRange } from "@/utils/semester";
 
 // 학년 ( year ) 은 상위 컴포넌트에서 전달
-const props = defineProps({year: Number })
+const props = defineProps({
+  year: Number,
+  semester: {
+    type: String,
+    default: "spring",
+    validator: (value) => ["spring", "summer", "fall", "winter", "full"].includes(value)
+  }
+})
 
 // Setup & Props
 const authStore = useAuthStore();
@@ -123,33 +131,25 @@ function closeModal() {
  * 시간표 및 이벤트 데이터 불러오기
  */
 async function loadTimetableData() {
-  // 임의 범위 설정
-  const start_date = "2025-03-01";
-  const end_date = "2025-07-31";
-
-  // year/level 추출
   const yearToUse = props.year ?? authStore.grade ?? 1;
+  const levelToUse = authStore.level ?? null;
+
+  const { start_date: start, end_date: end } = getSemesterRange(yearToUse, props.semester);
 
   try {
-    console.log('요청 데이터', {year: yearToUse, level: levelToUse, start_date , end_date});
-
-    // 1) API 호출 -> 원본 DB 데이터
     const response = await fetchTimetableWithEvents({
       year: yearToUse,
       level: levelToUse,
-      start_date,
-      end_date,
+      start_date: start,
+      end_date: end,
     });
-    console.log('응답 데이터', response);
 
-    // 2) 스토어에 넘겨 이벤트 객체로 변환
     timetableStore.setTimetableAndEvents(response.timetables, response.events);
-    // 3) FullCalendar에 반영
     calendarOptions.value.events = timetableStore.calendarEvents;
   } catch (error) {
     console.error("시간표 및 이벤트 데이터 불러오기 실패", error);
-    }
   }
+}
 
 // 마운트 시 & year 바뀔 때마다 재호출
 onMounted(() => {
