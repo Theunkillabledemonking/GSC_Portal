@@ -9,13 +9,19 @@
       </tr>
       </thead>
       <tbody>
-      <tr v-for="item in items" :key="item.id">
+      <tr
+          v-for="item in items"
+          :key="item.id"
+          :class="getRowClass(item)"
+      >
         <td v-for="col in columns" :key="col.field">
           {{ formatCell(col, item) }}
         </td>
         <td v-if="canEdit">
-          <button @click="$emit('edit', item)">수정</button>
-          <button @click="$emit('delete', item)">삭제</button>
+          <slot name="actions" :item="item">
+            <button @click="$emit('edit', item)">수정</button>
+            <button @click="$emit('delete', item)">삭제</button>
+          </slot>
         </td>
       </tr>
       </tbody>
@@ -41,12 +47,15 @@ const props = defineProps({
   }
 })
 
-/**
- * 셀 렌더링 유틸
- */
+// 셀 포맷 처리
 function formatCell(col, row) {
   const val = row[col.field]
   return col.format ? col.format(val, row) : (val ?? '-')
+}
+
+// 정규 vs 특강 구분
+function getRowClass(item) {
+  return item.is_special_lecture ? 'row-special' : 'row-regular'
 }
 </script>
 
@@ -54,23 +63,36 @@ function formatCell(col, row) {
 .base-schedule-list {
   margin-top: 15px;
 }
+
 table {
   width: 100%;
   border-collapse: collapse;
 }
+
 th, td {
   padding: 8px;
   border: 1px solid #ddd;
   text-align: center;
 }
+
 th {
   background-color: #f9f9f9;
 }
+
+.row-regular {
+  background-color: #e3f2fd; /* 연한 블루 */
+}
+
+.row-special {
+  background-color: #fff3e0; /* 연한 오렌지 */
+}
+
 button {
   margin: 0 4px;
   padding: 4px 8px;
   cursor: pointer;
 }
+
 .no-data {
   margin-top: 10px;
   color: #999;

@@ -3,15 +3,13 @@ import { defineStore } from 'pinia'
 
 export const useTimetableStore = defineStore('timetable', {
     state: () => ({
-        timetables: [], // 정규 수업
-        events: [],     // 보강 / 휴강 / 특강 / 일반 이벤트
-        holidays: [],   // 공휴일
+        timetables: [],        // 정규 수업
+        specialLectures: [],   // 특강 수업
+        events: [],            // 보강 / 휴강 / 특강 / 일반 이벤트
+        holidays: [],          // 공휴일
     }),
 
     getters: {
-        /**
-         * FullCalendar 용 이벤트 묶음
-         */
         calendarEvents(state) {
             const timetableBlocks = state.timetables.map(t => ({
                 id: `t-${t.id}`,
@@ -22,6 +20,17 @@ export const useTimetableStore = defineStore('timetable', {
                 backgroundColor: '#90caf9',
                 display: 'auto',
                 extendedProps: { ...t, type: 'timetable' }
+            }));
+
+            const specialBlocks = state.specialLectures.map(t => ({
+                id: `s-${t.id}`,
+                title: `[특강] ${t.subject_name}`,
+                daysOfWeek: [mapDayOfWeek(t.day)],
+                startTime: t.start_time,
+                endTime: t.end_time,
+                backgroundColor: '#ffcc80',
+                display: 'auto',
+                extendedProps: { ...t, type: 'special' }
             }));
 
             const eventBlocks = state.events.map(e => {
@@ -58,33 +67,34 @@ export const useTimetableStore = defineStore('timetable', {
                 extendedProps: { type: 'holiday' }
             }));
 
-            return [...timetableBlocks, ...eventBlocks, ...holidayBlocks];
+            return [...timetableBlocks, ...specialBlocks, ...eventBlocks, ...holidayBlocks];
         },
 
-        /**
-         * 📅 WeeklyTimetable.vue 에서 사용할 통합 데이터
-         * - 정규 수업 + 이벤트 + 공휴일
-         */
         getCombinedData(state) {
             const regulars = state.timetables.map(t => ({
                 ...t,
                 event_type: 'regular'
             }));
 
+            const specials = state.specialLectures.map(t => ({
+                ...t,
+                event_type: 'special'
+            }));
+
             const holidays = state.holidays.map(h => ({
                 event_type: 'holiday',
-                day: getDayFromDate(h.date),        // "월" ~ "금"
+                day: getDayFromDate(h.date),
                 start_period: 1,
                 end_period: 8,
                 description: h.name,
                 subject_name: '공휴일',
                 professor_name: '',
                 room: '',
-                year: h.year ?? 1,                  // 또는 모든 학년 대상으로 하려면 0
-                level: h.level ?? null              // 필요시 필터용
+                year: h.year ?? 1,
+                level: h.level ?? null
             }));
 
-            return [...regulars, ...state.events, ...holidays];
+            return [...regulars, ...specials, ...state.events, ...holidays];
         }
     },
 
@@ -93,9 +103,13 @@ export const useTimetableStore = defineStore('timetable', {
             this.timetables = timetables;
             this.events = events;
             this.holidays = holidays;
+        },
+
+        setSpecialLectures(specials = []) {
+            this.specialLectures = specials;
         }
     }
-})
+});
 
 /**
  * 월~금 → 1~5 (FullCalendar용)

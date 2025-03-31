@@ -12,7 +12,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { fetchEvents } from '@/services/eventService'
-import BaseScheduleList from './BaseScheduleList.vue'
+import BaseScheduleList from './schedule/BaseScheduleList.vue'
 
 // 🧠 유틸 포맷터 (필요 시 utils/format.js로 분리해도 OK)
 const eventTypeText = type => ({

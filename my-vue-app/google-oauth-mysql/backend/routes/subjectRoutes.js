@@ -3,6 +3,7 @@ const { verifyToken, hasRole } = require('../middlewares/authMiddleware');
 const {
     getSubjects,
     getSpecialLectures,
+    getSubjectsByLevel,
     createSubject,
     updateSubject,
     deleteSubject,
@@ -19,6 +20,9 @@ router.get("/special", verifyToken, getSpecialLectures);
 
 // ✅ 전체 과목 목록 조회 (모든 사용자 가능)
 router.get("/", getSubjects);
+
+router.get('/level', getSubjectsByLevel);
+
 
 // ✅ 과목 등록 (관리자만 가능)
 router.post("/", verifyToken, hasRole(1), createSubject);

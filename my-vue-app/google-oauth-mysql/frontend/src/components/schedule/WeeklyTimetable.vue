@@ -30,20 +30,23 @@
 <script setup>
 import { computed } from 'vue';
 import dayjs from 'dayjs';
-import { useTimetableStore } from '@/store/timetableStore';
 import TimetableCell from './TimetableCell.vue';
+import isSameOrAfter from 'dayjs/plugin/isSameOrAfter'
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore'
+dayjs.extend(isSameOrAfter)
+dayjs.extend(isSameOrBefore)
 
 const props = defineProps({
   year: Number,
   level: String,
   start: String, // YYYY-MM-DD
-  end: String    // YYYY-MM-DD
+  end: String,    // YYYY-MM-DD
+  timetables: Array
 });
 
 const days = ['월', '화', '수', '목', '금'];
-const periods = [1, 2, 3, 4, 5, 6, 7, 8];
+const periods = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
-const timetableStore = useTimetableStore();
 
 const startDate = computed(() => dayjs(props.start));
 const endDate = computed(() => dayjs(props.end));
@@ -52,22 +55,28 @@ const endDate = computed(() => dayjs(props.end));
  * 📌 유효한 날짜 범위 안의 수업 + 이벤트 + 공휴일 필터링
  */
 const combinedItems = computed(() =>
-    timetableStore.getCombinedData.filter(item => {
-      const isEventOrHoliday = !!item.event_date;
-      const dateToCheck = isEventOrHoliday ? dayjs(item.event_date) : null;
+    props.timetables.filter(item => {
+      const rawDate = item.event_date || item.date;
+      if (!rawDate) return false;
+
+      const date = dayjs(rawDate);
+      if (!date.isValid()) return false;
+
+      const levelMatches = item.level === props.level || item.level === null;
+      const yearMatches =
+          item.event_type === 'special'
+              ? true // 🔥 특강은 학년 무시
+              : item.year === props.year;
 
       return (
-          item.year === props.year &&
-          item.level === props.level &&
-          (
-              !isEventOrHoliday || (
-                  dateToCheck.isSameOrAfter(startDate.value) &&
-                  dateToCheck.isSameOrBefore(endDate.value)
-              )
-          )
+          yearMatches &&
+          levelMatches &&
+          date.isSameOrAfter(startDate.value) &&
+          date.isSameOrBefore(endDate.value)
       );
     })
 );
+console.log('🧪 timetables for this week:', props.timetables);
 
 /**
  * 🧠 요일 + 교시 기준으로 셀 데이터 필터링

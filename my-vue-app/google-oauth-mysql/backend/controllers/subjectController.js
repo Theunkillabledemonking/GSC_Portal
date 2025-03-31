@@ -27,6 +27,40 @@ exports.getSpecialLectures = async (req, res) => {
     }
 };
 
+
+/**
+ *
+ * @param req
+ * @param res
+ * @returns {Promise<*>}
+ */
+exports.getSubjectsForEvent = async (req, res) => {
+    const { year } = req.query;
+    const level = req.user?.level; // 로그인한 사용자의 레벨
+
+    if (!year || !level) {
+        return res.status(400).json({ message: "year 또는 사용자 레벨이 누락되었습니다." });
+    }
+
+    try {
+        const [rows] = await pool.query(`
+            SELECT * FROM subjects 
+            WHERE 
+              (
+                (is_special_lecture = 0 AND year = ?) 
+                OR 
+                (is_special_lecture = 1 AND (level = ? OR level IS NULL))
+              )
+            ORDER BY is_special_lecture DESC, name ASC
+        `, [year, level]);
+
+        res.status(200).json({ subjects: rows });
+    } catch (err) {
+        console.error("❌ getSubjectsForEvent 오류:", err);
+        res.status(500).json({ message: "서버 오류가 발생했습니다." });
+    }
+};
+
 /**
  * ✅ 학년별 과목 조회 (정규 과목만)
  */
@@ -45,6 +79,24 @@ exports.getSubjectsByYear = async (req, res) => {
     }
 };
 
+/**
+ * 레벨별 과목 조회
+ */
+exports.getSubjectsByLevel = async (req, res) => {
+    const { level } = req.query;
+
+    try {
+        const [rows] = await pool.query(`
+      SELECT * FROM subjects
+      WHERE level = ? OR level IS NULL
+    `, [level]);
+
+        res.json({ subjects: rows });
+    } catch (err) {
+        console.error("❌ getSubjectsByLevel 오류:", err);
+        res.status(500).json({ message: "서버 오류 발생" });
+    }
+};
 
 /**
  * ✅ 전체 과목 목록 조회

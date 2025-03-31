@@ -15,6 +15,19 @@ export const getSubjectsByYear = async (year) => {
     }
 };
 
+export const getSubjectsByLevel = async (level) => {
+    try {
+        const res = await apiClient.get('/subjects/level', {
+            params: { level }
+        });
+        return res.data;
+    } catch (err) {
+        console.error("❌ 레벨 기준 과목 조회 실패", err);
+        return { subjects: [] };
+    }
+}
+
+
 /**
  * 🔍 전체 과목 조회 (관리자용)
  * @returns {Promise<{ subjects: Array }>}

@@ -2,8 +2,8 @@
 import apiClient from "@/services/apiClient.js";
 
 /**
- * 📦 학년별 시간표 + 이벤트 + 공휴일 조회
- * @param {Object} params - year, level, start_date, end_date
+ * 📦 정규 수업 + 이벤트 + 공휴일 전체 조회
+ * @param {Object} params - { year, level, start_date, end_date }
  * @returns {Promise<{ timetables: Array, events: Array, holidays: Array }>}
  */
 export const fetchTimetableWithEvents = async ({ year, level, start_date, end_date }) => {
@@ -11,7 +11,7 @@ export const fetchTimetableWithEvents = async ({ year, level, start_date, end_da
         const res = await apiClient.get('/timetables/full', {
             params: {
                 year,
-                level: level || undefined,
+                level: level || null,
                 start_date,
                 end_date
             }
@@ -29,7 +29,7 @@ export const fetchTimetableWithEvents = async ({ year, level, start_date, end_da
 };
 
 /**
- * 📘 정규 시간표만 조회 (TimetableList 용)
+ * 📘 정규 수업만 조회 (is_special_lecture = 0)
  * @param {number} year
  * @param {string} level
  * @returns {Promise<Array>}
@@ -46,9 +46,28 @@ export const fetchTimetables = async (year, level) => {
     }
 };
 
+
 /**
- * 🆕 정규 수업 생성
+ * 🎓 특강 시간표 조회 (is_special_lecture = 1)
+ * @param {string} level
+ * @returns {Promise<Array>}
+ */
+export const fetchSpecialLectures = async ( level) => {
+    try {
+        const res = await apiClient.get('/timetables/special', {
+            params: { level }
+        });
+        return res.data.timetables ?? [];
+    } catch (error) {
+        console.error('❌ 특강 시간표 조회 실패:', error);
+        return [];
+    }
+};
+
+/**
+ * 🆕 정규 or 특강 수업 등록
  * @param {Object} timetableData
+ * @returns {Promise<Object>} 생성된 ID 포함 응답
  */
 export const createTimetable = async (timetableData) => {
     try {
@@ -61,9 +80,10 @@ export const createTimetable = async (timetableData) => {
 };
 
 /**
- * ✏️ 정규 수업 수정
+ * ✏️ 정규 or 특강 수업 수정
  * @param {number} id
  * @param {Object} timetableData
+ * @returns {Promise<Object>}
  */
 export const updateTimetable = async (id, timetableData) => {
     try {
@@ -76,8 +96,9 @@ export const updateTimetable = async (id, timetableData) => {
 };
 
 /**
- * ❌ 정규 수업 삭제
+ * ❌ 정규 or 특강 수업 삭제
  * @param {number} id
+ * @returns {Promise<Object>}
  */
 export const deleteTimetable = async (id) => {
     try {

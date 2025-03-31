@@ -3,7 +3,10 @@ import apiClient from "@/services/apiClient";
 
 /**
  * 🔍 이벤트 목록 조회
- * @param {Object} filters - { start_date, end_date, level }
+ * @param {Object} filters - 필터 조건
+ * @param {string} filters.start_date - 시작일 (YYYY-MM-DD)
+ * @param {string} filters.end_date - 종료일 (YYYY-MM-DD)
+ * @param {string} [filters.level] - 레벨 (optional)
  * @returns {Promise<Array>} - 이벤트 배열
  */
 export const fetchEvents = async ({ start_date, end_date, level } = {}) => {
