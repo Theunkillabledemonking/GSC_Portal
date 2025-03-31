@@ -82,12 +82,26 @@ console.log('🧪 timetables for this week:', props.timetables);
  * 🧠 요일 + 교시 기준으로 셀 데이터 필터링
  */
 function getItemsForCell(day, period) {
-  return combinedItems.value.filter(item =>
-      item.day === day &&
-      period >= item.start_period &&
-      period <= item.end_period
-  );
+  const result = combinedItems.value.filter(item => {
+    // 👇 여기에 추가!
+    console.log(`🧪 item`, {
+      day: item.day,
+      start_period: item.start_period,
+      end_period: item.end_period,
+      type: typeof item.start_period
+    });
+
+    return (
+        item.day == day &&
+        +period >= +item.start_period &&
+        +period <= +item.end_period
+    );
+  });
+
+  console.log(`📦 Cell(${day}, ${period})`, result);
+  return result;
 }
+
 </script>
 
 <style scoped>

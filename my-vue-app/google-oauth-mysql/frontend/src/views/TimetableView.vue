@@ -191,7 +191,7 @@ async function refresh() {
         start_date: startDate.value,
         end_date: endDate.value
       }),
-      fetchSpecialLectures(level.value) // 🔥 레벨만 넘김
+      fetchSpecialLectures(level.value, startDate.value, endDate.value) // 🔥 레벨만 넘김
     ]);
 
     timetableStore.setTimetableAndEvents(

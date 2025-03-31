@@ -50,14 +50,20 @@ export const fetchTimetables = async (year, level) => {
 /**
  * 🎓 특강 시간표 조회 (is_special_lecture = 1)
  * @param {string} level
+ * @param {number} startDate
+ * @param {number} endDate
  * @returns {Promise<Array>}
  */
-export const fetchSpecialLectures = async ( level) => {
+export const fetchSpecialLectures = async ( level, startDate, endDate) => {
     try {
         const res = await apiClient.get('/timetables/special', {
-            params: { level }
+            params: {
+                level,
+                start_date: startDate,
+                end_date: endDate
+            }
         });
-        return res.data.timetables ?? [];
+        return res.data;
     } catch (error) {
         console.error('❌ 특강 시간표 조회 실패:', error);
         return [];

@@ -78,7 +78,7 @@ exports.getTimetables = async (req, res) => {
 
 // 🔍 특강 시간표
 exports.getSpecialLectures = async (req, res) => {
-    const { level } = req.query;
+    const { level, start_date, end_date } = req.query;
 
     try {
         const [specials] = await pool.query(`
@@ -92,15 +92,23 @@ exports.getSpecialLectures = async (req, res) => {
 
         const periodMap = await getPeriodMap();
 
-        const formatted = specials.map(t => ({
-            ...t,
-            subject_name: t.subject_name || "미지정 과목",
-            professor_name: t.professor_name || "미지정 교수",
-            start_time: periodMap[t.start_period]?.start_time,
-            end_time: periodMap[t.end_period]?.end_time,
-        }));
+        const expanded = [];
 
-        res.json({ timetables: formatted });
+        for (const t of specials) {
+            const expandedDates = expandTimetableToDates(t, start_date, end_date);
+
+            for (const e of expandedDates) {
+                expanded.push({
+                    ...e,
+                    subject_name: t.subject_name || "미지정 과목",
+                    professor_name: t.professor_name || "미지정 교수",
+                    start_time: periodMap[e.start_period]?.start_time || '09:00',
+                    end_time: periodMap[e.end_period]?.end_time || '18:00',
+                });
+            }
+        }
+
+        res.json(expanded);
     } catch (err) {
         console.error("❌ getSpecialLectures 오류:", err);
         res.status(500).json({ message: "서버 오류 발생" });
