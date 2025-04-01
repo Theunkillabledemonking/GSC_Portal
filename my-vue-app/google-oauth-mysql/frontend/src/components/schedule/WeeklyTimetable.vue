@@ -28,80 +28,84 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
-import dayjs from 'dayjs';
-import TimetableCell from './TimetableCell.vue';
+import { computed } from 'vue'
+import dayjs from 'dayjs'
+import TimetableCell from './TimetableCell.vue'
+
+// 📦 dayjs 확장 플러그인: 날짜 비교용
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter'
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore'
 dayjs.extend(isSameOrAfter)
 dayjs.extend(isSameOrBefore)
 
+// ✅ props 정의: 상위에서 주입되는 정보
 const props = defineProps({
   year: Number,
   level: String,
   start: String, // YYYY-MM-DD
-  end: String,    // YYYY-MM-DD
-  timetables: Array
-});
+  end: String,   // YYYY-MM-DD
+  timetables: Array // 정규 + 이벤트 + 특강 + 공휴일 통합 데이터
+})
 
-const days = ['월', '화', '수', '목', '금'];
-const periods = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+// ✅ 렌더링 대상 요일 / 교시
+const days = ['월', '화', '수', '목', '금']
+const periods = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
-
-const startDate = computed(() => dayjs(props.start));
-const endDate = computed(() => dayjs(props.end));
+// ⏰ 날짜 계산
+const startDate = computed(() => dayjs(props.start))
+const endDate = computed(() => dayjs(props.end))
 
 /**
- * 📌 유효한 날짜 범위 안의 수업 + 이벤트 + 공휴일 필터링
+ * ✅ 날짜, 학년, 레벨 조건에 맞는 timetable 필터링
  */
 const combinedItems = computed(() =>
     props.timetables.filter(item => {
-      const rawDate = item.event_date || item.date;
-      if (!rawDate) return false;
+      const rawDate = item.event_date || item.date
+      if (!rawDate) return false
 
-      const date = dayjs(rawDate);
-      if (!date.isValid()) return false;
+      const date = dayjs(rawDate)
+      if (!date.isValid()) return false
 
-      const levelMatches = item.level === props.level || item.level === null;
-      const yearMatches =
-          item.event_type === 'special'
-              ? true // 🔥 특강은 학년 무시
-              : item.year === props.year;
+      const levelMatches = item.level === props.level || item.level === null
+      const yearMatches = item.event_type === 'special' ? true : item.year === props.year
+      console.log('📦 렌더링 직전 필터링된 timetable:', combinedItems.value)
 
       return (
           yearMatches &&
           levelMatches &&
           date.isSameOrAfter(startDate.value) &&
           date.isSameOrBefore(endDate.value)
-      );
+      )
     })
-);
-console.log('🧪 timetables for this week:', props.timetables);
+)
 
 /**
- * 🧠 요일 + 교시 기준으로 셀 데이터 필터링
+ * ✅ 셀별 렌더링 아이템 추출
+ * - 요일 & 교시 포함
+ * - 우선순위 정렬 포함
  */
 function getItemsForCell(day, period) {
-  const result = combinedItems.value.filter(item => {
-    // 👇 여기에 추가!
-    console.log(`🧪 item`, {
-      day: item.day,
-      start_period: item.start_period,
-      end_period: item.end_period,
-      type: typeof item.start_period
-    });
-
-    return (
-        item.day == day &&
-        +period >= +item.start_period &&
-        +period <= +item.end_period
-    );
-  });
-
-  console.log(`📦 Cell(${day}, ${period})`, result);
-  return result;
+  return combinedItems.value
+      .filter(item =>
+          item.day === day &&
+          +period >= +item.start_period &&
+          +period <= +item.end_period
+      )
+      .sort((a, b) => {
+        const typeA = a.event_type || 'regular'
+        const typeB = b.event_type || 'regular'
+        const priority = {
+          holiday: 0,
+          cancel: 1,
+          makeup: 2,
+          special: 3,
+          event: 4,
+          regular: 5
+        }
+        return priority[typeA] - priority[typeB]
+        console.log(`🧩 ${day} / ${period}교시 결과:`, result)
+      })
 }
-
 </script>
 
 <style scoped>
@@ -110,7 +114,7 @@ function getItemsForCell(day, period) {
   border-radius: 12px;
   overflow-x: auto;
   padding: 1rem;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
 }
 
 .timetable {

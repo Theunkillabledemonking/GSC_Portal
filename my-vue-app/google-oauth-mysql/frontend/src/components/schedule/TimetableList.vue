@@ -1,4 +1,3 @@
-<!-- components/TimetableList.vue -->
 <template>
   <BaseScheduleList
       :items="timetables"
@@ -24,8 +23,10 @@ const props = defineProps({
   level: String,
   type: {
     type: String,
-    default: 'regular' // 또는 'special'
+    default: 'regular' // or 'special'
   },
+  startDate: String,
+  endDate: String,
   canEdit: {
     type: Boolean,
     default: true
@@ -48,17 +49,20 @@ const columns = [
 ]
 
 /**
- * 📦 정규 + 특강 수업 로딩
+ * 📦 정규 or 특강 시간표 로딩
  */
 async function loadTimetables() {
   if (!props.level) return
 
   try {
     if (props.type === 'special') {
-      // 특강만 불러오기 (year 없이 level만)
-      timetables.value = await fetchSpecialLectures(props.level)
+      if (!props.startDate || !props.endDate) return
+      timetables.value = await fetchSpecialLectures(
+          props.level,
+          props.startDate,
+          props.endDate
+      )
     } else {
-      // 정규만 불러오기
       if (!props.year) return
       timetables.value = await fetchTimetables(props.year, props.level)
     }
@@ -68,6 +72,10 @@ async function loadTimetables() {
   }
 }
 
-// ⏱ props 변경 감지하여 로드
-watch(() => [props.year, props.level], loadTimetables, { immediate: true })
+// 감지해서 자동 reload
+watch(
+    () => [props.year, props.level, props.startDate, props.endDate],
+    loadTimetables,
+    { immediate: true }
+)
 </script>

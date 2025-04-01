@@ -120,7 +120,7 @@ exports.getTimetableWithEvents = async (req, res) => {
     const { year, level, start_date, end_date } = req.query;
 
     try {
-        // 1️⃣ 공휴일 API 조회
+        // 1️⃣ 공휴일 API
         const holidayRes = await axios.get(`${process.env.KOREA_HOLIDAY_API_URL}`, {
             params: {
                 ServiceKey: process.env.KOREA_HOLIDAY_KEY,
@@ -129,40 +129,101 @@ exports.getTimetableWithEvents = async (req, res) => {
                 _type: "json"
             }
         });
-        const holidays = parseHolidays(holidayRes);
+        const holidays = parseHolidays(holidayRes); // ex) ["2025-04-08", ...]
 
-        // 2️⃣ 정규 수업
-        const [timetables] = await pool.query(`
-      SELECT t.*, s.name AS subject_name
-      FROM timetables t
-      LEFT JOIN subjects s ON t.subject_id = s.id
-      WHERE t.year = ?
-        AND t.is_special_lecture = 0
-          ${level ? "AND (t.level = ? OR t.level IS NULL)" : ""}
-    `, level ? [year, level] : [year]);
+        // 2️⃣ 정규 수업 (is_special_lecture = 0)
+        const [regulars] = await pool.query(`
+            SELECT t.*, s.name AS subject_name
+            FROM timetables t
+                     LEFT JOIN subjects s ON t.subject_id = s.id
+            WHERE t.year = ?
+              AND t.is_special_lecture = 0
+                ${level ? "AND (t.level = ? OR t.level IS NULL)" : ""}
+        `, level ? [year, level] : [year]);
 
-        // 3️⃣ 이벤트
+        // 3️⃣ 이벤트 (보강, 휴강, 특강, 행사)
         const [events] = await pool.query(`
-      SELECT * FROM timetable_events
-      WHERE event_date BETWEEN ? AND ?
-        ${level ? "AND level = ?" : ""}
-    `, level ? [start_date, end_date, level] : [start_date, end_date]);
+            SELECT e.*, s.name AS subject_name
+            FROM timetable_events e
+                     LEFT JOIN subjects s ON e.subject_id = s.id
+            WHERE e.event_date BETWEEN ? AND ?
+                ${level ? "AND (e.level = ? OR e.level IS NULL)" : ""}
+        `, level ? [start_date, end_date, level] : [start_date, end_date]);
 
-        // 4️⃣ 날짜별 정규 수업 확장
+        // 4️⃣ 교시 → 시간 변환
         const periodMap = await getPeriodMap();
+
+        // 5️⃣ 정규 수업 확장 + 휴강 처리
         const expandedTimetables = [];
 
-        for (const t of timetables) {
-            const expanded = expandTimetableToDates(t, start_date, end_date);
-            for (const e of expanded) {
-                e.start_time = periodMap[e.start_period]?.start_time || "09:00";
-                e.end_time = periodMap[e.end_period]?.end_time || "18:00";
-                e.isCancelled = events.some(ev => ev.event_type === "cancel" && ev.timetable_id === t.id && ev.event_date === e.date);
+        for (const t of regulars) {
+            const expandedDates = expandTimetableToDates(t, start_date, end_date);
+            for (const e of expandedDates) {
+                const isCancelled = events.some(ev =>
+                    ev.event_type === "cancel" &&
+                    ev.timetable_id === t.id &&
+                    ev.event_date === e.date
+                );
+
+                expandedTimetables.push({
+                    ...e,
+                    start_time: periodMap[e.start_period]?.start_time || "09:00",
+                    end_time: periodMap[e.end_period]?.end_time || "18:00",
+                    event_type: isCancelled ? "cancel" : "regular",
+                    isCancelled
+                });
             }
-            expandedTimetables.push(...expanded);
         }
 
-        res.json({ timetables: expandedTimetables, events, holidays });
+        // 6️⃣ 이벤트 항목 추가
+        for (const ev of events) {
+            const base = {
+                id: `${ev.event_type}-${ev.id}`,
+                date: ev.event_date,
+                subject_name: ev.subject_name || "이벤트 과목",
+                professor_name: ev.professor_name || "",
+                room: ev.room || "-",
+                description: ev.description || "",
+                start_period: ev.start_period,
+                end_period: ev.end_period,
+                start_time: periodMap[ev.start_period]?.start_time || "09:00",
+                end_time: periodMap[ev.end_period]?.end_time || "18:00",
+                event_type: ev.event_type,
+                level: ev.level || null,
+                day: dayjs(ev.event_date).format('dd') // 요일 문자: '월', '화' 등
+            };
+
+            // 보강/특강/행사는 직접 추가 (휴강은 위에서 처리했음)
+            if (["makeup", "special", "event"].includes(ev.event_type)) {
+                expandedTimetables.push(base);
+            }
+        }
+
+        // 7️⃣ 공휴일 추가
+        for (const holiday of holidays) {
+            expandedTimetables.push({
+                id: `holiday-${holiday}`,
+                date: holiday,
+                subject_name: "공휴일",
+                professor_name: "",
+                room: "",
+                description: "공휴일",
+                start_period: 1,
+                end_period: 9,
+                start_time: "09:00",
+                end_time: "18:00",
+                event_type: "holiday",
+                day: dayjs(holiday).format('dd')
+            });
+        }
+
+        // 8️⃣ 응답
+        res.json({
+            timetables: expandedTimetables,
+            events,
+            holidays
+        });
+
     } catch (err) {
         console.error("❌ getTimetableWithEvents 오류:", err);
         res.status(500).json({ message: "서버 오류 발생" });

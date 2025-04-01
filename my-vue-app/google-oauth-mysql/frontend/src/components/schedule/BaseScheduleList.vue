@@ -1,4 +1,3 @@
-<!-- components/BaseScheduleList.vue -->
 <template>
   <div class="base-schedule-list">
     <table v-if="items.length > 0">
@@ -15,7 +14,10 @@
           :class="getRowClass(item)"
       >
         <td v-for="col in columns" :key="col.field">
-          {{ formatCell(col, item) }}
+          <!-- 커스텀 셀 렌더링 (필요 시 확장 가능) -->
+          <slot :name="`cell-${col.field}`" :item="item" :value="item[col.field]">
+            {{ formatCell(col, item) }}
+          </slot>
         </td>
         <td v-if="canEdit">
           <slot name="actions" :item="item">
@@ -53,9 +55,17 @@ function formatCell(col, row) {
   return col.format ? col.format(val, row) : (val ?? '-')
 }
 
-// 정규 vs 특강 구분
+// 행 스타일 구분: event_type > makeup > special_lecture > regular
 function getRowClass(item) {
-  return item.is_special_lecture ? 'row-special' : 'row-regular'
+  const type = item.event_type || (item.isMakeup && 'makeup') || (item.is_special_lecture && 'special') || 'regular'
+  return {
+    'row-regular': type === 'regular',
+    'row-makeup': type === 'makeup',
+    'row-cancel': type === 'cancel',
+    'row-special': type === 'special',
+    'row-event': type === 'event',
+    'row-holiday': type === 'holiday'
+  }
 }
 </script>
 
@@ -79,13 +89,13 @@ th {
   background-color: #f9f9f9;
 }
 
-.row-regular {
-  background-color: #e3f2fd; /* 연한 블루 */
-}
-
-.row-special {
-  background-color: #fff3e0; /* 연한 오렌지 */
-}
+/* 🎨 타입별 스타일 (event_type 기반 or fallback) */
+.row-regular { background-color: #e3f2fd; }   /* 정규 수업 - 연블루 */
+.row-makeup  { background-color: #e8f5e9; }   /* 보강 - 연그린 */
+.row-cancel  { background-color: #fbe9e7; }   /* 휴강 - 연코랄 */
+.row-special { background-color: #fff3e0; }   /* 특강 - 연오렌지 */
+.row-event   { background-color: #fce4ec; }   /* 행사 - 연핑크 */
+.row-holiday { background-color: #ede7f6; }   /* 공휴일 - 연보라 */
 
 button {
   margin: 0 4px;

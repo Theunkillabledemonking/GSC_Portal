@@ -1,4 +1,4 @@
-<!-- views/ScheduleManagement.vue -->
+<!-- views/TimetableView.vue -->
 <template>
   <div class="timetable-view space-y-8">
     <h2>📅 시간표 및 이벤트 관리</h2>
@@ -79,11 +79,12 @@
       <TimetableList
           :year="year"
           :level="level"
-          :canEdit="isAdminOrProfessor"
+          :startDate="startDate"
+          :endDate="endDate"
           type="special"
+          :canEdit="isAdminOrProfessor"
           @edit="item => openEditForm(item, 'special')"
-          @delete="item => handleDelete(item, 'regular')"
-      />
+          @delete="item => handleDelete(item, 'special')" />
     </section>
 
     <!-- 🎈 이벤트 목록 -->
@@ -98,6 +99,7 @@
           :year="year"
           :level="level"
           :canEdit="isAdminOrProfessor"
+          :events="timetableStore.eventsByType.event"
           @edit="item => openEditForm(item, 'event')"
           @delete="item => handleDelete(item, 'event')"
       />
@@ -133,7 +135,7 @@ import { deleteEvent } from '@/services/eventService'
 
 import WeeklyTimetable from '@/components/schedule/WeeklyTimetable.vue'
 import TimetableList from '@/components/schedule/TimetableList.vue'
-import EventList from '@/components/EventList.vue'
+import EventList from '@/components/schedule/EventList.vue'
 import UnifiedScheduleForm from '@/components/schedule/UnifiedScheduleForm.vue'
 
 // 📌 기본 상태
@@ -193,6 +195,9 @@ async function refresh() {
       }),
       fetchSpecialLectures(level.value, startDate.value, endDate.value) // 🔥 레벨만 넘김
     ]);
+
+    console.log('🧪 mainRes:', mainRes); // 👈 추가
+    console.log('🧪 specials:', specials); // 👈 추가
 
     timetableStore.setTimetableAndEvents(
         mainRes.timetables,

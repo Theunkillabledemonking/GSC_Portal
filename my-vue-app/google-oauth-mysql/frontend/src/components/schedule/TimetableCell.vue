@@ -6,17 +6,17 @@
         :class="['item-box', getClass(item)]"
     >
       <p class="subject">
-        <!-- 공휴일인 경우 -->
-        {{ item.event_type === 'holiday' ? '공휴일' :
-          item.isCancelled ? '휴강 - ' + item.subject_name :
-              item.subject_name || '수업' }}
+        {{
+          item.event_type === 'holiday'
+              ? '공휴일'
+              : item.event_type === 'cancel'
+                  ? '휴강 - ' + item.subject_name
+                  : item.subject_name || '수업'
+        }}
       </p>
       <p v-if="item.professor_name" class="professor">{{ item.professor_name }}</p>
       <p v-if="item.room" class="room">{{ item.room }}</p>
-      <span
-          v-if="getEventLabel(item)"
-          class="tag"
-      >
+      <span v-if="getEventLabel(item)" class="tag">
         {{ getEventLabel(item) }}
       </span>
     </div>
@@ -32,22 +32,28 @@ const props = defineProps({
 
 // 라벨 표시
 const getEventLabel = (item) => {
-  if (item.event_type === 'holiday') return '공휴일'
-  if (item.isCancelled) return '휴강'
-  const labels = {
-    makeup: '보강',
-    special: '특강',
-    event: '행사'
+  switch (item.event_type) {
+    case 'holiday': return '공휴일'
+    case 'cancel': return '휴강'
+    case 'makeup': return '보강'
+    case 'special': return '특강'
+    case 'event': return '행사'
+    default: return ''
   }
-  return labels[item.event_type] || ''
 }
 
-// 클래스 반환
+// 클래스 반환 (배경색 스타일 지정용)
 const getClass = (item) => {
-  if (item.isCancelled) return 'cancel'
-  if (item.event_type === 'holiday') return 'holiday'
-  return item.event_type && item.event_type !== 'regular' ? item.event_type : ''
+  switch (item.event_type) {
+    case 'holiday': return 'holiday'
+    case 'cancel': return 'cancel'
+    case 'makeup': return 'makeup'
+    case 'special': return 'special'
+    case 'event': return 'event'
+    default: return ''
+  }
 }
+
 </script>
 
 <style scoped>
