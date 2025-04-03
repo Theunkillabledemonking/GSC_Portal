@@ -1,9 +1,21 @@
 import apiClient from "@/services/apiClient";
 
 /**
- * 🔍 정규 + 공통 과목 조회 (학년 기준)
+ * 🔍 전체 과목 조회 (관리자용)
+ */
+export const getAllSubjects = async () => {
+    try {
+        const res = await apiClient.get("/subjects");
+        return res.data;
+    } catch (err) {
+        console.error("❌ 전체 과목 조회 실패", err);
+        return { subjects: [] };
+    }
+};
+
+/**
+ * 🔍 학년 기준 과목 조회
  * @param {number} year
- * @returns {Promise<{ subjects: Array }>}
  */
 export const getSubjectsByYear = async (year) => {
     try {
@@ -15,36 +27,51 @@ export const getSubjectsByYear = async (year) => {
     }
 };
 
+/**
+ * 🔍 레벨 기준 과목 조회
+ * @param {string} level
+ */
 export const getSubjectsByLevel = async (level) => {
     try {
-        const res = await apiClient.get('/subjects/level', {
-            params: { level }
-        });
+        const res = await apiClient.get('/subjects/level', { params: { level } });
         return res.data;
     } catch (err) {
         console.error("❌ 레벨 기준 과목 조회 실패", err);
         return { subjects: [] };
     }
-}
-
+};
 
 /**
- * 🔍 전체 과목 조회 (관리자용)
- * @returns {Promise<{ subjects: Array }>}
+ * 🔍 학기 기준 과목 조회
+ * @param {object} options - { year, semester }
  */
-export const getAllSubjects = async () => {
+export const getSubjectsBySemester = async ({ year, semester }) => {
     try {
-        const res = await apiClient.get("/subjects");
+        const res = await apiClient.get('/subjects/by-semester', {
+            params: { year, semester }
+        });
         return res.data;
     } catch (err) {
-        console.error("❌ 전체 과목 조회 실패", err);
-        throw err;
+        console.error("❌ 학기별 과목 조회 실패", err);
+        return { subjects: [] };
+    }
+};
+
+/**
+ * 🔍 특강 과목 조회
+ */
+export const getSpecialLectures = async () => {
+    try {
+        const res = await apiClient.get("/subjects/special");
+        return res.data;
+    } catch (err) {
+        console.error("❌ 특강 과목 조회 실패", err);
+        return { specialLectures: [] };
     }
 };
 
 /**
  * ➕ 과목 등록
- * @param {Object} subjectData - { name, year, level, is_special_lecture }
  */
 export const createSubject = async (subjectData) => {
     try {
@@ -57,7 +84,6 @@ export const createSubject = async (subjectData) => {
 
 /**
  * ✏️ 과목 수정
- * @param {Object} subject - { id, name, year, level, ... }
  */
 export const updateSubject = async (subject) => {
     try {
@@ -70,27 +96,12 @@ export const updateSubject = async (subject) => {
 
 /**
  * ❌ 과목 삭제
- * @param {number} id - 과목 ID
  */
 export const deleteSubject = async (id) => {
     try {
         await apiClient.delete(`/subjects/${id}`);
     } catch (err) {
         console.error("❌ 과목 삭제 실패", err);
-        throw err;
-    }
-};
-
-/**
- * 🔍 특강 과목 조회 (사용자 레벨 기준)
- * @returns {Promise<{ specialLectures: Array }>}
- */
-export const getSpecialLectures = async () => {
-    try {
-        const res = await apiClient.get("/subjects/special");
-        return res.data;
-    } catch (err) {
-        console.error("❌ 특강 과목 조회 실패", err);
         throw err;
     }
 };
