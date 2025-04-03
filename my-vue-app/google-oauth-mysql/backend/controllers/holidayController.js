@@ -1,40 +1,86 @@
 const axios = require('axios');
-const { KOREA_HOLIDAY_KEY } = process.env;
+const pool = require('../config/db');
+const dayjs = require('dayjs');
+const { KOREA_HOLIDAY_KEY, KOREA_HOLIDAY_API_URL } = process.env;
 
-const getPublicHolidays = async (req, res) => {
-    const { year, month } = req.query;
+/**
+ * ✅ DB에서 범위 기반 공휴일 조회
+ */
+async function getPublicHolidaysInRange(startDate, endDate) {
+    const [rows] = await pool.query(`
+        SELECT date FROM holidays
+        WHERE date BETWEEN ? AND ? AND isHoliday = 1
+    `, [startDate, endDate]);
+    return rows.map(row => row.date);
+}
 
-    if (!year || !month) {
-        return res.status(400).json({ message: "year, month 쿼리 파라미터가 필요합니다." });
-    }
+/**
+ * ✅ 외부 API 호출 (월별) + DB 저장
+ */
+async function fetchAndCacheMonthlyHolidays(year, month) {
+    const formattedMonth = month.toString().padStart(2, '0');
+
+    const [cached] = await pool.query(`
+        SELECT * FROM holidays WHERE DATE_FORMAT(date, '%Y-%m') = ?
+    `, [`${year}-${formattedMonth}`]);
+
+    if (cached.length > 0) return cached;
 
     try {
-        const response = await axios.get('https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo', {
+        const response = await axios.get(KOREA_HOLIDAY_API_URL, {
             params: {
                 ServiceKey: KOREA_HOLIDAY_KEY,
                 solYear: year,
-                solMonth: month.padStart(2, '0'),
-                _type: 'json',
-            },
+                solMonth: formattedMonth,
+                _type: 'json'
+            }
         });
 
         const items = response.data.response.body.items?.item || [];
 
-        const holidays = Array.isArray(items) ? items : [items];
-
-        const result = holidays.map(h => ({
-            date: h.locdate?.toString().replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3"),
+        const holidays = items.map(h => ({
+            date: h.locdate.toString().replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3"),
             name: h.dateName,
-            isHoliday: h.isHoliday === 'Y',
+            isHoliday: h.isHoliday === 'Y'
         }));
 
-        res.json({ holidays: result });
+        for (const h of holidays) {
+            await pool.query(`
+                INSERT IGNORE INTO holidays (date, name, isHoliday)
+                VALUES (?, ?, ?)
+            `, [h.date, h.name, h.isHoliday]);
+        }
+
+        return holidays;
     } catch (err) {
-        console.error("❌ 공휴일 API 호출 실패:", err);
-        res.status(500).json({ message: "공휴일 데이터를 불러오는 중 오류 발생" });
+        console.error(`❌ 공휴일 API 호출 실패: ${year}-${formattedMonth}`, err.message);
+        return []; // 실패했어도 일단 계속 진행
     }
-};
+}
+
+/**
+ * ✅ fallback 포함 범위 공휴일 조회
+ */
+async function getPublicHolidaysInRangeWithFallback(startDate, endDate) {
+    let holidays = await getPublicHolidaysInRange(startDate, endDate);
+    if (holidays.length > 0) return holidays;
+
+    const start = dayjs(startDate);
+    const end = dayjs(endDate);
+    const seen = new Set();
+
+    for (let d = start; d.isSame(end) || d.isBefore(end); d = d.add(1, 'day')) {
+        const key = `${d.year()}-${d.month() + 1}`;
+        if (!seen.has(key)) {
+            await fetchAndCacheMonthlyHolidays(d.year(), d.month() + 1);
+            seen.add(key);
+        }
+    }
+
+    holidays = await getPublicHolidaysInRange(startDate, endDate);
+    return holidays;
+}
 
 module.exports = {
-    getPublicHolidays,
+    getPublicHolidaysInRangeWithFallback
 };

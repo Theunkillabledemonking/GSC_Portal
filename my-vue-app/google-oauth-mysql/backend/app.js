@@ -23,6 +23,10 @@ const calendarRoutes = require('./routes/calendarRoutes');
 const timetableRoutes = require('./routes/timetableRoutes');
 const eventRoutes = require('./routes/eventRoutes'); // 이벤트 (보강/휴강/특강)
 const holidayRoutes = require('./routes/holidayRoutes');
+const { fetchAndCacheMonthlyHolidays } = require('./controllers/holidayController');
+
+
+
 // =======================
 // ✅ Express 앱 초기화
 // =======================
@@ -57,6 +61,13 @@ const accessLogStream = fs.createWriteStream(
     path.join(__dirname, 'logs', 'access.log'),
     { flags: 'a' } // append 모드
 );
+
+(async () => {
+    const year = new Date().getFullYear();
+    for (let m = 1; m <= 12; m++) {
+        await fetchAndCacheMonthlyHolidays(year, m);
+    }
+})();
 
 app.use(morgan('combined', { stream: accessLogStream }));
 
