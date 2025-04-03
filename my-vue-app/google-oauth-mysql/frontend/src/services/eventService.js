@@ -1,5 +1,16 @@
 // services/eventService.js
 import apiClient from "@/services/apiClient";
+import { getSemesterRange } from "@/utils/semester";
+
+/**
+ * 🎓 학기 기반 이벤트 조회 (내부에서 날짜 자동 계산)
+ * @param {Object} filters - { year, semester, level }
+ * @returns {Promise<Array>}
+ */
+export const fetchEventsBySemester = async ({ year, semester, level }) => {
+    const { start_date, end_date } = getSemesterRange(year, semester);
+    return await fetchEvents({ start_date, end_date, level });
+};
 
 /**
  * 🔍 이벤트 목록 조회
