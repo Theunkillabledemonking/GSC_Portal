@@ -1,20 +1,27 @@
 // services/timetableService.js
 import apiClient from "@/services/apiClient.js";
+import { getSemesterRange } from "@/utils/semester";
 
 /**
  * 📦 정규 수업 + 이벤트 + 공휴일 전체 조회
- * @param {Object} params - { year, level, start_date, end_date }
+ * @param {Object} params - { year, level, semester }
  * @returns {Promise<{ timetables: Array, events: Array, holidays: Array }>}
  */
-export const fetchTimetableWithEvents = async ({ year, level, start_date, end_date }) => {
+export const fetchTimetableWithEvents = async ({ year, level, semester }) => {
     try {
+        console.log("📡 fetchTimetableWithEvents 파라미터:", { year, level, semester });
+        if (!semester) throw new Error("학기 정보 없음");
+
+        // ✅ 값 체크 추가
+        const allowed = ['spring', 'summer', 'fall', 'winter', 'full'];
+        if (!allowed.includes(semester)) throw new Error(`허용되지 않은 학기값: ${semester}`);
+        year = Number(year); // ✅ 이 한 줄만 있어도 해결됨
+        const { start_date, end_date } = getSemesterRange(year, semester);
+
+        console.log("📡 호출: /timetables/full", { year, level, start_date, end_date });
+
         const res = await apiClient.get('/timetables/full', {
-            params: {
-                year,
-                level: level || null,
-                start_date,
-                end_date
-            }
+            params: { year, level, start_date, end_date, semester }
         });
 
         return {

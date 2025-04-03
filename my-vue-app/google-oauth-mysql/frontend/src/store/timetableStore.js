@@ -1,23 +1,39 @@
+// store/timetableStore.js
 import { defineStore } from 'pinia'
+import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+import timezone from 'dayjs/plugin/timezone'
+import { fetchTimetableWithEvents, fetchSpecialLectures } from "@/services/timetableService";
+import { getSemesterRange } from "@/utils/semester";
+
+// 📌 타임존 설정
+dayjs.extend(utc)
+dayjs.extend(timezone)
+
+function getDayFromDate(dateStr) {
+    const date = dayjs.utc(dateStr).tz('Asia/Seoul');
+    const dayIdx = date.day();
+    const map = ["일", "월", "화", "수", "목", "금", "토"];
+    return map[dayIdx];
+}
 
 export const useTimetableStore = defineStore('timetable', {
     state: () => ({
-        timetables: [],         // 정규 + 보강 포함
-        specialLectures: [],    // 반복형 특강 (is_special_lecture = 1)
-        holidays: [],           // 공휴일
-        eventsByType: {         // 이벤트 테이블에서 분기된 이벤트
+        timetables: [],
+        specialLectures: [],
+        holidays: [],
+        eventsByType: {
             cancel: [],
             makeup: [],
             special: [],
             event: []
-        }
+        },
+        selectedYear: new Date().getFullYear(),
+        selectedSemester: 'spring',
+        selectedLevel: '1'
     }),
 
     getters: {
-        /**
-         * ✅ 시간표 + 특강 + 공휴일 하나로 합친 데이터
-         * - FullCalendar나 셀 기반 렌더링에 활용
-         */
         getCombinedData(state) {
             const timetables = state.timetables;
 
@@ -45,11 +61,41 @@ export const useTimetableStore = defineStore('timetable', {
     },
 
     actions: {
-        /**
-         * ✅ 백엔드 통합 시간표 응답 저장 (정규 + 이벤트 포함)
-         */
+        async loadAllDataBySemester({ year, semester, level }) {
+            console.log("📥 [loadAllDataBySemester] 파라미터:", { year, semester, level });
+
+            if (!semester || !['spring', 'summer', 'fall', 'winter', 'full'].includes(semester)) {
+                console.warn("⚠️ semester 값이 잘못됨:", semester);
+                return;
+            }
+
+            const { start_date, end_date } = getSemesterRange(parseInt(year), semester);
+
+            const { timetables, events, holidays } = await fetchTimetableWithEvents({
+                year,
+                level,
+                semester, // ✅ 추가됨: semester도 명확히 넘김
+                start_date,
+                end_date
+            });
+
+            console.log("📡 호출: /timetables/full", {
+                year,
+                level,
+                start_date,
+                end_date
+            });
+
+
+            console.log("📦 받아온 이벤트 데이터:", events); // ✅ 이 줄 추가해서 콘솔 확인
+
+            const specialLectures = await fetchSpecialLectures(level, start_date, end_date);
+
+            this.setTimetableAndEvents(timetables, events, holidays);
+            this.setSpecialLectures(specialLectures);
+        },
+
         setTimetableAndEvents(timetables = [], events = [], holidays = []) {
-            // 이벤트 분리
             const eventsByType = {
                 cancel: [],
                 makeup: [],
@@ -58,13 +104,19 @@ export const useTimetableStore = defineStore('timetable', {
             };
 
             events.forEach(e => {
+                if (e.event_type === 'cancel') {
+                    console.log('📌 휴강 이벤트', e)
+                }
+
                 const withDay = {
                     ...e,
-                    day: getDayFromDate(e.event_date) // ✅ 핵심 포인트
-                }
+                    day: getDayFromDate(e.event_date)
+                };
 
                 if (eventsByType[e.event_type]) {
                     eventsByType[e.event_type].push(withDay);
+                } else {
+                    console.warn("⚠️ 미지원 event_type:", e.event_type, e);
                 }
             });
 
@@ -73,21 +125,14 @@ export const useTimetableStore = defineStore('timetable', {
             this.eventsByType = eventsByType;
         },
 
-        /**
-         * ✅ 특강 저장
-         */
         setSpecialLectures(specials = []) {
             this.specialLectures = specials;
+        },
+
+        setFilters({ year, semester, level }) {
+            this.selectedYear = year;
+            this.selectedSemester = semester;
+            this.selectedLevel = level;
         }
     }
 });
-
-/**
- * 🔁 날짜(YYYY-MM-DD) ➜ 요일 한글 ("월" ~ "일")
- */
-function getDayFromDate(dateStr) {
-    const date = new Date(dateStr);
-    const dayIdx = date.getDay();
-    const map = ["일", "월", "화", "수", "목", "금", "토"];
-    return map[dayIdx];
-}

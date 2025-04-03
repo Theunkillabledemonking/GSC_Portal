@@ -2,6 +2,7 @@ const axios = require("axios");
 const dayjs = require("dayjs");
 const pool = require("../config/db");
 const subjectController = require("./subjectController");
+const { getPublicHolidaysInRangeWithFallback } = require('./holidayController');
 
 // ------------------ 유틸 함수 ------------------
 
@@ -19,7 +20,7 @@ function expandTimetableToDates(timetable, startDate, endDate) {
 
     for (let date = start; date.isBefore(end) || date.isSame(end); date = date.add(1, "day")) {
         if (date.day() === dayOfWeek) {
-            result.push({ ...timetable, date: date.format("YYYY-MM-DD") });
+            result.push({ ...timetable, date: date.format("YYYY-MM-DD"), day: timetable.day });
         }
     }
 
@@ -47,21 +48,30 @@ exports.getSubjectsByYear = async (req, res) => subjectController.getSubjectsByY
 // ------------------ 시간표 조회 ------------------
 
 exports.getTimetables = async (req, res) => {
-    const { year, level } = req.query;
+    const { year, semester, grade, level, group_level } = req.query;
 
     try {
-        const [timetables] = await pool.query(`
-      SELECT t.*, s.name AS subject_name
-      FROM timetables t
-      LEFT JOIN subjects s ON t.subject_id = s.id
-      WHERE t.year = ?
-        AND t.is_special_lecture = 0
-          ${level ? "AND (t.level = ? OR t.level IS NULL)" : ""}
-    `, level ? [year, level] : [year]);
+        const [rows] = await pool.query(`
+            SELECT t.*, s.name AS subject_name
+            FROM timetables t
+                     LEFT JOIN subjects s ON t.subject_id = s.id
+            WHERE t.year = ?
+              AND t.semester = ?
+              AND (
+                (t.is_special_lecture = 0 AND t.grade = ?)
+                    OR
+                (t.is_special_lecture = 1 AND t.level = ?
+                    AND (
+                     t.group_levels IS NULL OR JSON_CONTAINS(t.group_levels, JSON_QUOTE(?))
+                     )
+                    )
+                )
+            ORDER BY t.day, t.start_period
+        `, [year, semester, grade, level, group_level]);
 
-        const periodMap = await getPeriodMap();
+        const periodMap = await getPeriodMap(); // 기존 유틸 사용
 
-        const formatted = timetables.map(t => ({
+        const formatted = rows.map(t => ({
             ...t,
             subject_name: t.subject_name || "미지정 과목",
             professor_name: t.professor_name || "미지정 교수",
@@ -117,89 +127,116 @@ exports.getSpecialLectures = async (req, res) => {
 
 // 🔍 주간 시간표 + 이벤트 + 공휴일
 exports.getTimetableWithEvents = async (req, res) => {
-    const { year, level, start_date, end_date } = req.query;
+    const year = Number(req.query.year);
+    const {
+        semester,
+        start_date,
+        end_date,
+        grade,
+        level,
+        group_level
+    } = req.query;
 
     try {
-        // 1️⃣ 공휴일 API
-        const holidayRes = await axios.get(`${process.env.KOREA_HOLIDAY_API_URL}`, {
+        // ✅ 공휴일 조회 (캐시 or API)
+        const holidayRes = await axios.get(process.env.KOREA_HOLIDAY_API_URL, {
             params: {
                 ServiceKey: process.env.KOREA_HOLIDAY_KEY,
                 year,
-                month: "",
                 _type: "json"
             }
         });
-        const holidays = parseHolidays(holidayRes); // ex) ["2025-04-08", ...]
 
-        // 2️⃣ 정규 수업 (is_special_lecture = 0)
+        const holidays = await getPublicHolidaysInRangeWithFallback(start_date, end_date);
+
+        const periodMap = await getPeriodMap(); // {1: {start_time, end_time}, ...}
+
+        // ✅ 정규 수업 조회 (grade 기반)
         const [regulars] = await pool.query(`
             SELECT t.*, s.name AS subject_name
             FROM timetables t
-                     LEFT JOIN subjects s ON t.subject_id = s.id
+            LEFT JOIN subjects s ON t.subject_id = s.id
             WHERE t.year = ?
+              AND t.semester = ?
               AND t.is_special_lecture = 0
-                ${level ? "AND (t.level = ? OR t.level IS NULL)" : ""}
-        `, level ? [year, level] : [year]);
+              AND t.grade = ?
+        `, [year, semester, grade]);
 
-        // 3️⃣ 이벤트 (보강, 휴강, 특강, 행사)
+        // ✅ 특강 수업 조회 (level + group_level 조건)
+        const [specials] = await pool.query(`
+            SELECT t.*, s.name AS subject_name
+            FROM timetables t
+            LEFT JOIN subjects s ON t.subject_id = s.id
+            WHERE t.year = ?
+              AND t.semester = ?
+              AND t.is_special_lecture = 1
+              AND t.level = ?
+              AND (t.group_levels IS NULL OR JSON_CONTAINS(t.group_levels, JSON_QUOTE(?)))
+        `, [year, semester, level, group_level]);
+
+        const allLectures = [...regulars, ...specials];
+
+        // ✅ 이벤트 조회 (grade OR level + group_levels 대응)
         const [events] = await pool.query(`
             SELECT e.*, s.name AS subject_name
             FROM timetable_events e
-                     LEFT JOIN subjects s ON e.subject_id = s.id
+            LEFT JOIN subjects s ON e.subject_id = s.id
             WHERE e.event_date BETWEEN ? AND ?
-                ${level ? "AND (e.level = ? OR e.level IS NULL)" : ""}
-        `, level ? [start_date, end_date, level] : [start_date, end_date]);
+              AND (
+                  e.grade = ? OR
+                  (
+                      e.level = ?
+                      AND (e.group_levels IS NULL OR JSON_CONTAINS(e.group_levels, JSON_QUOTE(?)))
+                  )
+              )
+        `, [start_date, end_date, grade, level, group_level]);
 
-        // 4️⃣ 교시 → 시간 변환
-        const periodMap = await getPeriodMap();
-
-        // 5️⃣ 정규 수업 확장 + 휴강 처리
+        // ✅ 정규/특강 확장 & 휴강/보강/행사 반영
         const expandedTimetables = [];
 
-        for (const t of regulars) {
-            const expandedDates = expandTimetableToDates(t, start_date, end_date);
-            for (const e of expandedDates) {
+        for (const t of allLectures) {
+            const dates = expandTimetableToDates(t, start_date, end_date);
+
+            for (const e of dates) {
                 const isCancelled = events.some(ev =>
-                    ev.event_type === "cancel" &&
-                    ev.timetable_id === t.id &&
-                    ev.event_date === e.date
+                    ev.event_type === 'cancel' &&
+                    ev.event_date === e.date &&
+                    (ev.timetable_id === t.id ||
+                        (!ev.timetable_id && ev.subject_id === t.subject_id &&
+                            !(ev.end_period < t.start_period || ev.start_period > t.end_period)))
                 );
 
                 expandedTimetables.push({
                     ...e,
-                    start_time: periodMap[e.start_period]?.start_time || "09:00",
-                    end_time: periodMap[e.end_period]?.end_time || "18:00",
-                    event_type: isCancelled ? "cancel" : "regular",
-                    isCancelled
+                    event_type: isCancelled ? 'cancel' : 'regular',
+                    isCancelled,
+                    start_time: periodMap[e.start_period]?.start_time || '09:00',
+                    end_time: periodMap[e.end_period]?.end_time || '18:00',
                 });
             }
         }
 
-        // 6️⃣ 이벤트 항목 추가
+        // ✅ 이벤트 직접 등록된 수업 (makeup, special, event)
         for (const ev of events) {
-            const base = {
-                id: `${ev.event_type}-${ev.id}`,
-                date: ev.event_date,
-                subject_name: ev.subject_name || "이벤트 과목",
-                professor_name: ev.professor_name || "",
-                room: ev.room || "-",
-                description: ev.description || "",
-                start_period: ev.start_period,
-                end_period: ev.end_period,
-                start_time: periodMap[ev.start_period]?.start_time || "09:00",
-                end_time: periodMap[ev.end_period]?.end_time || "18:00",
-                event_type: ev.event_type,
-                level: ev.level || null,
-                day: dayjs(ev.event_date).format('dd') // 요일 문자: '월', '화' 등
-            };
-
-            // 보강/특강/행사는 직접 추가 (휴강은 위에서 처리했음)
             if (["makeup", "special", "event"].includes(ev.event_type)) {
-                expandedTimetables.push(base);
+                expandedTimetables.push({
+                    id: `event-${ev.id}`,
+                    date: ev.event_date,
+                    day: dayjs(ev.event_date).format("dd"),
+                    subject_name: ev.subject_name || "이벤트",
+                    professor_name: ev.professor_name || "",
+                    room: ev.room || "",
+                    description: ev.description || "",
+                    start_period: ev.start_period,
+                    end_period: ev.end_period,
+                    start_time: periodMap[ev.start_period]?.start_time || "09:00",
+                    end_time: periodMap[ev.end_period]?.end_time || "18:00",
+                    event_type: ev.event_type
+                });
             }
         }
 
-        // 7️⃣ 공휴일 추가
+        // ✅ 공휴일 추가
         for (const holiday of holidays) {
             expandedTimetables.push({
                 id: `holiday-${holiday}`,
@@ -213,17 +250,11 @@ exports.getTimetableWithEvents = async (req, res) => {
                 start_time: "09:00",
                 end_time: "18:00",
                 event_type: "holiday",
-                day: dayjs(holiday).format('dd')
+                day: dayjs(holiday).format("dd")
             });
         }
 
-        // 8️⃣ 응답
-        res.json({
-            timetables: expandedTimetables,
-            events,
-            holidays
-        });
-
+        res.json({ timetables: expandedTimetables, events, holidays });
     } catch (err) {
         console.error("❌ getTimetableWithEvents 오류:", err);
         res.status(500).json({ message: "서버 오류 발생" });
@@ -237,7 +268,7 @@ exports.createTimetable = async (req, res) => {
     const {
         year, level, subject_id, room, description,
         day, start_period, end_period,
-        professor_name,
+        professor_name, semester,
         is_special_lecture = 0
     } = req.body;
 
@@ -245,12 +276,12 @@ exports.createTimetable = async (req, res) => {
         const [result] = await pool.query(`
       INSERT INTO timetables (
         year, level, subject_id, room, description,
-        day, start_period, end_period, professor_name, is_special_lecture
+        day, start_period, end_period, professor_name, semester, is_special_lecture
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
             year, level || null, subject_id, room || '', description || '',
-            day, start_period, end_period, professor_name || '', is_special_lecture
+            day, start_period, end_period, professor_name || '', semester, is_special_lecture
         ]);
 
         res.status(201).json({ message: "정규 수업 등록 완료", id: result.insertId });
