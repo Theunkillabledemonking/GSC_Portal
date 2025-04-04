@@ -2,7 +2,7 @@ const pool = require('../config/db');
 
 const VALID_EVENT_TYPES = ['cancel', 'makeup', 'special', 'event'];
 
-// ✅ 이벤트 유효성 검사
+// ✅ 유효성 검사
 async function validateEventInput(body, mode = 'create') {
     const {
         event_type, event_date, timetable_id,
@@ -10,18 +10,21 @@ async function validateEventInput(body, mode = 'create') {
     } = body;
 
     if (!event_type || !event_date) return '이벤트 유형과 날짜는 필수입니다.';
+
     if (!VALID_EVENT_TYPES.includes(event_type)) {
         return `이벤트 유형은 ${VALID_EVENT_TYPES.join(', ')} 중 하나여야 합니다.`;
     }
 
-    // 휴강 → timetable_id 반드시 필요
+    if (isNaN(Date.parse(event_date))) {
+        return 'event_date는 올바른 날짜 형식이어야 합니다.';
+    }
+
     if (event_type === 'cancel') {
         if (!timetable_id) return '휴강 이벤트는 timetable_id가 필요합니다.';
         const [[tt]] = await pool.query(`SELECT * FROM timetables WHERE id = ?`, [timetable_id]);
         if (!tt) return '해당 timetable_id의 정규 수업을 찾을 수 없습니다.';
     }
 
-    // 보강 / 특강 → 과목, 교시 필수
     if (['makeup', 'special'].includes(event_type)) {
         if (!subject_id) return '보강/특강은 과목 선택이 필요합니다.';
         if (!start_period || !end_period) return '보강/특강은 교시 정보가 필요합니다.';
@@ -31,11 +34,35 @@ async function validateEventInput(body, mode = 'create') {
     return null;
 }
 
-/**
- * 📌 이벤트 전체 조회 (grade, level, group_level 기반 필터링)
- */
+// ✅ 휴강 중복 검사
+async function isDuplicateCancel({ event_type, event_date, timetable_id }) {
+    if (event_type !== 'cancel' || !timetable_id) return false;
+
+    const [rows] = await pool.query(`
+        SELECT id FROM timetable_events
+        WHERE event_type = 'cancel' AND event_date = ? AND timetable_id = ?
+    `, [event_date, timetable_id]);
+
+    return rows.length > 0;
+}
+
+// ✅ group_levels 유틸
+function toJSONStringArray(input) {
+    if (Array.isArray(input)) return JSON.stringify(input);
+    if (typeof input === 'string') return JSON.stringify([input]);
+    return null;
+}
+
+// ✅ 로깅 유틸
+function logParams(label, obj) {
+    console.log(`📥 [${label}] 요청:`, JSON.stringify(obj, null, 2));
+}
+
+// ---------------------- 컨트롤러 ----------------------
+
 exports.getEvents = async (req, res) => {
-    const { grade, level, group_level, start_date, end_date } = req.query;
+    const { year, level, group_level, start_date, end_date } = req.query;
+    logParams('getEvents', req.query);
 
     try {
         let query = `
@@ -46,9 +73,9 @@ exports.getEvents = async (req, res) => {
         `;
         const params = [];
 
-        if (grade) {
-            query += ` AND (e.grade = ? OR e.grade IS NULL)`;
-            params.push(grade);
+        if (year) {
+            query += ` AND (e.year = ? OR e.year IS NULL)`;
+            params.push(year);
         }
 
         if (level) {
@@ -69,44 +96,68 @@ exports.getEvents = async (req, res) => {
         query += ` ORDER BY e.event_date DESC`;
 
         const [rows] = await pool.query(query, params);
-        res.status(200).json({ events: rows });
+
+        res.status(200).json({
+            status: 'success',
+            data: { events: rows }
+        });
     } catch (err) {
         console.error("❌ 이벤트 조회 오류:", err);
-        res.status(500).json({ message: "서버 오류가 발생했습니다." });
+        res.status(500).json({ status: 'error', message: '서버 오류 발생' });
     }
 };
 
-/**
- * 📌 이벤트 등록
- */
 exports.createEvent = async (req, res) => {
-    const error = await validateEventInput(req.body);
-    if (error) return res.status(400).json({ message: error });
+    const payload = req.body;
+    logParams('createEvent', payload);
+
+    const error = await validateEventInput(payload, 'create');
+    if (error) return res.status(400).json({ status: 'error', message: error });
 
     const {
         timetable_id, subject_id, event_type, event_date,
-        grade, level, group_levels,
+        year, level, group_levels,
         start_period, end_period, start_time, end_time,
         description
-    } = req.body;
+    } = payload;
 
     try {
+        if (await isDuplicateCancel({ event_type, event_date, timetable_id })) {
+            return res.status(409).json({
+                status: 'error',
+                message: '해당 날짜에 이미 휴강 이벤트가 존재합니다.'
+            });
+        }
+
+        let finalYear = year;
+        let finalLevel = level;
+        let finalSubject = subject_id;
+
+        // 휴강이면 timetable 기준으로 자동 보완
+        if (event_type === 'cancel' && timetable_id) {
+            const [[tt]] = await pool.query(`SELECT * FROM timetables WHERE id = ?`, [timetable_id]);
+            if (tt) {
+                finalYear = tt.year;
+                finalLevel = tt.level;
+                finalSubject = tt.subject_id;
+            }
+        }
+
         const [result] = await pool.query(`
             INSERT INTO timetable_events (
                 timetable_id, subject_id, event_type, event_date,
-                grade, level, group_levels,
-                start_period, end_period, start_time, end_time,
-                description
+                year, level, group_levels,
+                start_period, end_period, start_time, end_time, description
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             timetable_id || null,
-            subject_id || null,
+            finalSubject || null,
             event_type,
             event_date,
-            grade || null,
-            level || null,
-            group_levels ? JSON.stringify(group_levels) : null,
+            finalYear || null,
+            finalLevel || null,
+            toJSONStringArray(group_levels),
             start_period || null,
             end_period || null,
             start_time || null,
@@ -114,44 +165,62 @@ exports.createEvent = async (req, res) => {
             description || ''
         ]);
 
-        res.status(201).json({ message: '이벤트 등록 완료', id: result.insertId });
+        res.status(201).json({
+            status: 'success',
+            message: '이벤트 등록 완료',
+            data: { id: result.insertId }
+        });
     } catch (err) {
         console.error("❌ 이벤트 등록 오류:", err);
-        res.status(500).json({ message: "서버 오류가 발생했습니다." });
+        res.status(500).json({ status: 'error', message: '서버 오류 발생' });
     }
 };
 
-/**
- * 📌 이벤트 수정
- */
 exports.updateEvent = async (req, res) => {
     const { event_id } = req.params;
-    const error = await validateEventInput(req.body, 'update');
-    if (error) return res.status(400).json({ message: error });
+    const payload = req.body;
+    logParams('updateEvent', { event_id, ...payload });
+
+    const error = await validateEventInput(payload, 'update');
+    if (error) return res.status(400).json({ status: 'error', message: error });
 
     const {
         timetable_id, subject_id, event_type, event_date,
-        grade, level, group_levels,
+        year, level, group_levels,
         start_period, end_period, start_time, end_time,
         description
-    } = req.body;
+    } = payload;
 
     try {
+        // 휴강 중복 체크 (자기 자신 제외)
+        if (event_type === 'cancel' && timetable_id) {
+            const [rows] = await pool.query(`
+                SELECT id FROM timetable_events
+                WHERE event_type = 'cancel' AND event_date = ? AND timetable_id = ? AND id != ?
+            `, [event_date, timetable_id, event_id]);
+
+            if (rows.length > 0) {
+                return res.status(409).json({
+                    status: 'error',
+                    message: '해당 날짜에 이미 휴강 이벤트가 존재합니다.'
+                });
+            }
+        }
+
         const [result] = await pool.query(`
             UPDATE timetable_events SET
                 timetable_id = ?, subject_id = ?, event_type = ?, event_date = ?,
-                grade = ?, level = ?, group_levels = ?,
-                start_period = ?, end_period = ?,
-                start_time = ?, end_time = ?, description = ?
+                year = ?, level = ?, group_levels = ?,
+                start_period = ?, end_period = ?, start_time = ?, end_time = ?, description = ?
             WHERE id = ?
         `, [
             timetable_id || null,
             subject_id || null,
             event_type,
             event_date,
-            grade || null,
+            year || null,
             level || null,
-            group_levels ? JSON.stringify(group_levels) : null,
+            toJSONStringArray(group_levels),
             start_period || null,
             end_period || null,
             start_time || null,
@@ -161,32 +230,44 @@ exports.updateEvent = async (req, res) => {
         ]);
 
         if (result.affectedRows === 0) {
-            return res.status(404).json({ message: '이벤트를 찾을 수 없습니다.' });
+            return res.status(404).json({
+                status: 'error',
+                message: '이벤트를 찾을 수 없습니다.'
+            });
         }
 
-        res.json({ message: '이벤트 수정 완료' });
+        res.status(200).json({
+            status: 'success',
+            message: '이벤트 수정 완료',
+            data: { id: parseInt(event_id) }
+        });
     } catch (err) {
         console.error("❌ 이벤트 수정 오류:", err);
-        res.status(500).json({ message: "서버 오류가 발생했습니다." });
+        res.status(500).json({ status: 'error', message: '서버 오류 발생' });
     }
 };
 
-/**
- * 📌 이벤트 삭제
- */
 exports.deleteEvent = async (req, res) => {
     const { event_id } = req.params;
+    logParams('deleteEvent', { event_id });
 
     try {
         const [result] = await pool.query(`DELETE FROM timetable_events WHERE id = ?`, [event_id]);
 
         if (result.affectedRows === 0) {
-            return res.status(404).json({ message: '이벤트를 찾을 수 없습니다.' });
+            return res.status(404).json({
+                status: 'error',
+                message: '이벤트를 찾을 수 없습니다.'
+            });
         }
 
-        res.json({ message: '이벤트 삭제 완료' });
+        res.status(200).json({
+            status: 'success',
+            message: '이벤트 삭제 완료',
+            data: { id: parseInt(event_id) }
+        });
     } catch (err) {
         console.error("❌ 이벤트 삭제 오류:", err);
-        res.status(500).json({ message: "서버 오류가 발생했습니다." });
+        res.status(500).json({ status: 'error', message: '서버 오류 발생' });
     }
 };

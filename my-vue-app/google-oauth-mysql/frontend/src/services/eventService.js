@@ -1,35 +1,66 @@
 // services/eventService.js
+
 import apiClient from "@/services/apiClient";
 import { getSemesterRange } from "@/utils/semester";
+import { normalizeLevel } from "@/utils/level"; // ✅ 레벨 정규화 유틸
 
 /**
- * 🎓 학기 기반 이벤트 조회 (내부에서 날짜 자동 계산)
- * @param {Object} filters - { year, semester, level }
- * @returns {Promise<Array>}
+ * 📦 학기 기반 이벤트 조회
+ * - 내부적으로 start_date, end_date 자동 계산
+ * @param {Object} filters
+ * @param {number} filters.year - 실제 연도 (ex: 2025)
+ * @param {string} filters.semester - 'spring' | 'summer' | 'fall' | 'winter'
+ * @param {string} [filters.level] - 레벨 (N1, N2 등)
+ * @returns {Promise<Array>} 이벤트 리스트
  */
 export const fetchEventsBySemester = async ({ year, semester, level }) => {
-    const { start_date, end_date } = getSemesterRange(year, semester);
-    return await fetchEvents({ start_date, end_date, level });
+    try {
+        const { start_date, end_date } = getSemesterRange(year, semester);
+        const normalizedLevel = normalizeLevel(level);
+
+        return await fetchEvents({
+            year,
+            start_date,
+            end_date,
+            level: normalizedLevel
+        });
+    } catch (error) {
+        console.error("❌ fetchEventsBySemester 실패:", error);
+        return [];
+    }
 };
 
 /**
  * 🔍 이벤트 목록 조회
- * @param {Object} filters - 필터 조건
- * @param {string} filters.start_date - 시작일 (YYYY-MM-DD)
- * @param {string} filters.end_date - 종료일 (YYYY-MM-DD)
- * @param {string} [filters.level] - 레벨 (optional)
- * @returns {Promise<Array>} - 이벤트 배열
+ * - 날짜 기준 필터 필수
+ * - level, group_level, year 조건부 필터 지원
+ * @param {Object} filters
+ * @param {string} filters.start_date - YYYY-MM-DD
+ * @param {string} filters.end_date - YYYY-MM-DD
+ * @param {string} [filters.level]
+ * @param {number} [filters.year]
+ * @param {string} [filters.group_level]
+ * @returns {Promise<Array>}
  */
-export const fetchEvents = async ({ start_date, end_date, level } = {}) => {
+export const fetchEvents = async ({
+                                      start_date,
+                                      end_date,
+                                      level,
+                                      year,
+                                      group_level
+                                  } = {}) => {
     try {
-        const res = await apiClient.get("/events", {
-            params: {
-                start_date,
-                end_date,
-                level: level || undefined
-            }
-        });
+        const normalizedLevel = normalizeLevel(level);
 
+        const params = {
+            start_date,
+            end_date,
+            ...(year && { year }),
+            ...(normalizedLevel && { level: normalizedLevel }),
+            ...(group_level && { group_level })
+        };
+
+        const res = await apiClient.get("/events", { params });
         return res.data?.events || [];
     } catch (err) {
         console.error("❌ 이벤트 조회 실패:", err);
@@ -38,9 +69,9 @@ export const fetchEvents = async ({ start_date, end_date, level } = {}) => {
 };
 
 /**
- * ✅ 이벤트 등록
- * @param {Object} payload - 이벤트 데이터
- * @returns {Promise<Object>} - 생성된 이벤트 정보
+ * 🆕 이벤트 등록
+ * @param {Object} payload - 등록 데이터
+ * @returns {Promise<Object>} 등록 결과
  */
 export const createEvent = async (payload) => {
     try {
@@ -54,7 +85,7 @@ export const createEvent = async (payload) => {
 
 /**
  * ✏️ 이벤트 수정
- * @param {Number} eventId - 수정할 이벤트 ID
+ * @param {number} eventId
  * @param {Object} payload - 수정 데이터
  * @returns {Promise<Object>}
  */
@@ -70,7 +101,7 @@ export const updateEvent = async (eventId, payload) => {
 
 /**
  * ❌ 이벤트 삭제
- * @param {Number} eventId - 삭제 대상 ID
+ * @param {number} eventId
  * @returns {Promise<Object>}
  */
 export const deleteEvent = async (eventId) => {

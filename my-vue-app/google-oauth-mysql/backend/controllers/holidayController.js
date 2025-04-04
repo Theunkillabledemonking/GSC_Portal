@@ -1,86 +1,21 @@
-const axios = require('axios');
-const pool = require('../config/db');
-const dayjs = require('dayjs');
-const { KOREA_HOLIDAY_KEY, KOREA_HOLIDAY_API_URL } = process.env;
+// controllers/holidayController.js
+const { getPublicHolidaysInRangeWithFallback } = require('../services/holidayService');
 
 /**
- * ✅ DB에서 범위 기반 공휴일 조회
+ * 📅 Express 핸들러로 사용 가능한 공휴일 컨트롤러
  */
-async function getPublicHolidaysInRange(startDate, endDate) {
-    const [rows] = await pool.query(`
-        SELECT date FROM holidays
-        WHERE date BETWEEN ? AND ? AND isHoliday = 1
-    `, [startDate, endDate]);
-    return rows.map(row => row.date);
-}
+exports.getPublicHolidays = async (req, res) => {
+    const { start, end } = req.query;
 
-/**
- * ✅ 외부 API 호출 (월별) + DB 저장
- */
-async function fetchAndCacheMonthlyHolidays(year, month) {
-    const formattedMonth = month.toString().padStart(2, '0');
-
-    const [cached] = await pool.query(`
-        SELECT * FROM holidays WHERE DATE_FORMAT(date, '%Y-%m') = ?
-    `, [`${year}-${formattedMonth}`]);
-
-    if (cached.length > 0) return cached;
+    if (!start || !end) {
+        return res.status(400).json({ message: "start 와 end 날짜는 필수입니다" });
+    }
 
     try {
-        const response = await axios.get(KOREA_HOLIDAY_API_URL, {
-            params: {
-                ServiceKey: KOREA_HOLIDAY_KEY,
-                solYear: year,
-                solMonth: formattedMonth,
-                _type: 'json'
-            }
-        });
-
-        const items = response.data.response.body.items?.item || [];
-
-        const holidays = items.map(h => ({
-            date: h.locdate.toString().replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3"),
-            name: h.dateName,
-            isHoliday: h.isHoliday === 'Y'
-        }));
-
-        for (const h of holidays) {
-            await pool.query(`
-                INSERT IGNORE INTO holidays (date, name, isHoliday)
-                VALUES (?, ?, ?)
-            `, [h.date, h.name, h.isHoliday]);
-        }
-
-        return holidays;
+        const holidays = await getPublicHolidaysInRangeWithFallback(start, end);
+        res.status(200).json({ holidays });
     } catch (err) {
-        console.error(`❌ 공휴일 API 호출 실패: ${year}-${formattedMonth}`, err.message);
-        return []; // 실패했어도 일단 계속 진행
+        console.error("❌ 공휴일 조회 실패:", err.message);
+        res.status(500).json({ message: "공휴일 조회 중 서버 오류 발생" });
     }
-}
-
-/**
- * ✅ fallback 포함 범위 공휴일 조회
- */
-async function getPublicHolidaysInRangeWithFallback(startDate, endDate) {
-    let holidays = await getPublicHolidaysInRange(startDate, endDate);
-    if (holidays.length > 0) return holidays;
-
-    const start = dayjs(startDate);
-    const end = dayjs(endDate);
-    const seen = new Set();
-
-    for (let d = start; d.isSame(end) || d.isBefore(end); d = d.add(1, 'day')) {
-        const key = `${d.year()}-${d.month() + 1}`;
-        if (!seen.has(key)) {
-            await fetchAndCacheMonthlyHolidays(d.year(), d.month() + 1);
-            seen.add(key);
-        }
-    }
-
-    holidays = await getPublicHolidaysInRange(startDate, endDate);
-    return holidays;
-}
-
-module.exports = {
-    getPublicHolidaysInRangeWithFallback
 };

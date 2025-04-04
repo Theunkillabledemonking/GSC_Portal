@@ -4,14 +4,17 @@
       <thead>
       <tr>
         <th class="time-col">교시</th>
-        <th v-for="day in days" :key="day">{{ day }}</th>
+        <th v-for="day in DAYS" :key="day">
+          {{ day }}<br />
+          {{ formatDateForDay(day) }}
+        </th>
       </tr>
       </thead>
       <tbody>
-      <tr v-for="period in periods" :key="period">
+      <tr v-for="period in PERIODS" :key="period">
         <td class="time-col">{{ period }}교시</td>
         <td
-            v-for="day in days"
+            v-for="day in DAYS"
             :key="day"
             class="timetable-cell"
         >
@@ -19,111 +22,151 @@
               :day="day"
               :period="period"
               :items="getItemsForCell(day, period)"
+              @open-detail="({ items, el }) => showDetail(items, el)"
+              @close-detail="hideDetail"
           />
         </td>
       </tr>
       </tbody>
     </table>
+    <TimetableDetailModal
+        v-if="showModal"
+        :items="hoverItems"
+        :targetEl="hoverTarget"
+        :visible="showModal"
+        @close="hideDetail"
+    />
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import dayjs from 'dayjs'
-import TimetableCell from './TimetableCell.vue'
-
-// 📦 dayjs 확장 플러그인: 날짜 비교용
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter'
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore'
+import TimetableCell from './TimetableCell.vue'
+import TimetableDetailModal from './TimetableDetailModal.vue'
+
+
 dayjs.extend(isSameOrAfter)
 dayjs.extend(isSameOrBefore)
 
-// ✅ props 정의: 상위에서 주입되는 정보
+const showModal = ref(false)
+const hoverItems = ref([])
+const hoverTarget = ref(null)
+
+function showDetail(items, el) {
+  hoverItems.value = items
+  hoverTarget.value = el
+  showModal.value = true
+}
+
+function hideDetail() {
+  showModal.value = false
+}
+
+// ✅ Props 정의 + 타입 안정성
 const props = defineProps({
-  year: Number,
-  level: String,
-  start: String, // YYYY-MM-DD
-  end: String,   // YYYY-MM-DD
-  timetables: Array // 정규 + 이벤트 + 특강 + 공휴일 통합 데이터
+  year: { type: Number, required: true },
+  level: { type: String, required: true },
+  start: { type: String, required: true }, // YYYY-MM-DD
+  end: { type: String, required: true },
+  timetables: { type: Array, default: () => [] }
 })
 
-// ✅ 렌더링 대상 요일 / 교시
-const days = ['월', '화', '수', '목', '금']
-const periods = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+// ✅ 상수
+const DAYS = ['월', '화', '수', '목', '금']
+const DAY_INDEX_MAP = { 월: 0, 화: 1, 수: 2, 목: 3, 금: 4 }
+const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+const EVENT_PRIORITY = {
+  holiday: 0,
+  cancel: 1,
+  makeup: 2,
+  special: 3,
+  event: 4,
+  regular: 5
+}
 
-// ⏰ 날짜 계산
+// ✅ 날짜 파싱
 const startDate = computed(() => dayjs(props.start))
 const endDate = computed(() => dayjs(props.end))
 
-/**
- * ✅ 날짜, 학년, 레벨 조건에 맞는 timetable 필터링
- */
-const combinedItems = computed(() =>
-    props.timetables.filter(item => {
-      const rawDate = item.event_date || item.date
-      if (!rawDate) return false
+function formatDateForDay(dayName) {
+  const idx = DAY_INDEX_MAP[dayName]
+  return startDate.value.add(idx, 'day').format('MM/DD')
+}
 
-      const date = dayjs(rawDate)
-      if (!date.isValid()) return false
+// ✅ 날짜 필터 유틸
+function useDateInRange(dateStr) {
+  const d = dayjs(dateStr)
+  return d.isValid() &&
+      d.isSameOrAfter(startDate.value, 'day') &&
+      d.isSameOrBefore(endDate.value, 'day')
+}
 
-      const levelMatches = item.level === props.level || item.level === null
-      const yearMatches = item.event_type === 'special' ? true : item.year === props.year
-      console.log('📦 렌더링 직전 필터링된 timetable:', combinedItems.value)
+// ✅ 정렬 및 필터된 timetable 데이터
+const combinedItems = computed(() => {
+  return props.timetables
+      .filter(item => {
+        const isValidDate = item.date && useDateInRange(item.date)
+        if (!isValidDate) return false
 
-      return (
-          yearMatches &&
-          levelMatches &&
-          date.isSameOrAfter(startDate.value) &&
-          date.isSameOrBefore(endDate.value)
-      )
-    })
-)
+        const isSpecial = item.is_special_lecture === 1
+        const levelMatch = item.level === props.level || item.level == null
+        const gradeMatch = Number(item.year) === Number(props.year)
 
-/**
- * ✅ 셀별 렌더링 아이템 추출
- * - 요일 & 교시 포함
- * - 우선순위 정렬 포함
- */
-function getItemsForCell(day, period) {
-  return combinedItems.value
-      .filter(item =>
-          item.day === day &&
-          +period >= +item.start_period &&
-          +period <= +item.end_period
-      )
-      .sort((a, b) => {
-        const typeA = a.event_type || 'regular'
-        const typeB = b.event_type || 'regular'
-        const priority = {
-          holiday: 0,
-          cancel: 1,
-          makeup: 2,
-          special: 3,
-          event: 4,
-          regular: 5
+        switch (item.event_type) {
+          case 'regular': return !isSpecial && gradeMatch && !item.isCancelled
+          case 'special': return isSpecial && levelMatch
+          case 'makeup': return levelMatch || gradeMatch
+          case 'cancel': return true
+          case 'event': return true
+          case 'holiday': return true
+          default: return false
         }
-        return priority[typeA] - priority[typeB]
-        console.log(`🧩 ${day} / ${period}교시 결과:`, result)
       })
+      .sort((a, b) => EVENT_PRIORITY[a.event_type] - EVENT_PRIORITY[b.event_type])
+})
+
+// ✅ 셀 필터링 로직
+function getItemsForCell(day, period) {
+  const filtered = combinedItems.value.filter(item =>
+      item.day === day &&
+      period >= item.start_period &&
+      period <= item.end_period
+  )
+
+  const cancelIds = new Set(
+      filtered
+          .filter(i => i.event_type === 'cancel' && i.timetable_id)
+          .map(i => Number(i.timetable_id))
+  )
+
+  return filtered.filter(item => {
+    if (item.event_type === 'cancel') return true
+    if (item.event_type === 'regular' && cancelIds.has(Number(item.id))) return false
+    return true
+  })
 }
 </script>
 
 <style scoped>
 .weekly-timetable {
+  position: relative; /* 추가 */
   background: white;
   border-radius: 12px;
   overflow-x: auto;
   padding: 1rem;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
 }
-
 .timetable {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
 }
 
-th, td {
+th,
+td {
   border: 1px solid #e5e7eb;
   padding: 8px;
   text-align: center;
@@ -134,5 +177,9 @@ th, td {
   width: 60px;
   font-weight: bold;
   background: #f9fafb;
+}
+
+.timetable-cell {
+  position: relative;
 }
 </style>

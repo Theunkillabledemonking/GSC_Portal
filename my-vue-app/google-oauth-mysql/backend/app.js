@@ -11,6 +11,8 @@ const fs = require('fs');
 const cookieParser= require("cookie-parser");
 require('dotenv').config(); // ✅ 환경 변수 로드
 
+// ✅ 유틸 함수 - 공휴일 캐싱용
+const { fetchAndCacheMonthlyHolidays } = require('./services/holidayService');
 // =======================
 // ✅ 라우터 불러오기
 // =======================
@@ -23,7 +25,6 @@ const calendarRoutes = require('./routes/calendarRoutes');
 const timetableRoutes = require('./routes/timetableRoutes');
 const eventRoutes = require('./routes/eventRoutes'); // 이벤트 (보강/휴강/특강)
 const holidayRoutes = require('./routes/holidayRoutes');
-const { fetchAndCacheMonthlyHolidays } = require('./controllers/holidayController');
 
 
 
@@ -41,6 +42,10 @@ app.use(cors({ origin: process.env.VITE_FRONTEND_URL, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+    extensions: ['png', 'jpg', 'jpeg', 'pdf']
+}));
+
 // =======================
 // ✅ 라우터 등록
 // =======================
@@ -49,30 +54,38 @@ app.use('/api/user', userRoutes);       // ✅ 사용자 라우트 (사용자 �
 app.use('/api/admin', adminRoutes);     // ✅ 관리자 라우트 (승인 및 권한 관리)
 app.use('/api/notices', noticeRoutes);  // ✅ 공지사항 라우트
 app.use('/api/subjects', subjectRoutes);
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
-    extensions: ['png', 'jpg', 'jpeg', 'pdf']
-}));
 app.use('/api/calendar', calendarRoutes); // 구글 캘린더 라우트
 app.use('/api/timetables', timetableRoutes) // ✅ 정규 시간표 관리
 app.use('/api/events', eventRoutes); // ✅ 이벤트 관리 (보강/휴강/특강)
 app.use('/api/holidays', holidayRoutes);
 
+
+// =======================
+// ✅ 로깅 설정 (access.log 저장)
+// =======================
 const accessLogStream = fs.createWriteStream(
     path.join(__dirname, 'logs', 'access.log'),
-    { flags: 'a' } // append 모드
+    { flags: 'a' }
 );
-
-(async () => {
-    const year = new Date().getFullYear();
-    for (let m = 1; m <= 12; m++) {
-        await fetchAndCacheMonthlyHolidays(year, m);
-    }
-})();
-
 app.use(morgan('combined', { stream: accessLogStream }));
 
 // =======================
-// ✅ 에러 핸들러 (Global Error Handler)
+// 🚀 앱 시작 시 공휴일 캐시 미리 저장
+// =======================
+(async () => {
+    try {
+        const year = new Date().getFullYear();
+        for (let m = 1; m <= 12; m++) {
+            await fetchAndCacheMonthlyHolidays(year, m);
+        }
+        console.log("✅ 공휴일 캐시 완료");
+    } catch (err) {
+        console.error("❌ 공휴일 캐시 실패:", err.message);
+    }
+})();
+
+// =======================
+// ✅ 글로벌 에러 핸들러
 // =======================
 app.use((err, req, res, next) => {
     console.error(err.stack);
@@ -81,8 +94,7 @@ app.use((err, req, res, next) => {
     });
 });
 
-
 // =======================
-// ✅ 앱 객체 내보내기
+// ✅ 앱 내보내기 (server.js에서 사용)
 // =======================
 module.exports = app;
