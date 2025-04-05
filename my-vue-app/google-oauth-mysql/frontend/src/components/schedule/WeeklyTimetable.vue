@@ -40,13 +40,12 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter'
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore'
 import TimetableCell from './TimetableCell.vue'
 import TimetableDetailModal from './TimetableDetailModal.vue'
-
 
 dayjs.extend(isSameOrAfter)
 dayjs.extend(isSameOrBefore)
@@ -67,12 +66,15 @@ function hideDetail() {
 
 // ✅ Props 정의 + 타입 안정성
 const props = defineProps({
-  year: { type: Number, required: true },
+  year: { type: Number, required: true },       // 👉 연도
+  grade: { type: Number, required: true },      // 👉 학년 (정규 timetable용)
   level: { type: String, required: true },
-  start: { type: String, required: true }, // YYYY-MM-DD
+  groupLevel: { type: String, default: '' },
+  start: { type: String, required: true },
   end: { type: String, required: true },
   timetables: { type: Array, default: () => [] }
 })
+
 
 // ✅ 상수
 const DAYS = ['월', '화', '수', '목', '금']
@@ -91,20 +93,24 @@ const EVENT_PRIORITY = {
 const startDate = computed(() => dayjs(props.start))
 const endDate = computed(() => dayjs(props.end))
 
+const mondayStart = computed(() =>
+    startDate.value.startOf('week').add(1, 'day') // dayjs는 일요일이 week 시작이라 +1 필요
+)
+
 function formatDateForDay(dayName) {
   const idx = DAY_INDEX_MAP[dayName]
-  return startDate.value.add(idx, 'day').format('MM/DD')
+  return mondayStart.value.add(idx, 'day').format('MM/DD')
 }
-
 // ✅ 날짜 필터 유틸
 function useDateInRange(dateStr) {
+
   const d = dayjs(dateStr)
   return d.isValid() &&
       d.isSameOrAfter(startDate.value, 'day') &&
       d.isSameOrBefore(endDate.value, 'day')
 }
 
-// ✅ 정렬 및 필터된 timetable 데이터
+// ✅ 정렬 + 분반 필터 포함 필터링
 const combinedItems = computed(() => {
   return props.timetables
       .filter(item => {
@@ -112,23 +118,57 @@ const combinedItems = computed(() => {
         if (!isValidDate) return false
 
         const isSpecial = item.is_special_lecture === 1
-        const levelMatch = item.level === props.level || item.level == null
-        const gradeMatch = Number(item.year) === Number(props.year)
 
+        const levelMatch =
+            !props.level || item.level === props.level || item.level == null
+
+        const gradeMatch =
+            !isSpecial && (item.year == null || Number(item.year) === Number(props.grade))
+
+        let groupLevelMatch = true
+        if (item.group_levels) {
+          try {
+            const groupLevels = JSON.parse(item.group_levels)
+            groupLevelMatch = props.groupLevel === '' || groupLevels.includes(props.groupLevel)
+          } catch (e) {
+            console.warn('❌ group_levels JSON 파싱 오류:', item.group_levels)
+            groupLevelMatch = false
+          }
+        }
+
+        // 📦 필터 조건
         switch (item.event_type) {
-          case 'regular': return !isSpecial && gradeMatch && !item.isCancelled
-          case 'special': return isSpecial && levelMatch
-          case 'makeup': return levelMatch || gradeMatch
-          case 'cancel': return true
-          case 'event': return true
-          case 'holiday': return true
-          default: return false
+          case 'regular':
+            return !isSpecial && gradeMatch && !item.isCancelled
+          case 'special':
+            return isSpecial && levelMatch && groupLevelMatch
+          case 'makeup':
+            return (levelMatch || gradeMatch) && groupLevelMatch
+          case 'cancel':
+          case 'event':
+          case 'holiday':
+            return true
+          default:
+            return false
         }
       })
       .sort((a, b) => EVENT_PRIORITY[a.event_type] - EVENT_PRIORITY[b.event_type])
 })
 
-// ✅ 셀 필터링 로직
+
+
+
+watch(combinedItems, (val) => {
+  console.log("🔍 [combinedItems]", val)
+  const regulars = val.filter(i => i.event_type === 'regular')
+  console.log("🟩 정규수업 갯수:", regulars.length)
+
+  for (const r of regulars) {
+    console.log(`🧪 정규수업: ${r.subject_name} - ${r.year}학년`)
+  }
+}, { immediate: true })
+
+// ✅ 셀에 들어갈 데이터만 필터링
 function getItemsForCell(day, period) {
   const filtered = combinedItems.value.filter(item =>
       item.day === day &&
@@ -142,12 +182,20 @@ function getItemsForCell(day, period) {
           .map(i => Number(i.timetable_id))
   )
 
-  return filtered.filter(item => {
+  const final = filtered.filter(item => {
     if (item.event_type === 'cancel') return true
     if (item.event_type === 'regular' && cancelIds.has(Number(item.id))) return false
     return true
   })
+
+  // ✅ 로그 추가
+  if (final.length > 0) {
+    console.log(`📦 [${day} ${period}교시]`, final)
+  }
+
+  return final
 }
+
 </script>
 
 <style scoped>
@@ -155,6 +203,7 @@ function getItemsForCell(day, period) {
   position: relative; /* 추가 */
   background: white;
   border-radius: 12px;
+  overflow: visible;
   overflow-x: auto;
   padding: 1rem;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
