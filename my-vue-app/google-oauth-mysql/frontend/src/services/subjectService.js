@@ -1,107 +1,87 @@
 import apiClient from "@/services/apiClient";
 
-/**
- * 🔍 전체 과목 조회 (관리자용)
- */
-export const getAllSubjects = async () => {
+// ✅ 응답 구조 안전 처리 함수
+const handleResponse = async (promise, fallback = {}) => {
     try {
-        const res = await apiClient.get("/subjects");
+        const res = await promise;
         return res.data;
     } catch (err) {
-        console.error("❌ 전체 과목 조회 실패", err);
-        return { subjects: [] };
+        console.error("❌ API 요청 실패:", err);
+        return fallback;
     }
 };
 
-/**
- * 🔍 학년 기준 과목 조회
- * @param {number} year
- */
-export const getSubjectsByYear = async (year) => {
-    try {
-        const res = await apiClient.get(`/subjects/year/${year}`);
-        return res.data;
-    } catch (err) {
-        console.error("❌ 학년별 과목 조회 실패", err);
-        return { subjects: [] };
-    }
+// 🔍 전체 과목 조회 (관리자용)
+export const getAllSubjects = () =>
+    handleResponse(apiClient.get("/subjects"), { subjects: [] });
+
+// 🔍 학년 기준 정규 과목 조회
+export const getSubjectsByYear = (year) => {
+    if (!year) return Promise.resolve({ subjects: [] });
+    return handleResponse(apiClient.get(`/subjects/year/${year}`), { subjects: [] });
 };
 
-/**
- * 🔍 레벨 기준 과목 조회
- * @param {string} level
- */
-export const getSubjectsByLevel = async (level) => {
-    try {
-        const res = await apiClient.get('/subjects/level', { params: { level } });
-        return res.data;
-    } catch (err) {
-        console.error("❌ 레벨 기준 과목 조회 실패", err);
-        return { subjects: [] };
-    }
+// 🔍 레벨 기준 과목 조회
+export const getSubjectsByLevel = (level) => {
+    if (!level) return Promise.resolve({ subjects: [] });
+    return handleResponse(apiClient.get("/subjects/level", { params: { level } }), { subjects: [] });
 };
 
-/**
- * 🔍 학기 기준 과목 조회
- * @param {object} options - { year, semester }
- */
-export const getSubjectsBySemester = async ({ year, semester }) => {
-    try {
-        const res = await apiClient.get('/subjects/by-semester', {
-            params: { year, semester }
-        });
-        return res.data;
-    } catch (err) {
-        console.error("❌ 학기별 과목 조회 실패", err);
-        return { subjects: [] };
-    }
+// 🔍 학기 기준 정규 과목 조회
+export const getSubjectsBySemester = ({ year, semester }) => {
+    if (!year || !semester) return Promise.resolve({ subjects: [] });
+    return handleResponse(apiClient.get("/subjects/by-semester", { params: { year, semester } }), { subjects: [] });
 };
 
-/**
- * 🔍 특강 과목 조회
- */
-export const getSpecialLectures = async () => {
-    try {
-        const res = await apiClient.get("/subjects/special");
-        return res.data;
-    } catch (err) {
-        console.error("❌ 특강 과목 조회 실패", err);
-        return { specialLectures: [] };
-    }
+// 🔍 특강 과목 조회 (레벨, 분반 기반)
+export const getSpecialLectures = ({ level, group_level } = {}) => {
+    const params = {};
+    if (level) params.level = level;
+    if (group_level) params.group_level = group_level;
+    console.log('📡 [fetchSpecialLectures]', params)
+    return handleResponse(apiClient.get("/subjects/special", { params }), { specialLectures: [] });
 };
 
-/**
- * ➕ 과목 등록
- */
+// 🔍 이벤트 등록용 과목 조회
+export const getSubjectsForEvent = async ({ year, level, group_level }) => {
+    // 파라미터를 함께 전달 (year, level, group_level)
+    const params = {};
+    if (year) params.year = year;
+    if (level) params.level = level;
+    if (group_level) params.group_level = group_level;
+
+    return handleResponse(
+        apiClient.get("/subjects/event", { params }),
+        { subjects: [] }
+    );
+};
+
+// ➕ 과목 등록
 export const createSubject = async (subjectData) => {
     try {
         await apiClient.post("/subjects", subjectData);
     } catch (err) {
-        console.error("❌ 과목 등록 실패", err);
+        console.error("❌ 과목 등록 실패:", err);
         throw err;
     }
 };
 
-/**
- * ✏️ 과목 수정
- */
+// ✏️ 과목 수정
 export const updateSubject = async (subject) => {
     try {
         await apiClient.put(`/subjects/${subject.id}`, subject);
     } catch (err) {
-        console.error("❌ 과목 수정 실패", err);
+        console.error("❌ 과목 수정 실패:", err);
         throw err;
     }
 };
 
-/**
- * ❌ 과목 삭제
- */
+// ❌ 과목 삭제
 export const deleteSubject = async (id) => {
     try {
         await apiClient.delete(`/subjects/${id}`);
     } catch (err) {
-        console.error("❌ 과목 삭제 실패", err);
+        console.error("❌ 과목 삭제 실패:", err);
         throw err;
     }
 };
