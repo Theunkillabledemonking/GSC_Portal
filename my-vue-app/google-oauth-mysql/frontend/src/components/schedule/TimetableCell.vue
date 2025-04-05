@@ -1,27 +1,29 @@
 <template>
   <div class="cell" @click="handleClick">
-    <!-- 📌 수업 없음 -->
+    <!-- 🔹 수업 없음 -->
     <div v-if="items.length === 0" class="empty-cell"></div>
 
-    <!-- ✅ 단일 수업일 경우 그대로 렌더링 -->
+    <!-- 🔸 단일 수업 -->
     <div
-        v-else-if="items.length === 1"
+        v-else-if="items.length === 1 && items[0]"
         :class="['item-box', getClass(items[0])]"
+        :title="getTooltip(items[0])"
     >
       <p class="subject">{{ getSubjectTitle(items[0]) }}</p>
-      <p v-show="items[0].professor_name" class="professor">{{ items[0].professor_name }}</p>
-      <p v-show="items[0].room" class="room">{{ items[0].room }}</p>
+      <p v-if="items[0].professor_name" class="professor">{{ items[0].professor_name }}</p>
+      <p v-if="items[0].room" class="room">{{ items[0].room }}</p>
       <span v-if="getEventLabel(items[0])" class="tag">
         {{ getEventLabel(items[0]) }}
       </span>
     </div>
 
-    <!-- 📦 여러 수업이 겹치는 경우: 요약 + 클릭가능 -->
+    <!-- 🔸 다중 수업 -->
     <div
         v-else
         class="summary-box"
         @mouseenter="e => emit('open-detail', { items: props.items, el: e.currentTarget })"
         @mouseleave="emit('close-detail')"
+        :title="summaryTooltip"
     >
       <strong>📚 {{ items.length }}개 수업</strong>
       <p class="summary-text">{{ summaryLabel }}</p>
@@ -33,18 +35,16 @@
 import { computed } from 'vue'
 
 const props = defineProps({
-  day: String,
-  period: Number,
-  items: Array
+  day: String,       // ex: '2025-04-03'
+  period: Number,    // 교시
+  items: Array       // 이 칸의 수업 목록
 })
 
-const emit = defineEmits(['open-detail']) // 상세 모달 트리거
+const emit = defineEmits(['open-detail', 'close-detail']) // 상세 팝업 제어
 
-const getItemKey = (item) =>
-    item.id || `${item.subject_id || 'x'}-${item.date}-${item.event_type || 'regular'}-${Math.random()}`
-
-// ✅ 제목 가공
+// 🎓 수업 제목 가공
 const getSubjectTitle = (item) => {
+  if (!item) return ''
   if (item.event_type === 'holiday') return '📅 공휴일'
   if (item.event_type === 'cancel') return `❌ ${item.subject_name || '휴강'}`
   if (item.event_type === 'makeup') return `🔁 보강 - ${item.subject_name}`
@@ -53,7 +53,7 @@ const getSubjectTitle = (item) => {
   return item.subject_name || '수업'
 }
 
-// ✅ 오른쪽 태그
+// 🔖 오른쪽 라벨 텍스트
 const getEventLabel = (item) => {
   const map = {
     holiday: '공휴일',
@@ -65,27 +65,28 @@ const getEventLabel = (item) => {
   return map[item.event_type] || ''
 }
 
-// ✅ 색상 class
+// 🎨 타입별 색상 클래스
 const getClass = (item) => `tt-${item.event_type || 'regular'}`
 
-// ✅ Tooltip 단일 수업용
+// 📝 Tooltip 내용
 const getTooltip = (item) => {
+  if (!item) return ''
   const lines = []
   if (item.subject_name) lines.push(`과목: ${item.subject_name}`)
   if (item.professor_name) lines.push(`교수: ${item.professor_name}`)
   if (item.room) lines.push(`강의실: ${item.room}`)
-  if (item.description) lines.push(`메모: ${item.description}`)
+  if (item.description) lines.push(`비고: ${item.description}`)
   if (item.start_time && item.end_time) {
     lines.push(`시간: ${item.start_time} ~ ${item.end_time}`)
   }
   return lines.join('\n')
 }
 
-// ✅ 수업 갯수 요약 텍스트 (다중 수업용)
+// 📌 다중 수업 요약 텍스트
 const summaryLabel = computed(() => {
   const counts = { regular: 0, special: 0, cancel: 0, event: 0, makeup: 0, holiday: 0 }
   for (const item of props.items) {
-    const type = item.event_type || 'regular'
+    const type = item?.event_type || 'regular'
     counts[type]++
   }
 
@@ -104,15 +105,15 @@ const summaryLabel = computed(() => {
       .join(' · ')
 })
 
-// ✅ 전체 툴팁 (요약 뷰용)
+// 🧠 전체 Tooltip (다중용)
 const summaryTooltip = computed(() =>
     props.items.map(item => getTooltip(item)).join('\n---\n')
 )
 
-// ✅ 클릭 핸들링
+// 👉 클릭 시 상세 open emit
 function handleClick() {
   if (props.items.length > 1) {
-    emit('open-detail', props.items)
+    emit('open-detail', { items: props.items })
   }
 }
 </script>
@@ -124,12 +125,11 @@ function handleClick() {
   gap: 4px;
   cursor: pointer;
 }
-
 .empty-cell {
   height: 28px;
 }
 
-/* 단일 수업 스타일 */
+/* 단일 수업 박스 */
 .item-box {
   padding: 6px;
   border-radius: 6px;
@@ -143,7 +143,7 @@ function handleClick() {
   transform: scale(1.02);
 }
 
-/* 요약형 스타일 */
+/* 다중 수업 요약 */
 .summary-box {
   padding: 6px;
   border-radius: 6px;
@@ -157,7 +157,7 @@ function handleClick() {
   color: #666;
 }
 
-/* 🎨 타입별 색상 */
+/* 색상 타입별 */
 .tt-cancel   { background: #fee2e2; color: #991b1b; }
 .tt-makeup   { background: #d1fae5; color: #065f46; }
 .tt-special  { background: #fef3c7; color: #92400e; }
@@ -168,13 +168,9 @@ function handleClick() {
 .subject {
   font-weight: bold;
 }
-.professor {
+.professor, .room {
   font-size: 0.7rem;
   color: #555;
-}
-.room {
-  font-size: 0.7rem;
-  color: #666;
 }
 .tag {
   position: absolute;
