@@ -1,13 +1,16 @@
 // utils/level.js
-export const normalizeLevel = (rawLevel) => {
+export const normalizeLevel = raw => {
+    if (!raw) return '';
+
+    const clean = String(raw).trim().toUpperCase();
+
     const map = {
-        '1': 'N1',
-        '2': 'N2',
-        '3': 'N3',
-        '4': 'TOPIK4',
-        '5': 'TOPIK6'
+        '1': 'N1', 'N1': 'N1',
+        '2': 'N2', 'N2': 'N2',
+        '3': 'N3', 'N3': 'N3',
+        '4': 'TOPIK4', 'TOPIK4': 'TOPIK4',
+        '5': 'TOPIK6', 'TOPIK6': 'TOPIK6'
     };
 
-    // 이미 문자열로 되어있을 수도 있음
-    return map[rawLevel] || rawLevel?.toUpperCase();
+    return map[clean] || clean;
 };

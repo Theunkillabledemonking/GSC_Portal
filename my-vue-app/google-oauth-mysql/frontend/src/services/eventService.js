@@ -76,6 +76,7 @@ export const fetchEvents = async ({
 export const createEvent = async (payload) => {
     try {
         const res = await apiClient.post("/events", payload);
+        console.log("📡 이벤트 등록 데이터:", payload);
         return res.data;
     } catch (err) {
         console.error("❌ 이벤트 등록 실패:", err);

@@ -1,20 +1,26 @@
-export function getSemesterRange(year, semester) {
-    // 🛡️ year가 4자리 숫자 아니면 자동 보정 (예: 1 → 2025)
-    if (year < 1000) {
-        const current = new Date().getFullYear()
-        year = current
-    }
+// utils/semester.js
+import dayjs from 'dayjs';
 
-    const semesterMap = {
+export function getSemesterRange(year, semester) {
+    if (year < 1000) year = new Date().getFullYear();
+
+    const map = {
         spring: ['03-01', '06-30'],
         summer: ['07-01', '08-31'],
         fall:   ['09-01', '12-31'],
-        winter: ['01-01', '02-28']
-    }
-    const [start, end] = semesterMap[semester] || semesterMap.spring
+        winter: ['01-01', '02-28'],
+        full:   ['01-01', '12-31']
+    };
+
+    const [start, end] = map[semester] || map.spring;
+
+    // 겨울 학기 마지막 날 leap‑year 보정
+    const endDate = semester === 'winter'
+        ? dayjs(`${year}-${end}`).endOf('month').format('YYYY-MM-DD')
+        : `${year}-${end}`;
 
     return {
         start_date: `${year}-${start}`,
-        end_date: `${year}-${end}`
-    }
+        end_date: endDate
+    };
 }

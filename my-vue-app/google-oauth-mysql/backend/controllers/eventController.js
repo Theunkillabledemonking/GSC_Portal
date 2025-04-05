@@ -165,6 +165,9 @@ exports.createEvent = async (req, res) => {
             description || ''
         ]);
 
+        console.log("✅ [createEvent] 요청 body:", payload);
+
+
         res.status(201).json({
             status: 'success',
             message: '이벤트 등록 완료',
