@@ -11,6 +11,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { fetchTimetables, fetchSpecialLectures } from '@/services/timetableService.js'
+import { normalizeLevel } from '@/utils/level'            // ⬅︎ 레벨 정규화용
 import BaseScheduleList from './BaseScheduleList.vue'
 
 const props = defineProps({
@@ -53,21 +54,24 @@ const columns = [
 async function loadTimetables() {
   try {
     if (props.type === 'special') {
-      if (!props.startDate || !props.endDate) {
-        console.warn('⛔ 특강 조회: 필수 값 누락', props)
-        return
-      }
+
+      if (!props.semester || !props.startDate || !props.endDate) return
+
       // 특강 조회 시 학년, 학기, 레벨, 날짜 범위를 모두 전달
-      timetables.value = await fetchSpecialLectures(
-          props.year,
-          props.semester,
-          props.level,
-          props.startDate,
-          props.endDate
-      )
+      timetables.value = await fetchSpecialLectures({
+        year: new Date().getFullYear(),
+        semester: props.semester,
+        level: normalizeLevel(props.level),
+        group_level: props.group_level || '',
+        start_date: props.startDate,
+        end_date: props.endDate
+    })
     } else {
-      if (!props.year) return
-      timetables.value = await fetchTimetables(props.year, props.semester, props.level)
+      if (!props.year || !props.semester ) return
+      timetables.value = await fetchTimetables({
+        year: props.year,
+        semester: props.semester
+      })
     }
   } catch (err) {
     console.error('❌ 시간표 불러오기 실패', err)
