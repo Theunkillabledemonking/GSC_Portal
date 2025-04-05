@@ -4,56 +4,84 @@ const pool = require('../config/db');
  * ✅ 특강(레벨별) 과목 조회 (레벨이 있는 사용자만 조회 가능)
  */
 exports.getSpecialLectures = async (req, res) => {
-    const userLevel = req.user.level;
+    const userLevel = req.query.level || req.user?.level;
+    const groupLevel = req.query.group_level || null;
 
     if (!userLevel) {
         return res.status(403).json({ message: "레벨 정보가 없습니다. 관리자에게 문의하세요." });
     }
 
     try {
-        const query = `
-            SELECT id, name, year, level
+        // group_level 조건은 groupLevel 값이 있을 때에만 추가합니다.
+        let query = `
+            SELECT id, name, year, level, group_level
             FROM subjects
-            WHERE is_special_lecture = 1 AND (level = ? OR level IS NULL)
-            ORDER BY name ASC
+            WHERE is_special_lecture = 1
+              AND (level = ? OR level IS NULL)
         `;
-        const [specialLectures] = await pool.query(query, [userLevel]);
+        const params = [userLevel];
+
+        if (groupLevel) {
+            query += ` AND (group_level = ? OR group_level IS NULL)`;
+            params.push(groupLevel);
+        }
+
+        query += ` ORDER BY name ASC`;
+
+        const [specialLectures] = await pool.query(query, params);
 
         res.status(200).json({ specialLectures });
-
     } catch (error) {
-        console.error("특강 과목 조회 실패:", error);
+        console.error("❌ 특강 과목 조회 실패:", error);
         res.status(500).json({ message: "서버 오류가 발생했습니다." });
     }
 };
+
 
 /**
  * 🔍 이벤트용 과목 통합 조회
  */
 exports.getSubjectsForEvent = async (req, res) => {
-    const { year } = req.query;
-    const level = req.user?.level;
+    // year, level, group_level을 모두 고려해
+    // "정규 과목(해당 year)" + "특강 과목(해당 level, group_level)"을 한 번에 조회
+    const { year, level, group_level } = req.query;
 
-    if (!year || !level) {
-        return res.status(400).json({ message: "year 또는 사용자 레벨이 누락되었습니다." });
+    // year나 level이 없다면 기본값 설정 또는 에러 처리
+    if (!year && !level) {
+        return res.status(400).json({ message: "year 또는 level이 필요합니다." });
     }
 
     try {
-        const [rows] = await pool.query(`
-            SELECT * FROM subjects
+        // year = 정규 과목 / level = 특강 과목
+        // group_level도 고려하려면 아래 쿼리에 추가
+        let query = `
+            SELECT *
+            FROM subjects
             WHERE
+                (is_special_lecture = 0 AND year = ?)
+                  OR
                 (
-                    (is_special_lecture = 0 AND year = ?)
-                        OR
-                    (is_special_lecture = 1 AND (level = ? OR level IS NULL))
-                    )
-            ORDER BY is_special_lecture DESC, name ASC
-        `, [year, level]);
+                  is_special_lecture = 1
+                  AND (level = ? OR level IS NULL)
+        `;
 
-        res.status(200).json({ subjects: rows });
+        const params = [year, level];
+
+        // group_level이 있으면 AND (group_level=? OR group_level IS NULL) 추가
+        if (group_level) {
+            query += ` AND (group_level = ? OR group_level IS NULL)`;
+            params.push(group_level);
+        }
+
+        query += ` )
+            ORDER BY is_special_lecture DESC, name ASC
+        `;
+
+        const [rows] = await pool.query(query, params);
+        return res.status(200).json({ subjects: rows });
     } catch (err) {
         console.error("❌ getSubjectsForEvent 오류:", err);
-        res.status(500).json({ message: "서버 오류가 발생했습니다." });
+        return res.status(500).json({ message: "서버 오류 발생" });
     }
 };
 

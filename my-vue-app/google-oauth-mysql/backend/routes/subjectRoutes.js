@@ -6,6 +6,7 @@ const {
     getSubjectsByLevel,
     getSubjectsByYear,
     getSubjectsBySemester,
+    getSubjectsForEvent,
     createSubject,
     updateSubject,
     deleteSubject
@@ -27,6 +28,8 @@ router.get("/level", getSubjectsByLevel);
 
 // ✅ 특강(레벨별) 과목 조회 (로그인 필요)
 router.get("/special", verifyToken, getSpecialLectures);
+
+router.get("/event", verifyToken, getSubjectsForEvent);
 
 // ✅ 과목 등록 (관리자 전용)
 router.post("/", verifyToken, hasRole(1), createSubject);
