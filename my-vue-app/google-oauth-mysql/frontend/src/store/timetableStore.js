@@ -48,144 +48,225 @@ function toHolidayObj(dateStr) {
 
 export const useTimetableStore = defineStore('timetable', {
     state: () => ({
-        // 🎯 현재 선택된 필터 기준
-        selectedYear: dayjs().year(),
-        selectedSemester: 'spring',
-        selectedLevel: '',
-        selectedGroupLevel: 'A',
-
-        // 📦 백엔드 데이터
-        regulars: [],        // 정규 수업 (cancel 제외)
-        cancels: [],         // 휴강 (정규 수업에서 분리)
-        makeups: [],         // 보강 이벤트
-        events: [],          // 행사(event) 타입
-        specials: [],        // 특강
-        holidays: []         // 공휴일
+        regulars: [],   // 정규 수업
+        specials: [],   // 특강
+        cancels: [],    // 휴강
+        makeups: [],    // 보강
+        events: [],     // 이벤트
+        holidays: [],   // 공휴일
+        filters: {
+            year: 1,
+            semester: 'spring',
+            level: null,
+            groupLevel: null
+        },
+        dateRange: {
+            start: dayjs().startOf('week').format('YYYY-MM-DD'),
+            end: dayjs().startOf('week').add(6, 'day').format('YYYY-MM-DD')
+        }
     }),
 
     getters: {
         /**
          * 🎯 하나의 배열로 병합 + PRIORITY 정렬
+         *   - holiday(0) > cancel(1) > makeup(2) > special(3) > event(4) > regular(5)
          */
         combinedData(state) {
-            const merged = [
-                ...state.regulars,
-                ...state.specials,
-                ...state.makeups,
-                ...state.events,
-                ...state.cancels,
-                ...state.holidays
-            ]
+            console.log('📊 Store 데이터 현황 (병합 전):', {
+                regulars: state.regulars.length,
+                cancels: state.cancels.length,
+                makeups: state.makeups.length,
+                events: state.events.length,
+                specials: state.specials.length,
+                holidays: state.holidays.length
+            });
 
-            return merged.sort((a, b) => {
-                if (a.date === b.date) return a.start_period - b.start_period
-                const pa = PRIORITY.indexOf(a.event_type)
-                const pb = PRIORITY.indexOf(b.event_type)
-                if (pa !== pb) return pa - pb
-                return a.date.localeCompare(b.date)
-            })
+            const merged = [
+                ...state.holidays.map(h => ({ ...h, priority: 0 })),
+                ...state.cancels.map(c => ({ ...c, priority: 1 })),
+                ...state.makeups.map(m => ({ ...m, priority: 2 })),
+                ...state.specials.map(s => ({ ...s, priority: 3 })),
+                ...state.events.map(e => ({ ...e, priority: 4 })),
+                ...state.regulars.map(r => ({ ...r, priority: 5 }))
+            ];
+
+            // 정렬: 같은 시간대에는 priority 순으로
+            const sorted = merged.sort((a, b) => {
+                if (a.date === b.date) {
+                    if (a.start_period === b.start_period) {
+                        return a.priority - b.priority;
+                    }
+                    return a.start_period - b.start_period;
+                }
+                return a.date ? a.date.localeCompare(b.date || '') : -1;
+            });
+
+            console.log('📊 병합 결과:', {
+                total: sorted.length,
+                byType: sorted.reduce((acc, item) => {
+                    acc[item.event_type] = (acc[item.event_type] || 0) + 1;
+                    return acc;
+                }, {})
+            });
+
+            return sorted;
         }
     },
 
     actions: {
-        // --------------------------------------------------- 필터 관리
-        getFilters() {
-            return {
-                year: this.selectedYear,
-                semester: this.selectedSemester,
-                level: normalizeLevel(this.selectedLevel),
-                group_level: this.selectedGroupLevel
+        setFilters(filters) {
+            // 필터 정규화
+            const normalizedFilters = {};
+            
+            // year는 숫자로 변환
+            if ('year' in filters) {
+                normalizedFilters.year = Number(filters.year) || 1;
+            }
+            
+            // semester는 유효한 값만 허용
+            if ('semester' in filters && ['spring', 'summer', 'fall', 'winter'].includes(filters.semester)) {
+                normalizedFilters.semester = filters.semester;
+            }
+            
+            // level과 groupLevel은 문자열이 있을 때만 설정
+            if ('level' in filters && filters.level) {
+                normalizedFilters.level = String(filters.level);
+            }
+            if ('groupLevel' in filters && filters.groupLevel) {
+                normalizedFilters.groupLevel = String(filters.groupLevel);
+            }
+
+            this.filters = { ...this.filters, ...normalizedFilters };
+            console.log('🎯 필터 업데이트:', this.filters);
+        },
+
+        setDateRange(range) {
+            // 날짜 정규화
+            const start = range.start ? dayjs(range.start).format('YYYY-MM-DD') : null;
+            const end = range.end ? dayjs(range.end).format('YYYY-MM-DD') : null;
+
+            if (start && end) {
+                this.dateRange = { start, end };
+                console.log('📅 날짜 범위 업데이트:', this.dateRange);
+            } else {
+                console.warn('❌ Invalid date range:', range);
             }
         },
 
-        setFilters({ year, semester, level, group_level }) {
-            if (year) this.selectedYear = year
-            if (semester) this.selectedSemester = semester
-            if (level !== undefined) this.selectedLevel = level
-            if (group_level) this.selectedGroupLevel = group_level
-        },
-
-        // --------------------------------------------------- 데이터 로딩
-        /**
-         * 📡 학기 기준 모든 데이터 로딩
-         *   - 정규 수업(type='regular') + 이벤트 + 공휴일
-         *   - 특강(전체·분반) 별도 호출 후 병합
-         */
-        async loadAllDataBySemester() {
-            const { year, semester, level, group_level } = this.getFilters()
-            const { start_date, end_date } = getSemesterRange(year, semester)
-
+        async loadAllDataBySemester(params = null) {
             try {
-                // 1) 정규 수업 + 이벤트 + 공휴일
-                const { timetables, events, holidays } = await fetchTimetableWithEvents({
-                    year,
-                    semester,
-                    level,
-                    group_level,
-                    start_date,
-                    end_date,
-                    type: 'regular' // 정규만 받아옴
-                })
+                // 필터 업데이트
+                if (params) {
+                    this.setFilters(params);
+                }
 
-                // 2) 특강 (전체·분반)
-                const specials = await fetchSpecialLectures({
-                    year,
-                    semester,
-                    level,
-                    group_level,
-                    start_date,
-                    end_date
-                })
+                // 모든 배열 초기화
+                this.regulars = [];
+                this.specials = [];
+                this.cancels = [];
+                this.makeups = [];
+                this.events = [];
+                this.holidays = [];
 
-                // 3) 스토어에 저장
-                this._saveRegularAndEvents(timetables, events)
-                this.specials = specials.map(t => ({ ...t, event_type: 'special' }))
-                this.holidays = holidays.map(toHolidayObj)
-            } catch (err) {
-                console.error('❌ loadAllDataBySemester failed:', err)
+                // 데이터 로드
+                const data = await fetchTimetableWithEvents({
+                    year: this.filters.year,
+                    semester: this.filters.semester,
+                    level: this.filters.level,
+                    group_level: this.filters.groupLevel,
+                    start_date: this.dateRange.start,
+                    end_date: this.dateRange.end,
+                    type: 'all'
+                });
+
+                // 정규 수업: 학년 기준으로 필터링
+                this.regulars = data.filter(item => 
+                    item.event_type === 'regular' && !item.isCancelled
+                ).map(t => ({
+                    ...t,
+                    year: t.year || this.filters.year,  // 명시적으로 year 설정
+                    level: t.level || this.filters.level
+                }));
+
+                // 휴강: 정규수업의 휴강 + 휴강 이벤트
+                this.cancels = [
+                    ...data.filter(item => item.event_type === 'regular' && item.isCancelled),
+                    ...data.filter(item => item.event_type === 'cancel')
+                ].map(t => ({
+                    ...t,
+                    event_type: 'cancel',
+                    description: t.description || '휴강',
+                    year: t.year || this.filters.year,
+                    level: t.level || this.filters.level
+                }));
+                
+                this.makeups = data.filter(item => 
+                    item.event_type === 'makeup'
+                ).map(t => ({
+                    ...t,
+                    year: t.year || this.filters.year,
+                    level: t.level || this.filters.level
+                }));
+                
+                this.specials = data.filter(item => 
+                    item.event_type === 'special'
+                ).map(t => ({
+                    ...t,
+                    year: t.year || this.filters.year,
+                    level: t.level || this.filters.level
+                }));
+                
+                this.events = data.filter(item => 
+                    item.event_type === 'event'
+                ).map(t => ({
+                    ...t,
+                    year: t.year || this.filters.year,
+                    level: t.level || this.filters.level
+                }));
+                
+                this.holidays = data.filter(item => 
+                    item.event_type === 'holiday'
+                ).map(t => ({
+                    ...t,
+                    year: t.year || this.filters.year,
+                    level: t.level || this.filters.level
+                }));
+
+                console.log('📊 데이터 로드 완료:', {
+                    filters: this.filters,
+                    dateRange: this.dateRange,
+                    total: data.length,
+                    regulars: this.regulars.length,
+                    specials: this.specials.length,
+                    cancels: this.cancels.length,
+                    makeups: this.makeups.length,
+                    events: this.events.length,
+                    holidays: this.holidays.length
+                });
+
+            } catch (error) {
+                console.error('❌ loadAllDataBySemester failed:', error);
+                throw error;
             }
         },
 
-        // --------------------------------------------------- 내부 헬퍼
-        _saveRegularAndEvents(timetables = [], events = []) {
-            // 정규 수업 / 휴강 분리
-            this.regulars = timetables.filter(t => t.event_type === 'regular')
-            this.cancels  = timetables
-                .filter(t => t.event_type === 'cancel')
-                .map(t => ({
-                    ...t,
-                    description: '휴강',
-                    event_type: 'cancel'
-                }))
-
-            // 이벤트 테이블 기반 makeups / events 분리 (cancel 은 이미 처리했으므로 제외)
-            this.makeups = events
-                .filter(e => e.event_type === 'makeup')
-                .map(e => ({
-                    ...e,
-                    day: getDayFromDate(e.event_date),
-                    date: e.event_date,
-                    event_type: 'makeup'
-                }))
-
-            this.events = events
-                .filter(e => e.event_type === 'event')
-                .map(e => ({
-                    ...e,
-                    day: getDayFromDate(e.event_date),
-                    date: e.event_date,
-                    event_type: 'event'
-                }))
-        },
-
-        // --------------------------------------------------- 상태 초기화
         resetAll() {
             this.regulars = []
-            this.cancels  = []
-            this.makeups  = []
-            this.events   = []
             this.specials = []
+            this.cancels = []
+            this.makeups = []
+            this.events = []
             this.holidays = []
+            this.filters = {
+                year: 1,
+                semester: 'spring',
+                level: null,
+                groupLevel: null
+            }
+            this.dateRange = {
+                start: dayjs().startOf('week').format('YYYY-MM-DD'),
+                end: dayjs().startOf('week').add(6, 'day').format('YYYY-MM-DD')
+            }
         }
     }
 })

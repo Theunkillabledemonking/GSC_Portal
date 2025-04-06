@@ -56,17 +56,13 @@
       <input type="date" v-model="dateRange.end"   class="date-input" />
       <button @click="moveWeek(1)">다음 ➡️</button>
     </div>
-    <div>기간: {{ startDate }} ~ {{ endDate }}</div>
+    <div>기간: {{ startDate }} ~ {{ endDate }}</div>
 
     <!-- 🗓️ 주간 그리드 -->
     <WeeklyTimetable
         :start="startDate"
         :end="endDate"
-        :timetables="timetableStore.combinedData"
-        :year="year"
-        :grade="year"
-        :level="level"
-        :groupLevel="groupLevel"
+        @showDetail="item => openEditForm(item)"
     />
 
     <!-- 📘 정규 수업 목록 -->
@@ -167,39 +163,50 @@ const isAdminOrProfessor = computed(() => authStore.role <= 2)
 const levels = ['N1','N2','N3','TOPIK4','TOPIK6']
 
 // ------------------------------------------------------------------ 필터 상태
-const year       = ref(isAdminOrProfessor.value ? 1 : authStore.year)   // 학년
-const level      = ref(isAdminOrProfessor.value ? levels[0] : authStore.level)
-const groupLevel = ref('')
+const year = computed({
+  get: () => timetableStore.filters.year,
+  set: (value) => timetableStore.setFilters({ year: value })
+})
 
-// 학기 초기값을 현재 날짜로 계산
-function currentSemester() {
-  const m = dayjs().month()+1
-  if (m>=3 && m<=6)  return 'spring'
-  if (m>=7 && m<=8)  return 'summer'
-  if (m>=9)          return 'fall'
-  return 'winter'
-}
-const semester = ref(currentSemester())
+const level = computed({
+  get: () => timetableStore.filters.level,
+  set: (value) => timetableStore.setFilters({ level: value })
+})
+
+const groupLevel = computed({
+  get: () => timetableStore.filters.groupLevel,
+  set: (value) => timetableStore.setFilters({ groupLevel: value })
+})
 
 // ------------------------------------------------------------------ 날짜 범위
-const dateRange = ref({
-  start: dayjs().startOf('week').format('YYYY-MM-DD'),
-  end:   dayjs().startOf('week').add(6,'day').format('YYYY-MM-DD')
+const dateRange = computed({
+  get: () => timetableStore.dateRange,
+  set: (value) => timetableStore.setDateRange(value)
 })
-const startDate = computed(()=>dateRange.value.start)
-const endDate   = computed(()=>dateRange.value.end)
+
+const startDate = computed(() => dateRange.value.start)
+const endDate   = computed(() => dateRange.value.end)
+
+// ------------------------------------------------------------------ 학기 관리
+const semester = computed(() => {
+  const m = dayjs(dateRange.value.start).month() + 1
+  if (m >= 3 && m <= 6) return 'spring'
+  if (m >= 7 && m <= 8) return 'summer'
+  if (m >= 9) return 'fall'
+  return 'winter'
+})
+
+const semesterLabel = computed(() => {
+  switch (semester.value) {
+    case 'spring': return '1학기'
+    case 'summer': return '여름학기'
+    case 'fall': return '2학기'
+    case 'winter': return '겨울학기'
+  }
+})
 
 // ------------------------------------------------------------------ 과목 목록
 const subjects = ref([])
-
-// 학기 라벨
-const semesterLabel = computed(()=>{
-  const m = dayjs(dateRange.value.start).month()+1
-  if (m>=3 && m<=6)  return '1학기'
-  if (m>=7 && m<=8)  return '여름학기'
-  if (m>=9)          return '2학기'
-  return '겨울학기'
-})
 
 // ------------------------------------------------------------------ 모달
 const isUnifiedModalOpen = ref(false)
@@ -208,11 +215,139 @@ const formType           = ref('regular')
 const selectedItem       = ref(null)
 const formKey            = ref(0)
 
+// ------------------------------------------------------------------ 데이터 로드
+onMounted(async () => {
+  // 초기 필터 설정
+  if (!isAdminOrProfessor.value) {
+    timetableStore.setFilters({
+      year: authStore.year,
+      level: authStore.level
+    })
+  }
 
-// 날짜 변경 → 학기 재계산
-watch(()=>dateRange.value.start, s=>{
-  semester.value = currentSemester()
+  // 초기 날짜 범위 설정
+  timetableStore.setDateRange({
+    start: startDate.value,
+    end: endDate.value
+  })
+
+  // 데이터 로드
+  await timetableStore.loadAllDataBySemester()
+  
+  // 과목 로드
+  await loadSubjects()
+
+  console.log('🎯 초기 데이터 로드 완료:', {
+    filters: timetableStore.filters,
+    dateRange: timetableStore.dateRange,
+    items: timetableStore.combinedData.length
+  })
 })
+
+// 필터 변경 감지
+watch(
+  [year, level, groupLevel, semester],
+  async ([newYear, newLevel, newGroupLevel, newSemester], [oldYear, oldLevel, oldGroupLevel, oldSemester]) => {
+    console.log('필터 변경:', {
+      year: { old: oldYear, new: newYear },
+      level: { old: oldLevel, new: newLevel },
+      groupLevel: { old: oldGroupLevel, new: newGroupLevel },
+      semester: { old: oldSemester, new: newSemester }
+    })
+
+    // 필터 업데이트
+    await timetableStore.setFilters({
+      year: newYear,
+      level: newLevel,
+      groupLevel: newGroupLevel,
+      semester: newSemester
+    })
+
+    // 데이터 리로드
+    await timetableStore.loadAllDataBySemester()
+  },
+  { deep: true }
+)
+
+// 날짜 범위 변경 감지
+watch(
+  dateRange,
+  async (newRange, oldRange) => {
+    console.log('날짜 범위 변경:', {
+      old: oldRange,
+      new: newRange
+    })
+
+    // 학기가 변경되었는지 확인
+    const oldSemester = getSemesterFromDate(oldRange?.start)
+    const newSemester = getSemesterFromDate(newRange.start)
+
+    if (oldSemester !== newSemester) {
+      console.log('학기 변경:', { old: oldSemester, new: newSemester })
+      await timetableStore.setFilters({ semester: newSemester })
+    }
+
+    // 데이터 리로드
+    await timetableStore.loadAllDataBySemester()
+  },
+  { deep: true }
+)
+
+// 주 이동
+const moveWeek = (offset) => {
+  const start = dayjs(dateRange.value.start).add(offset, 'week')
+  dateRange.value = {
+    start: start.format('YYYY-MM-DD'),
+    end: start.add(6, 'day').format('YYYY-MM-DD')
+  }
+}
+
+// 학기 판단
+function getSemesterFromDate(date) {
+  if (!date) return null
+  const m = dayjs(date).month() + 1
+  if (m >= 3 && m <= 6) return 'spring'
+  if (m >= 7 && m <= 8) return 'summer'
+  if (m >= 9 && m <= 12) return 'fall'
+  return 'winter'
+}
+
+function openForm(t='regular'){
+  formType.value = t
+  isEditMode.value = false
+  selectedItem.value = null
+  formKey.value++
+  isUnifiedModalOpen.value = true
+}
+function openEditForm(item,t='regular'){
+  formType.value = t
+  isEditMode.value = true
+  selectedItem.value = item
+  formKey.value++
+  isUnifiedModalOpen.value = true
+}
+async function handleDelete(item,t='regular'){
+  if(!confirm('정말 삭제하시겠습니까?')) return
+  const fn = t==='regular' ? deleteTimetable : deleteEvent
+  await fn(item.id)
+  await refresh()
+}
+function handleCloseForm(){
+  isUnifiedModalOpen.value=false
+  isEditMode.value=false
+  selectedItem.value=null
+}
+
+// ------------------------------------------------------------------ 스토어 리프레시
+async function refresh(){
+  await timetableStore.setFilters({
+    year: year.value,             // 학년 → 정규/휴강 필터
+    semester: semester.value,
+    level: normalizeLevel(level.value),
+    group_level: groupLevel.value
+  })
+  await timetableStore.loadAllDataBySemester()
+}
 
 // 과목 동기화
 watch([year, level, groupLevel, formType], loadSubjects, { immediate: true })
@@ -250,55 +385,6 @@ async function loadSubjects() {
     console.error('❌ 과목 불러오기 실패', e)
     subjects.value = []
   }
-}
-
-
-
-// ------------------------------------------------------------------ 스토어 리프레시
-async function refresh(){
-  await timetableStore.setFilters({
-    year: year.value,             // 학년 → 정규/휴강 필터
-    semester: semester.value,
-    level: normalizeLevel(level.value),
-    group_level: groupLevel.value
-  })
-  await timetableStore.loadAllDataBySemester()
-}
-
-onMounted(refresh)
-watch([year,level,semester,groupLevel], refresh)
-
-// ------------------------------------------------------------------ 주간 이동
-function moveWeek(dir){
-  const n = dayjs(dateRange.value.start).add(dir*7,'day')
-  dateRange.value.start = n.format('YYYY-MM-DD')
-  dateRange.value.end   = n.add(6,'day').format('YYYY-MM-DD')
-}
-
-function openForm(t='regular'){
-  formType.value = t
-  isEditMode.value = false
-  selectedItem.value = null
-  formKey.value++
-  isUnifiedModalOpen.value = true
-}
-function openEditForm(item,t='regular'){
-  formType.value = t
-  isEditMode.value = true
-  selectedItem.value = item
-  formKey.value++
-  isUnifiedModalOpen.value = true
-}
-async function handleDelete(item,t='regular'){
-  if(!confirm('정말 삭제하시겠습니까?')) return
-  const fn = t==='regular' ? deleteTimetable : deleteEvent
-  await fn(item.id)
-  await refresh()
-}
-function handleCloseForm(){
-  isUnifiedModalOpen.value=false
-  isEditMode.value=false
-  selectedItem.value=null
 }
 </script>
 

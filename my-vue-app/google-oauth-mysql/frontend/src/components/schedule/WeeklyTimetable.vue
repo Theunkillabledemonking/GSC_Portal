@@ -1,234 +1,188 @@
 <template>
-  <div class="weekly-timetable">
-    <table class="timetable">
-      <thead>
-      <tr>
-        <th class="time-col">교시</th>
-        <th v-for="day in DAYS" :key="day">
-          {{ day }}<br />
-          {{ formatDateForDay(day) }}
-        </th>
-      </tr>
-      </thead>
-      <tbody>
-      <tr v-for="period in PERIODS" :key="period">
-        <td class="time-col">{{ period }}교시</td>
-        <td
-            v-for="day in DAYS"
-            :key="day"
-            class="timetable-cell"
-        >
+  <div class="timetable-grid">
+    <!-- Header row with dates -->
+    <div class="grid-header">
+      <div class="time-header"></div>
+      <div v-for="date in weekDates" :key="date" class="date-cell">
+        {{ formatDate(date) }}
+      </div>
+    </div>
+
+    <!-- Time slots -->
+    <div class="time-slots">
+      <div v-for="period in timeSlots" :key="period" class="time-row">
+        <div class="time-label">
+          {{ period }}교시<br>
+          <small class="text-gray-500">{{ getPeriodTime(period) }}</small>
+        </div>
+        <div v-for="date in weekDates" :key="date" class="time-cell">
           <TimetableCell
-              :day="day"
-              :period="period"
-              :items="getItemsForCell(day, period)"
-              @open-detail="({ items, el }) => showDetail(items, el)"
-              @close-detail="hideDetail"
+            :items="getItemsForCell(date, period)"
+            :date="date"
+            :time="period"
+            @click="item => $emit('showDetail', item)"
           />
-        </td>
-      </tr>
-      </tbody>
-    </table>
-    <TimetableDetailModal
-        v-if="showModal"
-        :items="hoverItems"
-        :targetEl="hoverTarget"
-        :visible="showModal"
-        @close="hideDetail"
-    />
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import dayjs from 'dayjs'
-import isSameOrAfter from 'dayjs/plugin/isSameOrAfter'
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore'
+import isSameOrAfter from 'dayjs/plugin/isSameOrAfter'
+import { useTimetableStore } from '@/store/timetableStore'
 import TimetableCell from './TimetableCell.vue'
-import TimetableDetailModal from './TimetableDetailModal.vue'
 
-dayjs.extend(isSameOrAfter)
 dayjs.extend(isSameOrBefore)
+dayjs.extend(isSameOrAfter)
 
-const showModal = ref(false)
-const hoverItems = ref([])
-const hoverTarget = ref(null)
+const timetableStore = useTimetableStore()
 
-function showDetail(items, el) {
-  hoverItems.value = items
-  hoverTarget.value = el
-  showModal.value = true
-}
-
-function hideDetail() {
-  showModal.value = false
-}
-
-// ✅ Props 정의 + 타입 안정성
+// Props
 const props = defineProps({
-  year: { type: Number, required: true },       // 👉 연도
-  grade: { type: Number, required: true },      // 👉 학년 (정규 timetable용)
-  level: { type: String, required: true },
-  groupLevel: { type: String, default: '' },
   start: { type: String, required: true },
-  end: { type: String, required: true },
-  timetables: { type: Array, default: () => [] }
+  end: { type: String, required: true }
 })
 
+// Emits
+defineEmits(['showDetail'])
 
-// ✅ 상수
-const DAYS = ['월', '화', '수', '목', '금']
-const DAY_INDEX_MAP = { 월: 0, 화: 1, 수: 2, 목: 3, 금: 4 }
-const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-const EVENT_PRIORITY = {
-  holiday: 0,
-  cancel: 1,
-  makeup: 2,
-  special: 3,
-  event: 4,
-  regular: 5
+// 교시별 시간 매핑
+const PERIOD_TIMES = {
+  1: '09:00-09:50',
+  2: '10:00-10:50',
+  3: '11:00-11:50',
+  4: '12:00-12:50',
+  5: '13:00-13:50',
+  6: '14:00-14:50',
+  7: '15:00-15:50',
+  8: '16:00-16:50',
+  9: '17:00-17:50'
 }
 
-// ✅ 날짜 파싱
-const startDate = computed(() => dayjs(props.start))
-const endDate = computed(() => dayjs(props.end))
-
-const mondayStart = computed(() =>
-    startDate.value.startOf('week').add(1, 'day') // dayjs는 일요일이 week 시작이라 +1 필요
-)
-
-function formatDateForDay(dayName) {
-  const idx = DAY_INDEX_MAP[dayName]
-  return mondayStart.value.add(idx, 'day').format('MM/DD')
-}
-// ✅ 날짜 필터 유틸
-function useDateInRange(dateStr) {
-
-  const d = dayjs(dateStr)
-  return d.isValid() &&
-      d.isSameOrAfter(startDate.value, 'day') &&
-      d.isSameOrBefore(endDate.value, 'day')
-}
-
-// ✅ 정렬 + 분반 필터 포함 필터링
-const combinedItems = computed(() => {
-  return props.timetables
-      .filter(item => {
-        const isValidDate = item.date && useDateInRange(item.date)
-        if (!isValidDate) return false
-
-        const isSpecial = item.is_special_lecture === 1
-
-        const levelMatch =
-            !props.level || item.level === props.level || item.level == null
-
-        const gradeMatch =
-            !isSpecial && (item.year == null || Number(item.year) === Number(props.grade))
-
-        let groupLevelMatch = true
-        if (item.group_levels) {
-          try {
-            const groupLevels = JSON.parse(item.group_levels)
-            groupLevelMatch = props.groupLevel === '' || groupLevels.includes(props.groupLevel)
-          } catch (e) {
-            console.warn('❌ group_levels JSON 파싱 오류:', item.group_levels)
-            groupLevelMatch = false
-          }
-        }
-
-        // 📦 필터 조건
-        switch (item.event_type) {
-          case 'regular':
-            return !isSpecial && gradeMatch && !item.isCancelled
-          case 'special':
-            return isSpecial && levelMatch && groupLevelMatch
-          case 'makeup':
-            return (levelMatch || gradeMatch) && groupLevelMatch
-          case 'cancel':
-          case 'event':
-          case 'holiday':
-            return true
-          default:
-            return false
-        }
-      })
-      .sort((a, b) => EVENT_PRIORITY[a.event_type] - EVENT_PRIORITY[b.event_type])
-})
-
-
-
-
-watch(combinedItems, (val) => {
-  console.log("🔍 [combinedItems]", val)
-  const regulars = val.filter(i => i.event_type === 'regular')
-  console.log("🟩 정규수업 갯수:", regulars.length)
-
-  for (const r of regulars) {
-    console.log(`🧪 정규수업: ${r.subject_name} - ${r.year}학년`)
+// Computed
+const weekDates = computed(() => {
+  const dates = []
+  let current = dayjs(props.start)
+  const end = dayjs(props.end)
+  
+  while (current.isSameOrBefore(end)) {
+    dates.push(current.format('YYYY-MM-DD'))
+    current = current.add(1, 'day')
   }
-}, { immediate: true })
+  console.log('📅 주간 날짜 계산:', dates)
+  return dates
+})
 
-// ✅ 셀에 들어갈 데이터만 필터링
-function getItemsForCell(day, period) {
-  const filtered = combinedItems.value.filter(item =>
-      item.day === day &&
-      period >= item.start_period &&
-      period <= item.end_period
-  )
+const timeSlots = computed(() => [1, 2, 3, 4, 5, 6, 7, 8, 9])
 
-  const cancelIds = new Set(
-      filtered
-          .filter(i => i.event_type === 'cancel' && i.timetable_id)
-          .map(i => Number(i.timetable_id))
-  )
+// Methods
+const formatDate = (date) => {
+  return dayjs(date).format('M/D (ddd)')
+}
 
-  const final = filtered.filter(item => {
-    if (item.event_type === 'cancel') return true
-    if (item.event_type === 'regular' && cancelIds.has(Number(item.id))) return false
-    return true
+const getPeriodTime = (period) => {
+  return PERIOD_TIMES[period] || ''
+}
+
+const getItemsForCell = (date, period) => {
+  const dayOfWeek = dayjs(date).format('ddd').toLowerCase()
+  const items = timetableStore.combinedData
+
+  // 요일 매핑
+  const dayMap = {
+    'mon': '월',
+    'tue': '화',
+    'wed': '수',
+    'thu': '목',
+    'fri': '금',
+    'sat': '토',
+    'sun': '일'
+  }
+
+  const filtered = items.filter(item => {
+    // 시작-종료 교시 범위 체크
+    const isInPeriodRange = Number(period) >= Number(item.start_period) && 
+                           Number(period) <= Number(item.end_period)
+
+    // 날짜가 있는 항목 (특강, 휴강, 보강 등)
+    if (item.date) {
+      return dayjs(item.date).format('YYYY-MM-DD') === date && isInPeriodRange
+    }
+    
+    // 정규 수업 (요일 기반)
+    return (item.day === dayMap[dayOfWeek] || item.day?.toLowerCase() === dayOfWeek) && 
+           isInPeriodRange
   })
 
-  // ✅ 로그 추가
-  if (final.length > 0) {
-    console.log(`📦 [${day} ${period}교시]`, final)
+  if (filtered.length > 0) {
+    console.log(`📊 셀 데이터 [${date} ${period}교시]:`, filtered.map(i => ({
+      subject: i.subject_name,
+      period: `${i.start_period}-${i.end_period}교시`,
+      type: i.event_type
+    })))
   }
 
-  return final
+  return filtered
 }
 
+// Lifecycle
+onMounted(() => {
+  console.log('WeeklyTimetable mounted:', {
+    start: props.start,
+    end: props.end,
+    weekDates: weekDates.value,
+    store: {
+      filters: timetableStore.filters,
+      dateRange: timetableStore.dateRange,
+      items: timetableStore.combinedData.length
+    }
+  })
+})
+
+// Watch for date changes
+watch([() => props.start, () => props.end], ([newStart, newEnd]) => {
+  console.log('Date range changed:', { newStart, newEnd })
+  timetableStore.setDateRange({
+    start: newStart,
+    end: newEnd
+  })
+})
 </script>
 
 <style scoped>
-.weekly-timetable {
-  position: relative; /* 추가 */
-  background: white;
-  border-radius: 12px;
-  overflow: visible;
-  overflow-x: auto;
-  padding: 1rem;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-}
-.timetable {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
+.timetable-grid {
+  @apply border rounded overflow-hidden;
 }
 
-th,
-td {
-  border: 1px solid #e5e7eb;
-  padding: 8px;
-  text-align: center;
-  vertical-align: top;
+.grid-header {
+  @apply grid grid-cols-8 bg-gray-100;
 }
 
-.time-col {
-  width: 60px;
-  font-weight: bold;
-  background: #f9fafb;
+.time-header {
+  @apply p-2 text-center border-b border-r bg-gray-200;
 }
 
-.timetable-cell {
-  position: relative;
+.date-cell {
+  @apply p-2 text-center border-b border-r;
+}
+
+.time-slots {
+  @apply divide-y;
+}
+
+.time-row {
+  @apply grid grid-cols-8;
+}
+
+.time-label {
+  @apply p-2 text-center border-r bg-gray-50 text-sm;
+}
+
+.time-cell {
+  @apply p-2 border-r min-h-[100px];
 }
 </style>

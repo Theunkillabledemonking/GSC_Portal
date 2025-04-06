@@ -34,11 +34,18 @@ export const getSubjectsBySemester = ({ year, semester }) => {
 };
 
 // 🔍 특강 과목 조회 (레벨, 분반 기반)
-export const getSpecialLectures = ({ level, group_level } = {}) => {
-    const params = {};
-    if (level) params.level = level;
+export const getSpecialLectures = ({ level, group_level, semester } = {}) => {
+    if (!level || !semester) return Promise.resolve({ specialLectures: [] });
+    
+    const params = {
+        level,
+        semester,
+        start_date: new Date().toISOString().split('T')[0],  // 오늘부터
+        end_date: new Date(new Date().setMonth(new Date().getMonth() + 6)).toISOString().split('T')[0]  // 6개월 후까지
+    };
     if (group_level) params.group_level = group_level;
-    console.log('📡 [fetchSpecialLectures]', params)
+    
+    console.log('📡 [getSpecialLectures]', params);
     return handleResponse(apiClient.get("/subjects/special", { params }), { specialLectures: [] });
 };
 

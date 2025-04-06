@@ -132,14 +132,26 @@ exports.createEvent = async (req, res) => {
         let finalYear = year;
         let finalLevel = level;
         let finalSubject = subject_id;
+        let finalStartPeriod = start_period;
+        let finalEndPeriod = end_period;
+        let finalDescription = description;
 
         // 휴강이면 timetable 기준으로 자동 보완
         if (event_type === 'cancel' && timetable_id) {
-            const [[tt]] = await pool.query(`SELECT * FROM timetables WHERE id = ?`, [timetable_id]);
+            const [[tt]] = await pool.query(
+                `SELECT t.*, s.name as subject_name 
+                 FROM timetables t 
+                 LEFT JOIN subjects s ON t.subject_id = s.id 
+                 WHERE t.id = ?`, 
+                [timetable_id]
+            );
             if (tt) {
                 finalYear = tt.year;
                 finalLevel = tt.level;
                 finalSubject = tt.subject_id;
+                finalStartPeriod = tt.start_period;
+                finalEndPeriod = tt.end_period;
+                finalDescription = description || `${tt.subject_name || '미지정 과목'} 휴강`;
             }
         }
 
@@ -158,15 +170,21 @@ exports.createEvent = async (req, res) => {
             finalYear || null,
             finalLevel || null,
             toJSONStringArray(group_levels),
-            start_period || null,
-            end_period || null,
+            finalStartPeriod || null,
+            finalEndPeriod || null,
             start_time || null,
             end_time || null,
-            description || ''
+            finalDescription || ''
         ]);
 
-        console.log("✅ [createEvent] 요청 body:", payload);
-
+        console.log("✅ [createEvent] 이벤트 생성 완료:", {
+            id: result.insertId,
+            event_type,
+            timetable_id,
+            subject_id: finalSubject,
+            start_period: finalStartPeriod,
+            end_period: finalEndPeriod
+        });
 
         res.status(201).json({
             status: 'success',
