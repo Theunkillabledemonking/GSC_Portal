@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>GSC index</title>
+</head>
+<body>
+    <h1 id="welcome"></h1>
+    <script>
+        // 1. window.location.search -> URL의 ?뒤 파라미터 전체
+        // ex: index.html?username=SeonggwanKim&password=$12345678 -> "?username=kim"
+        const queryString = window.location.search;
+
+        // 2. URLSearchParams 객체를 만들어서 쿼리스트링 파싱
+        const params = new URLSearchParams(queryString);
+
+        // 3. 특정 키("username")에 해당하는 값 가져오기
+        const userName = params.get("username") || "사용자";
+
+        // document -> 지금 웹페이지 전체 문서를 의미(DOM)
+        // .getElementById("welcome") -> 문서 안에서 id="welcome"인 html 요소를 찾아서 가져옴
+        document.getElementById("welcome").textContent = `환영합니다 ${userName}`;
+        // .textContent -> 해당 요소 <h1> 안의 텍스트 내용을 바꿔주는 속성
+    </script>
+
+    <a href="./login.html">로그아웃</a>
+</body>
+</html>
