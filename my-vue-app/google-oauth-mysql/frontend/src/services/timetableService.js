@@ -90,22 +90,36 @@ export const fetchTimetableWithEvents = async ({
             // 기본 필드 정규화
             const normalized = {
                 ...item,
+                original_class: item.original_class || null,
                 year: Number(item.year || year),
                 level: item.level || level || '',
-                date: item.event_date ? dayjs(item.event_date).format('YYYY-MM-DD') : null,
+                date: item.date || item.event_date || item.event_date_local || null,
                 start_period: Number(item.start_period || 1),
                 end_period: Number(item.end_period || 1),
                 day: item.day?.toLowerCase() || null  // 요일은 소문자로 통일
             };
+
+            // ✅ original_class 수동 생성
+            const original_class = (
+                item.original_day || item.original_start_period
+            ) ? {
+                day: item.original_day || null,
+                start_period: item.original_start_period || null,
+                end_period: item.original_end_period || null,
+                year: item.original_year || null,
+                professor_name: item.original_professor || null,
+                subject_id: item.original_subject_id || null
+            } : null
 
             // 이벤트 타입별 처리
             if (item.event_type === 'cancel') {
                 return {
                     ...normalized,
                     event_type: 'cancel',
+                    original_class,
                     description: item.description || '휴강',
                     date: item.event_date ? dayjs(item.event_date).format('YYYY-MM-DD') : normalized.date
-                };
+                }
             }
 
             if (item.event_type === 'makeup') {

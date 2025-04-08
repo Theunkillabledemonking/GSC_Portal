@@ -61,7 +61,12 @@ export const fetchEvents = async ({
         };
 
         const res = await apiClient.get("/events", { params });
-        return res.data?.events || [];
+
+        // ✅ 이벤트 날짜 명시적으로 date 필드에 설정
+        return (res.data?.events || []).map(event => ({
+            ...event,
+            date: event.event_date || event.event_date_local || null
+        }));
     } catch (err) {
         console.error("❌ 이벤트 조회 실패:", err);
         return [];

@@ -19,13 +19,14 @@ import {
 
 import { getSemesterRange } from '@/utils/semester'
 import { normalizeLevel } from '@/utils/level'
+import { inferDateFromOriginalClass } from '@/utils/date'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
 
 // util ----------------------------------------------------------------------
 const DAYS_KO = ['일', '월', '화', '수', '목', '금', '토']
-const PRIORITY = ['holiday', 'event', 'makeup', 'special', 'regular']
+const PRIORITY = ['holiday', 'cancel', 'makeup', 'short_lecture', 'special', 'event', 'regular'];
 
 function getDayFromDate(dateStr) {
     const date = dayjs.utc(dateStr).tz('Asia/Seoul')
@@ -92,14 +93,21 @@ export const useTimetableStore = defineStore('timetable', {
 
             // 정렬: 같은 시간대에는 priority 순으로
             const sorted = merged.sort((a, b) => {
-                if (a.date === b.date) {
-                    if (a.start_period === b.start_period) {
-                        return a.priority - b.priority;
+                const dateA = a.date || ''
+                const dateB = b.date || ''
+                const periodA = a.start_period ?? 1
+                const periodB = b.start_period ?? 1
+                const priorityA = a.priority ?? 99
+                const priorityB = b.priority ?? 99
+
+                if (dateA === dateB) {
+                    if (periodA === periodB) {
+                        return priorityA - priorityB
                     }
-                    return a.start_period - b.start_period;
+                    return periodA - periodB
                 }
-                return a.date ? a.date.localeCompare(b.date || '') : -1;
-            });
+                return dateA.localeCompare(dateB)
+            })
 
             console.log('📊 병합 결과:', {
                 total: sorted.length,
@@ -168,6 +176,9 @@ export const useTimetableStore = defineStore('timetable', {
                 this.events = [];
                 this.holidays = [];
 
+                const semesterRange = getSemesterRange(this.filters.year, this.filters.semester)
+
+
                 // 데이터 로드
                 const data = await fetchTimetableWithEvents({
                     year: this.filters.year,
@@ -197,15 +208,18 @@ export const useTimetableStore = defineStore('timetable', {
                     event_type: 'cancel',
                     description: t.description || '휴강',
                     year: t.year || this.filters.year,
-                    level: t.level || this.filters.level
-                }));
-                
+                    level: t.level || this.filters.level,
+                    date: t.date
+                }))
+
                 this.makeups = data.filter(item => 
                     item.event_type === 'makeup'
                 ).map(t => ({
                     ...t,
                     year: t.year || this.filters.year,
-                    level: t.level || this.filters.level
+                    level: t.level || this.filters.level,
+                    date: t.date
+
                 }));
                 
                 this.specials = data.filter(item => 
@@ -213,7 +227,8 @@ export const useTimetableStore = defineStore('timetable', {
                 ).map(t => ({
                     ...t,
                     year: t.year || this.filters.year,
-                    level: t.level || this.filters.level
+                    level: t.level || this.filters.level,
+                    date: t.date
                 }));
                 
                 this.events = data.filter(item => 
@@ -231,18 +246,6 @@ export const useTimetableStore = defineStore('timetable', {
                     year: t.year || this.filters.year,
                     level: t.level || this.filters.level
                 }));
-
-                console.log('📊 데이터 로드 완료:', {
-                    filters: this.filters,
-                    dateRange: this.dateRange,
-                    total: data.length,
-                    regulars: this.regulars.length,
-                    specials: this.specials.length,
-                    cancels: this.cancels.length,
-                    makeups: this.makeups.length,
-                    events: this.events.length,
-                    holidays: this.holidays.length
-                });
 
             } catch (error) {
                 console.error('❌ loadAllDataBySemester failed:', error);
