@@ -1,6 +1,6 @@
 <template>
   <BaseScheduleList
-      :items="events"
+      :items="filteredEvents"
       :columns="columns"
       :canEdit="canEdit"
       @edit="$emit('edit', $event)"
@@ -9,6 +9,8 @@
 </template>
 
 <script setup>
+import { computed } from 'vue';
+import dayjs from 'dayjs'
 import BaseScheduleList from './BaseScheduleList.vue'
 
 // ✅ Props
@@ -31,6 +33,23 @@ const eventTypeLabel = {
   event: '행사'
 }
 
+// 이벤트 타입만 추출
+const filteredEvents = computed(() => {
+  const valid = props.events.filter(e =>
+      ['cancel', 'makeup', 'event'].includes(e.event_type)
+  )
+  console.log('✅ 필터링된 이벤트:', valid)
+  console.log('✅ 필터링된 이벤트:', filteredEvents.value)
+  return valid
+})
+
+const formatDateWithDay = (dateStr) => {
+  if (!dateStr) return '-'
+  const d = dayjs(dateStr)
+  const days = ['일', '월', '화', '수', '목', '금', '토']
+  return `${d.format('YYYY-MM-DD')} (${days[d.day()]})`
+}
+
 // ✅ 시간 또는 교시 포맷
 function formatPeriodOrTime(e) {
   if (e.start_time && e.end_time) {
@@ -45,8 +64,10 @@ function formatPeriodOrTime(e) {
 const columns = [
   {
     label: '📅 날짜',
-    field: 'event_date',
-    format: v => v
+    field: 'date',
+    format: (_, row) => {
+      return formatDateWithDay(row.event_date || row.date || null)
+    }
   },
   {
     label: '🎯 유형',

@@ -72,6 +72,7 @@
         <button class="btn-primary" @click="openForm('regular')">+ 정규 수업 추가</button>
       </div>
       <TimetableList
+          :items="timetableStore.regulars"
           :year="year"
           :semester="semester"
           :level="level"
@@ -89,6 +90,7 @@
         <button class="btn-primary" @click="openForm('special')">+ 특강 추가</button>
       </div>
       <TimetableList
+          :items="timetableStore.specials"
           type="special"
           :year="year"
           :semester="semester"
@@ -109,7 +111,7 @@
         <button class="btn-primary" @click="openForm('event')">+ 이벤트 추가</button>
       </div>
       <EventList
-          :events="timetableStore.events"
+          :events="timetableStore.combinedData"
           :canEdit="true"
           @edit="i=>openEditForm(i,'event')"
           @delete="i=>handleDelete(i,'event')"
