@@ -1,6 +1,5 @@
 // TimetableController.js -------------------------------------------------
 // 전체 로직을 개선한 버전. Node.js + Express + MySQL(pool) 환경에서 동작한다.
-// 변경·추가된 주요 사항
 //   1. 정규 수업 조회에서 level 필터를 제거해 "학년(year)" 기준만 적용.
 //   2. 특강 조회 시 JSON_CONTAINS 로 group_levels 배열 매칭.
 //   3. 요일 확장 시 day_ko(한글 요일)·day_en(영문 두 글자)·weekday_index(0‑6) 동시 제공.
@@ -206,229 +205,195 @@ exports.getTimetableWithEvents = async (req, res) => {
         end_date,
         level,
         group_level = "A",
-        type = "all", // regular | special | all
+        type = "all"
     } = req.query;
 
-    // 파라미터 최소 검증
     if (!year || !semester || !start_date || !end_date) {
-        return res.status(400).json({ message: "year, semester, start_date, end_date 파라미터 필수" });
+        return res.status(400).json({ message: "필수 파라미터 누락" });
     }
 
     try {
-        // 1) 공휴일 -------------------------------------------------------------
         const holidays = await getPublicHolidaysInRangeWithFallback(start_date, end_date);
-
-        // 2) 기본 데이터 ---------------------------------------------------------
         const periodMap = await getPeriodMap();
 
-        // 3) 정규 수업 (학년 기준) ----------------------------------------------
-        const [regulars] = await pool.query(
-            `SELECT t.*, s.name AS subject_name
-             FROM timetables t
-                      LEFT JOIN subjects s ON t.subject_id = s.id
-             WHERE t.year = ?
-               AND t.semester = ?
-               AND t.is_special_lecture = 0`,
-            [year, semester]
-        );
+        const [regulars] = await pool.query(`
+            SELECT t.*, s.name AS subject_name
+            FROM timetables t
+            LEFT JOIN subjects s ON t.subject_id = s.id
+            WHERE t.year = ? AND t.semester = ? AND t.is_special_lecture = 0
+        `, [year, semester]);
 
-        // 4) 특강 (레벨·그룹 기준) ----------------------------------------------
-        const [specials] = await pool.query(
-            `SELECT t.*, s.name AS subject_name
-             FROM timetables t
-                      LEFT JOIN subjects s ON t.subject_id = s.id
-             WHERE t.semester = ?
-               AND t.is_special_lecture = 1
-               AND (t.level = ? OR t.level IS NULL)
-               AND (t.group_levels IS NULL OR JSON_CONTAINS(t.group_levels, JSON_QUOTE(?)))`,
-            [semester, level, group_level]
-        );
+        const [specials] = await pool.query(`
+            SELECT t.*, s.name AS subject_name
+            FROM timetables t
+            LEFT JOIN subjects s ON t.subject_id = s.id
+            WHERE t.semester = ?
+              AND t.is_special_lecture = 1
+              AND (t.level = ? OR t.level IS NULL)
+              AND (t.group_levels IS NULL OR JSON_CONTAINS(t.group_levels, JSON_QUOTE(?)))
+        `, [semester, level, group_level]);
 
-        // 5) 이벤트 (보강·휴강·행사·단기특강) -------------------------------------------
-        const [events] = await pool.query(
-            `SELECT e.*, s.name AS subject_name, 
-                    t.year as original_year, 
-                    t.level as original_level, 
-                    t.day as original_day,
-                    t.is_special_lecture,
-                    t.start_period as original_start_period,
-                    t.end_period as original_end_period,
-                    t.room as original_room,
-                    t.professor_name as original_professor,
-                    t.subject_id as original_subject_id,
-                    t.group_levels as original_group_levels,
-                    DATE_FORMAT(e.event_date, '%Y-%m-%d') as event_date_local
-             FROM timetable_events e
-             LEFT JOIN subjects s ON e.subject_id = s.id
-             LEFT JOIN timetables t ON e.timetable_id = t.id
-             WHERE DATE(e.event_date) BETWEEN ? AND ?
-               AND (
-                   -- 휴강/보강은 원본 수업의 속성으로 체크
-                   (e.event_type IN ('cancel', 'makeup') AND (
-                       -- 정규수업: 학년으로 체크
-                       (t.is_special_lecture = 0 AND t.year = ?) OR
-                       -- 특강: 레벨로 체크
-                       (t.is_special_lecture = 1 AND (t.level = ? OR t.level IS NULL))
-                   )) OR
-                   -- 단기특강/행사는 자체 속성으로 체크
-                   (e.event_type IN ('short_lecture', 'event') AND (
-                       (e.year = ? OR e.year IS NULL) AND
-                       (e.level = ? OR e.level IS NULL)
-                   ))
-               )
-               AND (
-                   -- 단기특강/행사만 group_level 체크
-                   e.event_type IN ('cancel', 'makeup') OR
-                   e.group_levels IS NULL OR 
-                   e.group_levels = '[]' OR 
-                   JSON_CONTAINS(e.group_levels, JSON_QUOTE(?))
-               )`,
-            [start_date, end_date, year, level, year, level, group_level]
-        );
+        const [events] = await pool.query(`
+            SELECT e.*, s.name AS subject_name,
+                   DATE_FORMAT(e.event_date, '%Y-%m-%d') AS event_date_local,
+                   t.day AS original_day,
+                   t.year AS original_year, 
+                   t.level AS original_level, 
+                   t.start_period AS original_start_period,
+                   t.end_period AS original_end_period,
+                   t.professor_name AS original_professor,
+                   t.subject_id AS original_subject_id,
+                   t.room AS original_room
+            FROM timetable_events e
+            LEFT JOIN subjects s ON e.subject_id = s.id
+            LEFT JOIN timetables t ON e.timetable_id = t.id
+            WHERE DATE(e.event_date) BETWEEN ? AND ?
+              AND (
+                  (e.event_type IN ('cancel', 'makeup') AND (
+                      (t.is_special_lecture = 0 AND t.year = ?) OR
+                      (t.is_special_lecture = 1 AND (t.level = ? OR t.level IS NULL))
+                  )) OR
+                  (e.event_type IN ('short_lecture', 'event') AND (
+                      (e.year = ? OR e.year IS NULL) AND (e.level = ? OR e.level IS NULL)
+                  ))
+              )
+              AND (
+                  e.event_type IN ('cancel', 'makeup') OR
+                  e.group_levels IS NULL OR e.group_levels = '[]' OR 
+                  JSON_CONTAINS(e.group_levels, JSON_QUOTE(?))
+              )
+        `, [start_date, end_date, year, level, year, level, group_level]);
 
-        console.log(`📅 조회된 이벤트:`, events.map(e => ({
-            type: e.event_type,
-            date: e.event_date_local,
-            subject: e.subject_name,
-            timetable_id: e.timetable_id,
-            is_special: e.is_special_lecture === 1,
-            year: e.inherit_attributes ? e.original_year : e.year,
-            level: e.inherit_attributes ? e.original_level : e.level
-        })));
-
-        // 6) 수업 + 특강을 날짜별로 확장 ----------------------------------------
-        let baseLectures = [];
-        if (type === "regular")      baseLectures = regulars;
-        else if (type === "special") baseLectures = specials;
-        else                        baseLectures = [...regulars, ...specials];
-
-        const expanded = [];
-
-        // 휴강 정보를 Map으로 구성
         const cancelMap = new Map();
-        events.forEach(ev => {
+        for (const ev of events) {
             if (ev.event_type === 'cancel') {
-                const localDate = ev.event_date_local;
-                if (!cancelMap.has(localDate)) {
-                    cancelMap.set(localDate, new Set());
-                }
-                if (ev.timetable_id) {
-                    cancelMap.get(localDate).add(ev.timetable_id);
-                }
-                console.log(`📅 휴강 등록: ${localDate}, timetable_id: ${ev.timetable_id}`);
+                const date = ev.event_date_local;
+                if (!cancelMap.has(date)) cancelMap.set(date, new Set());
+                cancelMap.get(date).add(ev.timetable_id);
             }
-        });
+        }
 
-        // 모든 수업을 날짜별로 확장
-        for (const t of baseLectures) {
-            console.log(`🔄 수업 확장 시작: ${t.subject_name}, 요일: ${t.day}`);
-            const dates = expandTimetableToDates(t, start_date, end_date);
-            console.log(`📅 확장된 날짜: ${dates.length}개`);
+        const baseLectures = (type === "regular")
+            ? regulars : (type === "special")
+                ? specials : [...regulars, ...specials];
 
-            for (const e of dates) {
-                // 휴강 여부 확인
-                const cancelInfo = cancelMap.get(e.date);
-                const isCancelled = cancelInfo && cancelInfo.has(t.id);
+        const result = [];
+        const pushedEventSet = new Set();
+
+        for (const lecture of baseLectures) {
+            const dates = expandTimetableToDates(lecture, start_date, end_date);
+            for (const instance of dates) {
+                const isCancelled = cancelMap.get(instance.date)?.has(lecture.id);
 
                 if (isCancelled) {
-                    console.log(`🚫 휴강 처리: ${e.date}, id: ${t.id}, subject: ${t.subject_name}`);
-                    // 휴강된 수업을 이벤트로 추가
-                    const cancelEvent = events.find(ev => 
-                        ev.event_type === 'cancel' &&
-                        ev.event_date_local === e.date &&
-                        ev.timetable_id === t.id
+                    const cancelEvent = events.find(e =>
+                        e.event_type === 'cancel' &&
+                        e.event_date_local === instance.date &&
+                        e.timetable_id === lecture.id
                     );
 
-                    if (cancelEvent) {
-                        expanded.push({
-                            ...e,
+                    const dateValue = cancelEvent.event_date_local || cancelEvent.event_date || instance.date || null;
+
+                    if (cancelEvent && !pushedEventSet.has(cancelEvent.id)) {
+                        pushedEventSet.add(cancelEvent.id);
+                        result.push({
+                            ...instance,
                             id: `event-${cancelEvent.id}`,
-                            event_type: 'cancel',
-                            description: cancelEvent.description || '휴강',
+                            event_type: "cancel",
+                            date: dateValue,
+                            description: cancelEvent.description || "휴강",
                             isCancelled: true,
-                            priority: 1,  // 휴강 우선순위
+                            priority: 1,
                             original_class: {
-                                id: t.id,
-                                subject_id: t.subject_id,
-                                subject_name: t.subject_name,
-                                start_period: t.start_period,
-                                end_period: t.end_period,
-                                year: t.year,
-                                level: t.level,
-                                room: t.room,
-                                professor_name: t.professor_name,
-                                is_special_lecture: t.is_special_lecture
+                                day: cancelEvent.original_day,
+                                start_period: cancelEvent.original_start_period,
+                                end_period: cancelEvent.original_end_period,
+                                year: cancelEvent.original_year,
+                                level: cancelEvent.original_level,
+                                room: cancelEvent.original_room,
+                                professor_name: cancelEvent.original_professor,
+                                subject_id: cancelEvent.original_subject_id
                             }
                         });
                     }
                 } else {
-                    // 정규수업 또는 특강 추가
-                    expanded.push({
-                        ...e,
-                        id: t.id,
-                        event_type: t.is_special_lecture ? "special" : "regular",
-                        subject_name: t.subject_name || "미지정",
-                        professor_name: t.professor_name || "미지정",
-                        room: t.room || "",
-                        start_time: periodMap[e.start_period]?.start_time || "09:00",
-                        end_time:   periodMap[e.end_period]?.end_time   || "18:00",
+                    result.push({
+                        ...instance,
+                        id: lecture.id,
+                        event_type: lecture.is_special_lecture ? "special" : "regular",
+                        subject_name: lecture.subject_name || "미지정",
+                        professor_name: lecture.professor_name || "",
+                        room: lecture.room || "",
+                        start_time: periodMap[lecture.start_period]?.start_time || "09:00",
+                        end_time: periodMap[lecture.end_period]?.end_time || "18:00",
                         isCancelled: false,
-                        priority: t.is_special_lecture ? 3 : 5,  // 특강: 3, 정규: 5
-                        year: t.year,
-                        level: t.level,
-                        is_special_lecture: t.is_special_lecture,
-                        semester: t.semester
+                        priority: lecture.is_special_lecture ? 3 : 5
                     });
                 }
             }
         }
 
-        // 단기특강과 행사 추가
         for (const ev of events) {
-            if (ev.event_type === 'short_lecture' || ev.event_type === 'event') {
-                expanded.push({
-                    id: `event-${ev.id}`,
-                    event_type: ev.event_type,
-                    date: ev.event_date_local,
-                    subject_name: ev.subject_name || "미지정",
-                    professor_name: ev.professor_name || "",
-                    room: ev.room || "",
-                    description: ev.description || "",
-                    start_period: ev.start_period,
-                    end_period: ev.end_period,
-                    start_time: periodMap[ev.start_period]?.start_time || "09:00",
-                    end_time:   periodMap[ev.end_period]?.end_time   || "18:00",
-                    year: ev.year,
-                    level: ev.level,
-                    isCancelled: false,
-                    priority: ev.event_type === 'short_lecture' ? 2 : 4  // 단기특강: 2, 행사: 4
-                });
-            }
+            const key = `event-${ev.id}`;
+            if (pushedEventSet.has(ev.id)) continue;
+
+            result.push({
+                id: key,
+                event_type: ev.event_type,
+                date: ev.event_date_local,
+                subject_name: ev.subject_name || "미지정",
+                professor_name: ev.professor_name || "",
+                room: ev.room || "",
+                description: ev.description || "",
+                start_period: ev.start_period || 1,
+                end_period: ev.end_period || 1,
+                start_time: periodMap[ev.start_period]?.start_time || "09:00",
+                end_time: periodMap[ev.end_period]?.end_time || "18:00",
+                year: ev.original_year || ev.year || year,
+                level: ev.original_level || ev.level || level,
+                isCancelled: ev.event_type === "cancel",
+                priority: {
+                    cancel: 1,
+                    makeup: 2,
+                    short_lecture: 2,
+                    event: 4
+                }[ev.event_type] || 99,
+                original_class: ev.event_type === 'cancel' || ev.event_type === 'makeup' ? {
+                    day: ev.original_day,
+                    start_period: ev.original_start_period,
+                    end_period: ev.original_end_period,
+                    year: ev.original_year,
+                    level: ev.original_level,
+                    room: ev.original_room,
+                    professor_name: ev.original_professor,
+                    subject_id: ev.original_subject_id
+                } : null
+            });
         }
 
-        // 8) 공휴일 push --------------------------------------------------------
         for (const holiday of holidays) {
-            expanded.push({
+            result.push({
                 id: `holiday-${holiday}`,
                 date: holiday,
+                event_type: "holiday",
                 subject_name: "공휴일",
                 description: "공휴일",
                 start_period: 1,
                 end_period: 9,
                 start_time: "09:00",
                 end_time: "18:00",
-                event_type: "holiday",
                 day_ko: dayjs(holiday).format("dd"),
-                priority: 0  // 공휴일 최우선
+                priority: 0
             });
         }
 
-        res.json({ timetables: expanded, events, holidays });
+        res.json({ timetables: result, events, holidays });
     } catch (err) {
         console.error("❌ getTimetableWithEvents 오류:", err);
         res.status(500).json({ message: "서버 오류 발생" });
     }
 };
+
 
 // ------------------------ CRUD -----------------------
 exports.createTimetable = async (req, res) => {
