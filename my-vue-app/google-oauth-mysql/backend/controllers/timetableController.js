@@ -148,24 +148,33 @@ exports.getTimetables = async (req, res) => {
  * /special-lectures?semester=spring&level=mid&group_level=A&start_date=2025-03-01&end_date=2025-06-30
  * 레벨·그룹·학기 범위에 맞는 특강을 요일별로 날짜 확장해 반환한다.
  */
+// ✅ [특강 조회 API]
 exports.getSpecialLectures = async (req, res) => {
     const { level, start_date, end_date, group_level = "A", semester } = req.query;
-
+    console.log('📡 [getSpecialLectures]', { level, semester, group_level });
     if (!level || !start_date || !end_date || !semester) {
         return res.status(400).json({ message: "level, semester, start_date, end_date 파라미터 필수" });
     }
 
     try {
-        const [specials] = await pool.query(
-            `SELECT t.*, s.name AS subject_name
-             FROM timetables t
-                      LEFT JOIN subjects s ON t.subject_id = s.id
-             WHERE t.semester = ?
-               AND t.is_special_lecture = 1
-               AND (t.level = ? OR t.level IS NULL)
-               AND (t.group_levels IS NULL OR JSON_CONTAINS(t.group_levels, JSON_QUOTE(?)))`,
-            [semester, level, group_level]
-        );
+        const query = `
+            SELECT t.*, s.name AS subject_name
+            FROM timetables t
+            LEFT JOIN subjects s ON t.subject_id = s.id
+            WHERE t.semester = ?
+              AND t.is_special_lecture = 1
+              AND (t.level = ? OR t.level IS NULL)
+              AND (t.group_levels IS NULL OR JSON_CONTAINS(t.group_levels, JSON_QUOTE(?)))
+        `;
+        const params = [semester, level, group_level];
+
+        // ✅ 로그: 쿼리와 파라미터 출력
+        console.log("🔍 실행 쿼리:", query.trim());
+        console.log("🧾 쿼리 파라미터:", params);
+
+        const [specials] = await pool.query(query, params);
+
+        console.log("✅ 특강 원본 수업 수:", specials.length);
 
         const periodMap = await getPeriodMap();
         const expanded = [];
@@ -178,13 +187,15 @@ exports.getSpecialLectures = async (req, res) => {
                     subject_name: t.subject_name || "미지정 과목",
                     professor_name: t.professor_name || "미지정 교수",
                     start_time: periodMap[e.start_period]?.start_time || "09:00",
-                    end_time:   periodMap[e.end_period]?.end_time   || "18:00",
+                    end_time: periodMap[e.end_period]?.end_time || "18:00",
                     event_type: "special",
                 });
             }
         }
 
+        console.log(`📦 최종 반환 특강 개수: ${expanded.length}`);
         res.json(expanded);
+
     } catch (err) {
         console.error("❌ getSpecialLectures 오류:", err);
         res.status(500).json({ message: "서버 오류 발생" });

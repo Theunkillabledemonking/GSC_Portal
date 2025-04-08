@@ -84,8 +84,8 @@
           </select>
         </div>
 
-        <!-- 수업 선택 (휴강) -->
-        <div v-if="isCancel && form.day" class="form-group">
+        <!-- 수업 선택 (휴강 & 보강 모두) -->
+        <div v-if="(isCancel || isMakeup) && form.day" class="form-group">
           <label>수업 *</label>
           <select v-model="form.timetable_id" class="form-control">
             <option value="">선택해주세요</option>
@@ -97,6 +97,7 @@
             선택한 요일에 등록된 수업이 없습니다.
           </small>
         </div>
+
 
         <!-- 교시 선택 -->
         <template v-if="needsPeriodInput">
@@ -191,7 +192,7 @@ const form = ref({
 const loading = ref(false)
 const classType = ref('')
 const selectedYear = ref(props.year || 1)
-const selectedLevel = ref(props.level || '')
+const selectedLevel = ref(props.level || 'N1')
 const timetableOpts = ref([])
 const subjectOpts = ref([])
 const availableTimeSlots = ref([]) // 사용 가능한 시간대
@@ -251,12 +252,14 @@ if (props.formType === 'special') {
   watch(
       [selectedLevel, groupLevelProxy],
       async ([lvl, grp]) => {
+        console.log('[watch] selectedLevel:', lvl, 'groupLevel:', grp)
         if (!lvl) {
           subjectOpts.value = props.subjects || []
           return
         }
         try {
           const { specialLectures } = await getSpecialLectures({ level: lvl, group_level: grp, semester: props.semester })
+          console.log('[watch] getSpecialLectures returns:', specialLectures)
           subjectOpts.value = specialLectures
         } catch (error) {
           console.error('특강 과목 불러오기 실패:', error)
@@ -378,15 +381,7 @@ watch(
 // 시간표 로딩 함수
 async function loadTimetables() {
   try {
-    console.log('시간표 로딩 시작:', { 
-      semester: props.semester,
-      day: form.value.day,
-      classType: classType.value,
-      year: selectedYear.value,
-      level: selectedLevel.value
-    })
-
-    const params = { 
+    const params = {
       semester: props.semester,
       day: form.value.day
     }
@@ -397,8 +392,10 @@ async function loadTimetables() {
       params.is_special_lecture = 0  // 정규 수업만 조회
     }
     // 특강인 경우 레벨 필터 추가
-    else if (classType.value === 'special' && selectedLevel.value) {
-      params.level = selectedLevel.value
+    else if (classType.value === 'special') {
+      // selectedLevel, props.level 둘 다 확인하고, 없을 경우 기본값 'N1' 사용
+      params.level = selectedLevel.value || props.level || 'N1'
+      params.group_level = groupLevelProxy.value
       params.is_special_lecture = 1  // 특강만 조회
     }
 
@@ -408,20 +405,26 @@ async function loadTimetables() {
 
     // 수업 정보 가공
     timetableOpts.value = timetables
-      .filter(tt => {
-        if (classType.value === 'regular') {
-          // 정규 수업: year가 있고 is_special_lecture가 0인 경우
-          return tt.year && tt.is_special_lecture === 0
-        } else if (classType.value === 'special') {
-          // 특강: level이 있고 is_special_lecture가 1인 경우
-          return tt.level && tt.is_special_lecture === 1
-        }
-        return false
-      })
-      .map(tt => ({
-        ...tt,
-        display_name: `[${tt.level || (tt.year + '학년')}] ${tt.subject_name} ${tt.group_level ? `(${tt.group_level}분반)` : ''} - ${tt.start_period}~${tt.end_period}교시`
-      }))
+        .filter(tt => {
+          if (classType.value === 'regular') {
+            // 정규 수업: year가 있고 is_special_lecture가 0 (숫자 또는 문자열 "0") 인 경우
+            return tt.year && Number(tt.is_special_lecture) === 0
+          } else if (classType.value === 'special') {
+            return tt.level === (selectedLevel.value || props.level || 'N1') &&
+                (!groupLevelProxy.value || tt.group_level === groupLevelProxy.value) &&
+                Number(tt.is_special_lecture) === 1
+          }
+          return false
+        })
+        .map(tt => ({
+          ...tt,
+          display_name: `[${tt.level || (tt.year + '학년')}] ${tt.subject_name} ${tt.group_level ? `(${tt.group_level}분반)` : ''} - ${tt.start_period}~${tt.end_period}교시`
+        }))
+
+    // 디버깅: 반환된 각 시간표의 is_special_lecture 값 및 타입 출력
+    timetables.forEach(tt => {
+      console.log(`tt.id: ${tt.id}, is_special_lecture: ${tt.is_special_lecture}, type: ${typeof tt.is_special_lecture}`);
+    });
 
     console.log('가공된 시간표:', {
       type: classType.value,
@@ -436,7 +439,7 @@ async function loadTimetables() {
 
 // 요일 변경 시 시간표 로드
 watch(() => form.value.day, async (newDay) => {
-  if (form.value.event_type === 'cancel' && newDay) {
+  if ((form.value.event_type === 'cancel' || form.value.event_type === 'makeup') && newDay) {
     await loadTimetables()
   }
 })
@@ -444,7 +447,7 @@ watch(() => form.value.day, async (newDay) => {
 // 수업 선택 시 자동 필드 설정
 watch(() => form.value.timetable_id, async (newId) => {
   if (!newId) return
-  
+
   const selected = timetableOpts.value.find(t => t.id === newId)
   if (!selected) return
 
@@ -748,9 +751,7 @@ const filteredSubjects = computed(() => {
         )
     } else if (form.value?.event_type === 'special') {
         // 특강인 경우 - level만 확인 (이미 getSpecialLectures API에서 특강만 가져옴)
-        filtered = subjectOpts.value.filter(s => 
-            (!s.level || s.level === selectedLevel.value)
-        )
+        filtered = subjectOpts.value.filter(s => s.level === selectedLevel.value)
     } else if (classType.value === 'special' && ['cancel', 'makeup'].includes(form.value?.event_type)) {
         // 특강 휴강/보강인 경우
         filtered = subjectOpts.value.filter(s => 

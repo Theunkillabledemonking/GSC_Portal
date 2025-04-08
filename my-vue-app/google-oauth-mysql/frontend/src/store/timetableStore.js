@@ -51,6 +51,7 @@ export const useTimetableStore = defineStore('timetable', {
     state: () => ({
         regulars: [],   // 정규 수업
         specials: [],   // 특강
+        shortLectures: [], // 단기특강 (가끔씩 한번 하는 특강)
         cancels: [],    // 휴강
         makeups: [],    // 보강
         events: [],     // 이벤트
@@ -86,28 +87,33 @@ export const useTimetableStore = defineStore('timetable', {
                 ...state.holidays.map(h => ({ ...h, priority: 0 })),
                 ...state.cancels.map(c => ({ ...c, priority: 1 })),
                 ...state.makeups.map(m => ({ ...m, priority: 2 })),
-                ...state.specials.map(s => ({ ...s, priority: 3 })),
-                ...state.events.map(e => ({ ...e, priority: 4 })),
-                ...state.regulars.map(r => ({ ...r, priority: 5 }))
+                ...state.shortLectures.map(s => ({ ...s, priority: 3 })),
+                ...state.specials.map(s => ({ ...s, priority: 4 })),
+                ...state.events.map(e => ({ ...e, priority: 5 })),
+                ...state.regulars.map(r => ({ ...r, priority: 6 }))
             ];
 
             // 정렬: 같은 시간대에는 priority 순으로
             const sorted = merged.sort((a, b) => {
-                const dateA = a.date || ''
-                const dateB = b.date || ''
-                const periodA = a.start_period ?? 1
-                const periodB = b.start_period ?? 1
-                const priorityA = a.priority ?? 99
-                const priorityB = b.priority ?? 99
-
-                if (dateA === dateB) {
-                    if (periodA === periodB) {
-                        return priorityA - priorityB
-                    }
-                    return periodA - periodB
+                // 1) 요일 정렬: dayjs를 사용하여 날짜를 숫자로 반환 (0: 일, 1: 월, …, 6: 토)
+                const dayA = a.date ? dayjs(a.date).day() : 999;
+                const dayB = b.date ? dayjs(b.date).day() : 999;
+                if (dayA !== dayB) {
+                    return dayA - dayB;
                 }
-                return dateA.localeCompare(dateB)
-            })
+
+                // 2) 같은 요일이면 교시(start_period) 비교 (없으면 기본값 1)
+                const periodA = a.start_period ?? 1;
+                const periodB = b.start_period ?? 1;
+                if (periodA !== periodB) {
+                    return periodA - periodB;
+                }
+
+                // 3) 같은 교시라면 priority 비교 (기본 우선순위값은 99)
+                const priorityA = a.priority ?? 99;
+                const priorityB = b.priority ?? 99;
+                return priorityA - priorityB;
+            });
 
             console.log('📊 병합 결과:', {
                 total: sorted.length,
@@ -152,7 +158,6 @@ export const useTimetableStore = defineStore('timetable', {
             // 날짜 정규화
             const start = range.start ? dayjs(range.start).format('YYYY-MM-DD') : null;
             const end = range.end ? dayjs(range.end).format('YYYY-MM-DD') : null;
-
             if (start && end) {
                 this.dateRange = { start, end };
                 console.log('📅 날짜 범위 업데이트:', this.dateRange);
@@ -171,6 +176,7 @@ export const useTimetableStore = defineStore('timetable', {
                 // 모든 배열 초기화
                 this.regulars = [];
                 this.specials = [];
+                this.shortLectures = [];
                 this.cancels = [];
                 this.makeups = [];
                 this.events = [];
@@ -196,10 +202,12 @@ export const useTimetableStore = defineStore('timetable', {
                 ).map(t => ({
                     ...t,
                     year: t.year || this.filters.year,  // 명시적으로 year 설정
-                    level: t.level || this.filters.level
+                    level: t.level || this.filters.level,
+                    // date가 없으면 inferDateFromOriginalClass 유틸 사용
+                    date: t.date || inferDateFromOriginalClass(t)
                 }));
 
-                // 휴강: 정규수업의 휴강 + 휴강 이벤트
+                // 휴강: 정규 수업 중 취소된 강의와 별도의 휴강 이벤트 처리
                 this.cancels = [
                     ...data.filter(item => item.event_type === 'regular' && item.isCancelled),
                     ...data.filter(item => item.event_type === 'cancel')
@@ -209,17 +217,27 @@ export const useTimetableStore = defineStore('timetable', {
                     description: t.description || '휴강',
                     year: t.year || this.filters.year,
                     level: t.level || this.filters.level,
-                    date: t.date
+                    date: t.date || inferDateFromOriginalClass(t)
                 }))
 
+                // 보강: event_type 'makeup'
                 this.makeups = data.filter(item => 
                     item.event_type === 'makeup'
                 ).map(t => ({
                     ...t,
                     year: t.year || this.filters.year,
                     level: t.level || this.filters.level,
-                    date: t.date
+                    date: t.date || inferDateFromOriginalClass(t)
+                }));
 
+                // 단기특강: event_type 'short_lecture'
+                this.shortLectures = data.filter(item =>
+                    item.event_type === 'short_lecture'
+                ).map(t => ({
+                    ...t,
+                    year: t.year || this.filters.year,
+                    level: t.level || this.filters.level,
+                    date: t.date || inferDateFromOriginalClass(t)
                 }));
                 
                 this.specials = data.filter(item => 
@@ -228,7 +246,7 @@ export const useTimetableStore = defineStore('timetable', {
                     ...t,
                     year: t.year || this.filters.year,
                     level: t.level || this.filters.level,
-                    date: t.date
+                    date: t.date || inferDateFromOriginalClass(t)
                 }));
                 
                 this.events = data.filter(item => 
@@ -236,7 +254,8 @@ export const useTimetableStore = defineStore('timetable', {
                 ).map(t => ({
                     ...t,
                     year: t.year || this.filters.year,
-                    level: t.level || this.filters.level
+                    level: t.level || this.filters.level,
+                    date: t.date || inferDateFromOriginalClass(t)
                 }));
                 
                 this.holidays = data.filter(item => 
@@ -254,22 +273,23 @@ export const useTimetableStore = defineStore('timetable', {
         },
 
         resetAll() {
-            this.regulars = []
-            this.specials = []
-            this.cancels = []
-            this.makeups = []
-            this.events = []
-            this.holidays = []
+            this.regulars = [];
+            this.specials = [];
+            this.shortLectures = [];
+            this.cancels = [];
+            this.makeups = [];
+            this.events = [];
+            this.holidays = [];
             this.filters = {
                 year: 1,
                 semester: 'spring',
                 level: null,
                 groupLevel: null
-            }
+            };
             this.dateRange = {
                 start: dayjs().startOf('week').format('YYYY-MM-DD'),
                 end: dayjs().startOf('week').add(6, 'day').format('YYYY-MM-DD')
-            }
+            };
         }
     }
 })
