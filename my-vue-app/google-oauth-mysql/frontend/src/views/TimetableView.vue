@@ -125,8 +125,8 @@
         :isOpen="isUnifiedModalOpen"
         :isEditMode="isEditMode"
         :initialData="selectedItem"
-        :year="year"
-        :level="level"
+        :year="['regular', 'cancel', 'makeup'].includes(formType) ? year : null"
+        :level="['special', 'cancel', 'makeup', 'event'].includes(formType) ? level : ''"
         :semester="semester"
         :formType="formType"
         :groupLevel="groupLevel"
@@ -140,259 +140,256 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import dayjs from 'dayjs'
+
+// 🏪 스토어
 import { useAuthStore } from '@/store/authStore'
 import { useTimetableStore } from '@/store/timetableStore'
+
+// 📡 API
 import {
   getSubjectsByYear,
-  getSubjectsByLevel,
-  getSubjectsForEvent,
-  getSpecialLectures
+  getSpecialLectures,
+  getSubjectsForEvent
 } from '@/services/subjectService'
 import { deleteTimetable } from '@/services/timetableService'
 import { deleteEvent } from '@/services/eventService'
+
+// 🛠 유틸
 import { normalizeLevel } from '@/utils/level'
 
+// 🧩 컴포넌트
 import WeeklyTimetable from '@/components/schedule/WeeklyTimetable.vue'
 import TimetableList from '@/components/schedule/TimetableList.vue'
 import EventList from '@/components/schedule/EventList.vue'
 import UnifiedScheduleForm from '@/components/schedule/UnifiedScheduleForm.vue'
 
-// ------------------------------------------------------------------ 스토어 & 상수
+/* -------------------- 상태 초기화 -------------------- */
 const authStore = useAuthStore()
 const timetableStore = useTimetableStore()
+
 const isAdminOrProfessor = computed(() => authStore.role <= 2)
 
 const levels = ['N1', 'N2', 'N3', 'TOPIK4', 'TOPIK6']
-
-// ------------------------------------------------------------------ 필터 상태
-const year = computed({
-  get: () => {
-    console.log("Computed get year:", timetableStore.filters.year)
-    return timetableStore.filters.year;
-  },
-  set: (value) => {
-    console.log("Computed set year:", value)
-    timetableStore.setFilters({ year: value })
-  }
-})
-
-const level = computed({
-  get: () => {
-    console.log("Computed get level:", timetableStore.filters.level)
-    return timetableStore.filters.level;
-  },
-  set: (value) => {
-    console.log("Computed set level:", value)
-    timetableStore.setFilters({ level: value })
-  }
-})
-
-const groupLevel = computed({
-  get: () => {
-    console.log("Computed get groupLevel:", timetableStore.filters.groupLevel)
-    return timetableStore.filters.groupLevel;
-  },
-  set: (value) => {
-    console.log("Computed set groupLevel:", value)
-    timetableStore.setFilters({ groupLevel: value })
-  }
-})
-
-// ------------------------------------------------------------------ 날짜 범위
-const dateRange = computed({
-  get: () => timetableStore.dateRange,
-  set: (value) => timetableStore.setDateRange(value)
-})
-
-const startDate = computed(() => dateRange.value.start)
-const endDate = computed(() => dateRange.value.end)
-
-// ------------------------------------------------------------------ 학기 관리 및 계산
-const semester = computed(() => {
-  const m = dayjs(dateRange.value.start).month() + 1
-  let sem;
-  if (m >= 3 && m <= 6) sem = 'spring'
-  else if (m >= 7 && m <= 8) sem = 'summer'
-  else if (m >= 9) sem = 'fall'
-  else sem = 'winter'
-  console.log("Computed semester:", sem, "for month:", m)
-  return sem
-})
-
-const semesterLabel = computed(() => {
-  switch (semester.value) {
-    case 'spring': return '1학기'
-    case 'summer': return '여름학기'
-    case 'fall': return '2학기'
-    case 'winter': return '겨울학기'
-  }
-})
-
-// ------------------------------------------------------------------ 과목 목록
 const subjects = ref([])
 
-// ------------------------------------------------------------------ 모달 관련 상태
 const isUnifiedModalOpen = ref(false)
 const isEditMode = ref(false)
 const formType = ref('regular')
 const selectedItem = ref(null)
 const formKey = ref(0)
 
-// ------------------------------------------------------------------ 데이터 로드
-onMounted(async () => {
-  // 초기 필터 설정 (관리자/교수 외면 authStore 값 사용)
-  if (!isAdminOrProfessor.value) {
-    timetableStore.setFilters({
-      year: authStore.year,
-      level: authStore.level
-    })
+/* -------------------- 필터 (year / level / groupLevel) -------------------- */
+const year = computed({
+  get: () => timetableStore.filters.year,
+  set: val => timetableStore.setFilters({ year: val })
+})
+
+const level = computed({
+  get: () => timetableStore.filters.level,
+  set: val => timetableStore.setFilters({ level: val })
+})
+
+const groupLevel = computed({
+  get: () => timetableStore.filters.groupLevel,
+  set: val => timetableStore.setFilters({ groupLevel: val })
+})
+
+/* -------------------- 날짜 관련 -------------------- */
+const dateRange = computed({
+  get: () => timetableStore.dateRange,
+  set: val => timetableStore.setDateRange(val)
+})
+
+const startDate = computed(() => dateRange.value.start)
+const endDate = computed(() => dateRange.value.end)
+
+const semester = computed(() => {
+  const m = dayjs(dateRange.value.start).month() + 1
+  if (m >= 3 && m <= 6) return 'spring'
+  if (m >= 7 && m <= 8) return 'summer'
+  if (m >= 9 && m <= 12) return 'fall'
+  return 'winter'
+})
+
+const semesterLabel = computed(() => ({
+  spring: '1학기',
+  summer: '여름학기',
+  fall: '2학기',
+  winter: '겨울학기'
+})[semester.value])
+
+/* -------------------- 폼 모달 핸들러 -------------------- */
+function openForm(t = 'regular') {
+  formType.value = t
+  isEditMode.value = false
+  selectedItem.value = null
+  formKey.value++
+  isUnifiedModalOpen.value = true
+}
+
+function openEditForm(item, t = 'regular') {
+  selectedItem.value = {
+    ...item,
+    originalInfo: formatOriginalInfo(item)
+  }
+  formType.value = t
+  isEditMode.value = true
+  formKey.value++
+  isUnifiedModalOpen.value = true
+}
+
+function handleCloseForm() {
+  isUnifiedModalOpen.value = false
+  isEditMode.value = false
+  selectedItem.value = null
+}
+
+/* -------------------- 원본 정보 포맷팅 -------------------- */
+function formatOriginalInfo(item) {
+  const parts = [`[${item.is_special_lecture ? '특강' : '정규'}]`]
+
+  if (item.level) {
+    let levelInfo = `[${item.level}]`
+    if (item.group_levels?.length) {
+      const levels = item.group_levels.filter(Boolean)
+      const isAll = ['A', 'B', 'C'].every(l => levels.includes(l)) || levels.includes('ALL')
+      levelInfo += isAll ? ' (전체)' : ` (${levels.join('/')}분반)`
+    }
+    parts.push(levelInfo)
   }
 
-  // 초기 날짜 범위 설정
+  if (item.subject_name) parts.push(item.subject_name)
+  if (item.day && item.start_period) {
+    const time = `${item.day}요일 ${item.start_period}~${item.end_period}교시`
+    parts.push(`${time} (${getPeriodTime(item.start_period)}~${getPeriodTime(item.end_period)})`)
+  }
+  if (item.room) parts.push(`강의실: ${item.room}`)
+  if (item.professor_name) parts.push(`교수: ${item.professor_name}`)
+
+  return parts.join(' | ')
+}
+
+function getPeriodTime(p) {
+  return {
+    1: '09:00', 2: '10:00', 3: '11:00', 4: '12:00',
+    5: '13:00', 6: '14:00', 7: '15:00', 8: '16:00', 9: '17:00'
+  }[p] || `${p}:00`
+}
+
+/* -------------------- 삭제 핸들러 -------------------- */
+async function handleDelete(item, type = 'regular') {
+  if (!confirm('정말 삭제하시겠습니까?')) return
+  const fn = type === 'regular' ? deleteTimetable : deleteEvent
+  await fn(item.id)
+  await refresh()
+}
+
+/* -------------------- 주 이동 함수 -------------------- */
+function moveWeek(offset) {
+  const current = dayjs(startDate.value)
+  let start = current.day() === 0 ? current.add(1, 'day') : current.subtract(current.day() - 1, 'day')
+  start = start.add(offset, 'week')
+  dateRange.value = {
+    start: start.format('YYYY-MM-DD'),
+    end: start.add(4, 'day').format('YYYY-MM-DD')
+  }
+}
+
+/* -------------------- 과목 동기화 -------------------- */
+async function loadSubjects() {
+  try {
+    console.log('🔥 loadSubjects() triggered -> formType:', formType.value)
+    let res
+    if (formType.value === 'special') {
+      res = await getSpecialLectures({
+        level: level.value,
+        group_level: groupLevel.value || 'ALL'
+      })
+      subjects.value = res?.specialLectures ?? []
+    } else if (formType.value === 'regular') {
+      res = await getSubjectsByYear(year.value)
+      subjects.value = res?.subjects ?? []
+    } else if (formType.value === 'event') {
+      res = await getSubjectsForEvent({
+        year: year.value,
+        level: level.value,
+        group_level: groupLevel.value || 'ALL'
+      })
+      subjects.value = res?.subjects ?? []
+    } else {
+      subjects.value = []
+    }
+    console.log('🎓 과목 데이터:', subjects.value)
+  } catch (e) {
+    console.error('❌ 과목 불러오기 실패', e)
+    subjects.value = []
+  }
+}
+
+/* -------------------- 스토어 리프레시 -------------------- */
+async function refresh() {
+  timetableStore.setFilters({
+    year: year.value,
+    level: normalizeLevel(level.value),
+    group_level: groupLevel.value,
+    semester: semester.value
+  })
+  await timetableStore.loadAllDataBySemester()
+}
+
+/* -------------------- 날짜 → 학기 계산 -------------------- */
+function getSemesterFromDate(date) {
+  if (!date) return null
+  const m = dayjs(date).month() + 1
+  if (m >= 3 && m <= 6) return 'spring'
+  if (m >= 7 && m <= 8) return 'summer'
+  if (m >= 9) return 'fall'
+  return 'winter'
+}
+
+/* -------------------- 라이프사이클 -------------------- */
+onMounted(async () => {
+  if (!isAdminOrProfessor.value) {
+    timetableStore.setFilters({ year: authStore.year, level: authStore.level })
+  }
+
   timetableStore.setDateRange({
     start: startDate.value,
     end: endDate.value
   })
 
-  // 데이터 로드 (시간표, 이벤트 등)
   await timetableStore.loadAllDataBySemester()
-
-  // 과목 로드 (필터 조건에 따라 특강/정규/이벤트용)
   await loadSubjects()
 
-  console.log('🎯 초기 데이터 로드 완료:', {
-    filters: timetableStore.filters,
-    dateRange: timetableStore.dateRange,
-    items: timetableStore.combinedData.length
-  })
+  console.log('🎯 초기 데이터 로드 완료')
 })
 
-// ------------------------------------------------------------------ Watch 설정
-
-// 필터 변경 감지 (year, level, groupLevel, formType)
-watch(
-    [year, level, groupLevel, formType],
-    (newValues, oldValues) => {
-      console.log("Watch triggered for filters:",
-          {
-            new: { year: newValues[0], level: newValues[1], groupLevel: newValues[2], formType: newValues[3] },
-            old: { year: oldValues[0], level: oldValues[1], groupLevel: oldValues[2], formType: oldValues[3] }
-          }
-      );
-      loadSubjects();
-    },
-    { immediate: true }
-)
-
-// 날짜 범위 변경 감지
-watch(
-    dateRange,
-    (newRange, oldRange) => {
-      console.log("날짜 범위 변경:", { old: oldRange, new: newRange });
-
-      const oldSemester = getSemesterFromDate(oldRange?.start);
-      const newSemester = getSemesterFromDate(newRange.start);
-      if (oldSemester !== newSemester) {
-        console.log("학기 변경 감지:", { old: oldSemester, new: newSemester });
-        timetableStore.setFilters({ semester: newSemester });
-      }
-      timetableStore.loadAllDataBySemester();
-    },
-    { deep: true }
-)
-
-// 주 이동 함수
-const moveWeek = (offset) => {
-  const start = dayjs(dateRange.value.start).add(offset, 'week')
-  dateRange.value = {
-    start: start.format('YYYY-MM-DD'),
-    end: start.add(6, 'day').format('YYYY-MM-DD')
-  }
-}
-
-// 학기 계산 헬퍼 함수
-function getSemesterFromDate(date) {
-  if (!date) return null;
-  const m = dayjs(date).month() + 1;
-  if (m >= 3 && m <= 6) return 'spring';
-  if (m >= 7 && m <= 8) return 'summer';
-  if (m >= 9 && m <= 12) return 'fall';
-  return 'winter';
-}
-
-// ------------------------------------------------------------------ 모달 함수
-function openForm(t = 'regular') {
-  formType.value = t;
-  isEditMode.value = false;
-  selectedItem.value = null;
-  formKey.value++;
-  isUnifiedModalOpen.value = true;
-}
-function openEditForm(item, t = 'regular') {
-  formType.value = t;
-  isEditMode.value = true;
-  selectedItem.value = item;
-  formKey.value++;
-  isUnifiedModalOpen.value = true;
-}
-async function handleDelete(item, t = 'regular') {
-  if (!confirm('정말 삭제하시겠습니까?')) return;
-  const fn = t === 'regular' ? deleteTimetable : deleteEvent;
-  await fn(item.id);
-  await refresh();
-}
-function handleCloseForm() {
-  isUnifiedModalOpen.value = false;
-  isEditMode.value = false;
-  selectedItem.value = null;
-}
-
-// ------------------------------------------------------------------ 스토어 리프레시 함수
-async function refresh() {
-  await timetableStore.setFilters({
-    year: year.value,
+/* -------------------- Watchers -------------------- */
+watch([year, level, groupLevel], async ([y, l, g]) => {
+  console.log("📡 필터 변경 감지:", { y, l, g })
+  await timetableStore.loadAllDataBySemester({
+    year: y,
+    level: l,
+    group_level: g,
     semester: semester.value,
-    level: normalizeLevel(level.value),
-    group_level: groupLevel.value
-  });
-  await timetableStore.loadAllDataBySemester();
-}
+    ...dateRange.value
+  })
+  await loadSubjects()
+})
 
-// ------------------------------------------------------------------ 과목 동기화 함수
-watch([year, level, groupLevel, formType], loadSubjects, { immediate: true })
+watch(formType, async (newType) => {
+  console.log("🧩 formType 변경:", newType)
+  await loadSubjects()
+})
 
-async function loadSubjects() {
-  console.log('🔥 loadSubjects() triggered -> formType:', formType.value)
-  try {
-    if (formType.value === 'special') {
-      const res = await getSpecialLectures({
-        level: level.value,
-        group_level: groupLevel.value
-      });
-      console.log("getSpecialLectures response:", res);
-      subjects.value = res?.specialLectures ?? [];
-    } else if (formType.value === 'regular') {
-      const res = await getSubjectsByYear(year.value);
-      console.log("getSubjectsByYear response:", res);
-      subjects.value = res?.subjects ?? [];
-    } else if (formType.value === 'event') {
-      // 이벤트용 과목 조회: year, level, group_level을 함께 전달
-      const res = await getSubjectsForEvent({
-        year: year.value,
-        level: level.value,
-        group_level: groupLevel.value
-      });
-      console.log("getSubjectsForEvent response:", res);
-      subjects.value = res?.subjects ?? [];
-    } else {
-      subjects.value = [];
-    }
-    console.log('🎓 과목 데이터:', subjects.value);
-  } catch (e) {
-    console.error('❌ 과목 불러오기 실패', e);
-    subjects.value = [];
+watch(dateRange, (newVal, oldVal) => {
+  const newSem = getSemesterFromDate(newVal.start)
+  const oldSem = getSemesterFromDate(oldVal?.start)
+  if (newSem !== oldSem) {
+    timetableStore.setFilters({ semester: newSem })
   }
-}
+  timetableStore.loadAllDataBySemester()
+}, { deep: true })
 </script>
 
 <style scoped>
