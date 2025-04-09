@@ -56,8 +56,16 @@ const weekDates = computed(() => {
   let current = dayjs(props.start)
   const end = dayjs(props.end)
   
-  while (current.isSameOrBefore(end)) {
-    dates.push(current.format('YYYY-MM-DD'))
+  // Ensure we only process one week's worth of dates
+  const weekEnd = current.add(4, 'day') // 5 days from start (Mon-Fri)
+  const finalEnd = end.isBefore(weekEnd) ? end : weekEnd
+
+  while (current.isSameOrBefore(finalEnd)) {
+    // Only include weekdays (Monday to Friday)
+    const day = current.day()
+    if (day >= 1 && day <= 5) {  // 1 is Monday, 5 is Friday
+      dates.push(current.format('YYYY-MM-DD'))
+    }
     current = current.add(1, 'day')
   }
   console.log('📅 주간 날짜 계산:', dates)
@@ -124,15 +132,13 @@ const getItemsForCell = (date, period) => {
   const dayOfWeek = dayjs(date).format('ddd').toLowerCase()
   const items = timetableStore.combinedData
 
-  // 요일 매핑
+  // 요일 매핑 (영어 -> 한글)
   const dayMap = {
     'mon': '월',
     'tue': '화',
     'wed': '수',
     'thu': '목',
     'fri': '금',
-    'sat': '토',
-    'sun': '일'
   }
 
   const filtered = items.filter(item => {
@@ -146,8 +152,7 @@ const getItemsForCell = (date, period) => {
     }
     
     // 정규 수업 (요일 기반)
-    return (item.day === dayMap[dayOfWeek] || item.day?.toLowerCase() === dayOfWeek) && 
-           isInPeriodRange
+    return item.day === dayMap[dayOfWeek] && isInPeriodRange
   })
 
   return filtered
@@ -183,7 +188,7 @@ watch([() => props.start, () => props.end], ([newStart, newEnd]) => {
 }
 
 .grid-header {
-  @apply grid grid-cols-8 bg-gray-100;
+  @apply grid grid-cols-6 bg-gray-100;
 }
 
 .time-header {
@@ -199,7 +204,7 @@ watch([() => props.start, () => props.end], ([newStart, newEnd]) => {
 }
 
 .time-row {
-  @apply grid grid-cols-8;
+  @apply grid grid-cols-6;
 }
 
 .time-label {
