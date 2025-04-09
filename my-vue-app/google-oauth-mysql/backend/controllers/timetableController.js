@@ -151,30 +151,37 @@ exports.getTimetables = async (req, res) => {
 // ✅ [특강 조회 API]
 exports.getSpecialLectures = async (req, res) => {
     const { level, start_date, end_date, group_level = "A", semester } = req.query;
-    console.log('📡 [getSpecialLectures]', { level, semester, group_level });
-    if (!level || !start_date || !end_date || !semester) {
-        return res.status(400).json({ message: "level, semester, start_date, end_date 파라미터 필수" });
+
+    if (!start_date || !end_date || !semester) {
+        return res.status(400).json({ message: "semester, start_date, end_date는 필수입니다." });
     }
 
+    const ignoreLevelFilter = level === 'ALL' || !level;
+    const ignoreGroupFilter = group_level === 'ALL' || !group_level;
+
     try {
-        const query = `
+        let query = `
             SELECT t.*, s.name AS subject_name
             FROM timetables t
-            LEFT JOIN subjects s ON t.subject_id = s.id
+                     LEFT JOIN subjects s ON t.subject_id = s.id
             WHERE t.semester = ?
               AND t.is_special_lecture = 1
-              AND (t.level = ? OR t.level IS NULL)
-              AND (t.group_levels IS NULL OR JSON_CONTAINS(t.group_levels, JSON_QUOTE(?)))
         `;
-        const params = [semester, level, group_level];
+        const params = [semester];
 
-        // ✅ 로그: 쿼리와 파라미터 출력
-        console.log("🔍 실행 쿼리:", query.trim());
-        console.log("🧾 쿼리 파라미터:", params);
+        if (!ignoreLevelFilter) {
+            query += ` AND (t.level = ? OR t.level IS NULL)`;
+            params.push(level);
+        }
+
+        if (!ignoreGroupFilter) {
+            query += ` AND (t.group_levels IS NULL OR JSON_CONTAINS(t.group_levels, JSON_QUOTE(?)))`;
+            params.push(group_level);
+        }
+        console.log("🔍 쿼리:", query.trim());
+        console.log("🧾 파라미터:", params);
 
         const [specials] = await pool.query(query, params);
-
-        console.log("✅ 특강 원본 수업 수:", specials.length);
 
         const periodMap = await getPeriodMap();
         const expanded = [];
@@ -193,7 +200,7 @@ exports.getSpecialLectures = async (req, res) => {
             }
         }
 
-        console.log(`📦 최종 반환 특강 개수: ${expanded.length}`);
+        console.log(`📦 반환 특강 개수: ${expanded.length}`);
         res.json(expanded);
 
     } catch (err) {
@@ -413,6 +420,7 @@ exports.createTimetable = async (req, res) => {
         day, start_period, end_period,
         professor_name = "", semester,
         is_special_lecture = 0,
+        group_levels = []  // 👈 여기를 기본 빈 배열로 받기
     } = req.body;
 
     if (!year || !semester || !day || !start_period || !end_period || !subject_id) {
@@ -423,10 +431,14 @@ exports.createTimetable = async (req, res) => {
         const [result] = await pool.query(
             `INSERT INTO timetables (
                 year, level, subject_id, room, description,
-                day, start_period, end_period, professor_name, semester, is_special_lecture
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [year, level || null, subject_id, room, description,
-                day, start_period, end_period, professor_name, semester, is_special_lecture]
+                day, start_period, end_period, professor_name, semester, is_special_lecture, group_levels
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                year, level || null, subject_id, room, description,
+                day, start_period, end_period, professor_name, semester,
+                is_special_lecture,
+                group_levels.length ? JSON.stringify(group_levels) : null // ✅ 핵심
+            ]
         );
 
         res.status(201).json({ status: "success", message: "시간표 등록 완료", data: { id: result.insertId } });

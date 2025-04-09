@@ -85,8 +85,19 @@ export const fetchTimetableWithEvents = async ({
     try {
         const { data } = await apiClient.get(ENDPOINTS.timetableWithEvents, { params });
         
+        // 중복 방지를 위한 Set
+        const processedItems = new Set();
+        
         // 데이터 정규화
-        const timetables = (data?.timetables || []).map(item => {
+        const timetables = (data?.timetables || []).reduce((acc, item) => {
+            // 중복 체크를 위한 키 생성
+            const itemKey = `${item.event_type || 'regular'}-${item.id}-${item.date || item.day}-${item.start_period}`;
+            if (processedItems.has(itemKey)) {
+                console.warn('⚠️ 중복 데이터 무시:', item);
+                return acc;
+            }
+            processedItems.add(itemKey);
+
             // 기본 필드 정규화
             const normalized = {
                 ...item,
@@ -112,51 +123,49 @@ export const fetchTimetableWithEvents = async ({
             } : null
 
             // 이벤트 타입별 처리
+            let processedItem;
             if (item.event_type === 'cancel') {
-                return {
+                processedItem = {
                     ...normalized,
                     event_type: 'cancel',
                     original_class,
                     description: item.description || '휴강',
                     date: item.event_date ? dayjs(item.event_date).format('YYYY-MM-DD') : normalized.date
-                }
-            }
-
-            if (item.event_type === 'makeup') {
-                return {
+                };
+            } else if (item.event_type === 'makeup') {
+                processedItem = {
                     ...normalized,
                     event_type: 'makeup',
                     description: item.description || '보강',
                     date: item.event_date ? dayjs(item.event_date).format('YYYY-MM-DD') : normalized.date
                 };
-            }
-
-            if (item.event_type === 'holiday') {
-                return {
+            } else if (item.event_type === 'holiday') {
+                processedItem = {
                     ...normalized,
                     event_type: 'holiday',
                     description: item.description || '공휴일',
                     start_period: 1,
                     end_period: 9
                 };
-            }
-
-            if (item.is_special_lecture) {
-                return {
+            } else if (item.is_special_lecture) {
+                processedItem = {
                     ...normalized,
                     event_type: 'special',
                     description: item.description || '특강',
                     date: item.event_date ? dayjs(item.event_date).format('YYYY-MM-DD') : normalized.date
                 };
+            } else {
+                // 기본은 정규 수업
+                processedItem = {
+                    ...normalized,
+                    event_type: 'regular',
+                    description: item.description || '정규 수업'
+                };
             }
 
-            // 기본은 정규 수업
-            return {
-                ...normalized,
-                event_type: 'regular',
-                description: item.description || '정규 수업'
-            };
-        });
+            acc.push(processedItem);
+            return acc;
+        }, []);
 
         // 이벤트 타입별 분류 및 로깅
         const eventsByType = timetables.reduce((acc, item) => {
@@ -190,83 +199,64 @@ export const fetchTimetableWithEvents = async ({
 // 2) 특강 전용 조회
 // ---------------------------------------------------------------------------
 
-export const fetchSpecialLectures = async ({
-    year,
-    semester,
-    level = '1',  // 기본값 설정
-    group_level = '',
-    start_date,
-    end_date
-}) => {
-    // 필수 파라미터 검증
-    if (!year || isNaN(year)) {
-        console.warn('❌ year must be a valid number for fetchSpecialLectures');
-        return [];
-    }
-
-    if (!semester) {
-        console.warn('❌ semester is required for fetchSpecialLectures');
-        return [];
-    }
-
-    // 날짜 범위 계산 (학기 기준)
-    const dateRange = resolveDateRange(year, semester, start_date, end_date);
-    
-    // 파라미터 정규화
-    const params = {
-        year: Number(year),
-        semester,
-        level: normalizeLevel(level || '1'),  // level은 필수이므로 기본값 설정
-        start_date: dateRange.start_date,
-        end_date: dateRange.end_date
-    };
-
-    // group_level은 선택적 파라미터
-    if (group_level && group_level !== '') {
-        params.group_level = group_level;
-    }
-
-    console.log("📡 [fetchSpecialLectures] Request:", { 
-        url: ENDPOINTS.specialLectures,
-        params 
-    });
-
+export const fetchSpecialLectures = async (params = {}) => {
     try {
-        const { data } = await apiClient.get(ENDPOINTS.specialLectures, { params });
-        
-        // 응답 데이터 정규화
-        const lectures = (data?.timetables || []).map(lecture => ({
-            ...lecture,
-            event_type: 'special',
-            year: Number(lecture.year || year),
-            level: lecture.level || level || '1',
-            date: lecture.date ? dayjs(lecture.date).format('YYYY-MM-DD') : null,
-            start_period: Number(lecture.start_period || 1),
-            end_period: Number(lecture.end_period || 1)
-        }));
+        // Normalize parameters
+        const normalizedParams = {
+            year: params.year || 1,
+            semester: params.semester || 'spring'
+        }
 
-        console.log("📚 특강 데이터:", {
+        // Only add level and group_level if they have values
+        if (params.level && params.level !== '') {
+            normalizedParams.level = params.level
+        }
+        if (params.group_level && params.group_level !== '' && params.group_level !== 'ALL') {
+            normalizedParams.group_level = params.group_level
+        }
+
+        // Add date range if provided
+        if (params.start_date) {
+            normalizedParams.start_date = params.start_date
+        }
+        if (params.end_date) {
+            normalizedParams.end_date = params.end_date
+        }
+
+        console.log('📡 [fetchSpecialLectures] Request:', {
+            url: ENDPOINTS.specialLectures,
+            params: normalizedParams
+        })
+
+        const response = await apiClient.get(ENDPOINTS.specialLectures, {
+            params: normalizedParams
+        })
+
+        const lectures = response.data || []
+        console.log('📚 특강 데이터:', {
             total: lectures.length,
             dates: lectures.map(l => l.date),
-            params
-        });
+            params: normalizedParams,
+            raw: lectures
+        })
 
-        return lectures;
-    } catch (err) {
-        // 에러 응답 상세 로깅
-        if (err.response) {
-            console.error("❌ fetchSpecialLectures failed:", {
-                status: err.response.status,
-                statusText: err.response.statusText,
-                data: err.response.data,
-                params
-            });
-        } else {
-            console.error("❌ fetchSpecialLectures failed:", err);
-        }
-        return [];
+        // Normalize lecture data
+        return lectures.map(lecture => ({
+            ...lecture,
+            event_type: 'special',
+            is_special_lecture: true,
+            start_time: lecture.start_time || '00:00',
+            end_time: lecture.end_time || '00:00',
+            room: lecture.room || lecture.classroom || '-',
+            professor_name: lecture.professor_name || '-',
+            start_period: Number(lecture.start_period || 1),
+            end_period: Number(lecture.end_period || 1)
+        }))
+    } catch (error) {
+        console.error('❌ [fetchSpecialLectures] Error:', error)
+        return []
     }
-};
+}
 
 // ---------------------------------------------------------------------------
 // 3) 정규 수업 전용 조회
