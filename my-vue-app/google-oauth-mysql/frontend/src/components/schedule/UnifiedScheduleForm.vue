@@ -1,163 +1,187 @@
 <template>
   <div v-if="isOpen" class="modal-overlay">
-    <div class="modal-content">
-      <h3>{{ isEditMode ? titles.edit : titles.create }}</h3>
-      <form @submit.prevent="handleSubmit">
-        <!-- 이벤트 유형 -->
-        <div class="form-group">
-          <label>이벤트 유형 *</label>
-          <select v-model="form.event_type" class="form-control">
-            <option value="">선택해주세요</option>
-            <option value="regular">정규 수업</option>
-            <option value="special">특강</option>
-            <option value="cancel">휴강</option>
-            <option value="makeup">보강</option>
-            <option value="event">이벤트</option>
-          </select>
+    <div class="modal-wrapper">
+      <div class="modal-content">
+        <h3>{{ isEditMode ? titles.edit : titles.create }}</h3>
+        <div class="form-layout">
+          <!-- 수정 폼 -->
+          <form @submit.prevent="handleSubmit" class="edit-form">
+            <!-- 원래 정보 표시 (수정 모드일 때만) -->
+            <div v-if="isEditMode && initialData?.originalInfo" class="original-info-top">
+              <div class="info-box">
+                <div class="info-label">📝 수정할 정보:</div>
+                <div class="info-content">{{ initialData.originalInfo }}</div>
+              </div>
+            </div>
+
+            <!-- 이벤트 유형 -->
+            <div class="form-group">
+              <label>이벤트 유형 *</label>
+              <select v-model="form.event_type" class="form-control">
+                <option value="">선택해주세요</option>
+                <option value="regular">정규 수업</option>
+                <option value="special">특강</option>
+                <option value="cancel">휴강</option>
+                <option value="makeup">보강</option>
+                <option value="event">이벤트</option>
+              </select>
+            </div>
+
+            <!-- 수업 종류 선택 (휴강/보강) -->
+            <div v-if="isCancelOrMakeup" class="form-group">
+              <label>수업 종류 *</label>
+              <select v-model="classType" class="form-control">
+                <option value="">선택해주세요</option>
+                <option value="regular">정규 수업</option>
+                <option value="special">특강</option>
+              </select>
+            </div>
+
+            <!-- 학년 선택 (정규 수업/정규 휴강/정규 보강) -->
+            <div v-if="needsYearInput" class="form-group">
+              <label>학년 *</label>
+              <select v-model="selectedYear" class="form-control">
+                <option value="">선택해주세요</option>
+                <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}학년</option>
+              </select>
+            </div>
+
+            <!-- 레벨 선택 (특강/특강 휴강/특강 보강) -->
+            <div v-if="needsLevelInput" class="form-group">
+              <label>레벨 *</label>
+              <select v-model="selectedLevel" class="form-control">
+                <option value="">선택해주세요</option>
+                <option v-for="l in levels" :key="l" :value="l">{{ l }}</option>
+              </select>
+            </div>
+
+            <!-- 분반 선택 (특강) -->
+            <div v-if="needsGroupLevel" class="form-group">
+              <label>분반</label>
+              <select v-model="groupLevelProxy" class="form-control">
+                <option value="">전체</option>
+                <option v-for="g in groupLevelOptions" :key="g" :value="g">{{ g }}반</option>
+              </select>
+            </div>
+
+            <!-- 요일 선택 (정규/특강/휴강) -->
+            <div v-if="needsDayInput" class="form-group">
+              <label>요일 *</label>
+              <select v-model="form.day" class="form-control">
+                <option value="">선택해주세요</option>
+                <option v-for="day in days" :key="day" :value="day">{{ day }}요일</option>
+              </select>
+            </div>
+
+            <!-- 날짜 선택 (휴강/보강/이벤트) -->
+            <div v-if="needsDateInput" class="form-group">
+              <label>날짜 *</label>
+              <input 
+                type="date" 
+                v-model="form.event_date" 
+                class="form-control"
+                :min="new Date().toISOString().split('T')[0]"
+              />
+            </div>
+
+            <!-- 과목 선택 -->
+            <div v-if="needsSubjectSelect" class="form-group">
+              <label>과목 *</label>
+              <select v-model="form.subject_id" class="form-control">
+                <option value="">선택해주세요</option>
+                <option v-for="subj in filteredSubjects" :key="subj.id" :value="subj.id">
+                  {{ subj.name }}
+                </option>
+              </select>
+            </div>
+
+            <!-- 수업 선택 (휴강) -->
+            <div v-if="isCancel && form.day" class="form-group">
+              <label>수업 *</label>
+              <select v-model="form.timetable_id" class="form-control">
+                <option value="">선택해주세요</option>
+                <option v-for="tt in timetableOpts" :key="tt.id" :value="tt.id">
+                  {{ tt.display_name }}
+                </option>
+              </select>
+              <small v-if="timetableOpts.length === 0" class="text-muted">
+                선택한 요일에 등록된 수업이 없습니다.
+              </small>
+            </div>
+
+            <!-- 교시 선택 -->
+            <template v-if="needsPeriodInput">
+              <div class="form-group">
+                <label>시작 교시 *</label>
+                <select v-model="form.start_period" class="form-control">
+                  <option value="">선택해주세요</option>
+                  <option v-for="p in availablePeriods" :key="p" :value="p">
+                    {{ p }}교시
+                  </option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>종료 교시 *</label>
+                <select v-model="form.end_period" class="form-control">
+                  <option value="">선택해주세요</option>
+                  <option v-for="p in availablePeriods" :key="p" :value="p">
+                    {{ p }}교시
+                  </option>
+                </select>
+              </div>
+            </template>
+
+            <!-- 설명 -->
+            <div class="form-group">
+              <label>설명</label>
+              <textarea v-model="form.description" class="form-control" rows="3"></textarea>
+            </div>
+
+            <!-- 액션 버튼 -->
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" :disabled="loading">
+                {{ loading ? '처리 중...' : (isEditMode ? '수정' : '등록') }}
+              </button>
+              <button type="button" class="btn btn-secondary" @click="$emit('close')">
+                취소
+              </button>
+              <button v-if="isEditMode" type="button" class="btn btn-danger" @click="handleDelete">
+                삭제
+              </button>
+            </div>
+          </form>
         </div>
-
-        <!-- 수업 종류 선택 (휴강/보강) -->
-        <div v-if="isCancelOrMakeup" class="form-group">
-          <label>수업 종류 *</label>
-          <select v-model="classType" class="form-control">
-            <option value="">선택해주세요</option>
-            <option value="regular">정규 수업</option>
-            <option value="special">특강</option>
-          </select>
-        </div>
-
-        <!-- 학년 선택 (정규 수업/정규 휴강/정규 보강) -->
-        <div v-if="needsYearInput" class="form-group">
-          <label>학년 *</label>
-          <select v-model="selectedYear" class="form-control">
-            <option value="">선택해주세요</option>
-            <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}학년</option>
-          </select>
-        </div>
-
-        <!-- 레벨 선택 (특강/특강 휴강/특강 보강) -->
-        <div v-if="needsLevelInput" class="form-group">
-          <label>레벨 *</label>
-          <select v-model="selectedLevel" class="form-control">
-            <option value="">선택해주세요</option>
-            <option v-for="l in levels" :key="l" :value="l">{{ l }}</option>
-          </select>
-        </div>
-
-        <!-- 분반 선택 (특강) -->
-        <div v-if="needsGroupLevel" class="form-group">
-          <label>분반</label>
-          <select v-model="groupLevelProxy" class="form-control">
-            <option value="">전체</option>
-            <option v-for="g in groupLevelOptions" :key="g" :value="g">{{ g }}반</option>
-          </select>
-        </div>
-
-        <!-- 요일 선택 (정규/특강/휴강) -->
-        <div v-if="needsDayInput" class="form-group">
-          <label>요일 *</label>
-          <select v-model="form.day" class="form-control">
-            <option value="">선택해주세요</option>
-            <option v-for="day in days" :key="day" :value="day">{{ day }}요일</option>
-          </select>
-        </div>
-
-        <!-- 날짜 선택 (휴강/보강/이벤트) -->
-        <div v-if="needsDateInput" class="form-group">
-          <label>날짜 *</label>
-          <input 
-            type="date" 
-            v-model="form.event_date" 
-            class="form-control"
-            :min="new Date().toISOString().split('T')[0]"
-          />
-        </div>
-
-        <!-- 과목 선택 -->
-        <div v-if="needsSubjectSelect" class="form-group">
-          <label>과목 *</label>
-          <select v-model="form.subject_id" class="form-control">
-            <option value="">선택해주세요</option>
-            <option v-for="subj in filteredSubjects" :key="subj.id" :value="subj.id">
-              {{ subj.name }}
-            </option>
-          </select>
-        </div>
-
-        <!-- 수업 선택 (휴강 & 보강 모두) -->
-        <div v-if="(isCancel || isMakeup) && form.day" class="form-group">
-          <label>수업 *</label>
-          <select v-model="form.timetable_id" class="form-control">
-            <option value="">선택해주세요</option>
-            <option v-for="tt in timetableOpts" :key="tt.id" :value="tt.id">
-              {{ tt.display_name }}
-            </option>
-          </select>
-          <small v-if="timetableOpts.length === 0" class="text-muted">
-            선택한 요일에 등록된 수업이 없습니다.
-          </small>
-        </div>
-
-
-        <!-- 교시 선택 -->
-        <template v-if="needsPeriodInput">
-          <div class="form-group">
-            <label>시작 교시 *</label>
-            <select v-model="form.start_period" class="form-control">
-              <option value="">선택해주세요</option>
-              <option v-for="p in availablePeriods" :key="p" :value="p">
-                {{ p }}교시
-              </option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>종료 교시 *</label>
-            <select v-model="form.end_period" class="form-control">
-              <option value="">선택해주세요</option>
-              <option v-for="p in availablePeriods" :key="p" :value="p">
-                {{ p }}교시
-              </option>
-            </select>
-          </div>
-        </template>
-
-        <!-- 설명 -->
-        <div class="form-group">
-          <label>설명</label>
-          <textarea v-model="form.description" class="form-control" rows="3"></textarea>
-        </div>
-
-        <!-- 액션 버튼 -->
-        <div class="form-actions">
-          <button type="submit" class="btn btn-primary" :disabled="loading">
-            {{ loading ? '처리 중...' : (isEditMode ? '수정' : '등록') }}
-          </button>
-          <button type="button" class="btn btn-secondary" @click="$emit('close')">
-            취소
-          </button>
-          <button v-if="isEditMode" type="button" class="btn btn-danger" @click="handleDelete">
-            삭제
-          </button>
-        </div>
-      </form>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
+// =========================================================
+// 1. Imports & 초기 설정
+// =========================================================
 import { ref, computed, watch } from 'vue'
 import { useAuthStore } from '@/store/authStore'
 import {
-  fetchTimetables, createTimetable, updateTimetable, deleteTimetable
+  fetchTimetables,
+  createTimetable,
+  updateTimetable,
+  deleteTimetable
 } from '@/services/timetableService'
 import {
-  createEvent, updateEvent, deleteEvent
+  createEvent,
+  updateEvent,
+  deleteEvent
 } from '@/services/eventService'
 import {
-  getSpecialLectures, getSubjectsForEvent, getSubjectsByYear
+  getSpecialLectures,
+  getSubjectsForEvent,
+  getSubjectsByYear
 } from '@/services/subjectService'
 
-/* ----------------- Props & Emits ----------------- */
+// =========================================================
+// 2. Props & Emits
+// =========================================================
 const props = defineProps({
   isOpen: Boolean,
   isEditMode: Boolean,
@@ -171,10 +195,12 @@ const props = defineProps({
 })
 const emit = defineEmits(['close', 'saved'])
 
-/* ----------------- State ----------------- */
+// =========================================================
+// 3. State 변수 및 기본 값 설정
+// =========================================================
 const form = ref({
   id: null,
-  event_type: props.formType || '',
+  event_type: props.formType === 'event' ? 'event' : '',
   timetable_id: null,
   subject_id: '',
   event_date: '',
@@ -192,74 +218,186 @@ const form = ref({
 const loading = ref(false)
 const classType = ref('')
 const selectedYear = ref(props.year || 1)
-const selectedLevel = ref(props.level || 'N1')
+const selectedLevel = ref(props.level || '')
 const timetableOpts = ref([])
 const subjectOpts = ref([])
-const availableTimeSlots = ref([]) // 사용 가능한 시간대
+const availableTimeSlots = ref([])
 
 const days = ['월','화','수','목','금','토']
 const levels = ['N1','N2','N3','TOPIK4','TOPIK6']
+const yearOptions = [1, 2, 3]
+const groupLevelOptions = ['A', 'B']
+
 const auth = useAuthStore()
 
-/* ----------------- 권한 ----------------- */
+// =========================================================
+// 4. 컴퓨티드 프로퍼티
+// =========================================================
+
+// 권한 관련
 const isAdminOrProfessor = computed(() => auth.role <= 2)
 
-/* ----------------- Form Type ----------------- */
-const isRegular  = computed(() => props.formType === 'regular')
-const isSpecial  = computed(() => props.formType === 'special')
-const isEvent    = computed(() => props.formType === 'event')
-const isCancel   = computed(() => form.value.event_type === 'cancel')
-const isMakeup   = computed(() => form.value.event_type === 'makeup')
+// 폼 타입 관련
+const isRegular = computed(() => props.formType === 'regular')
+const isSpecial = computed(() => props.formType === 'special')
+const isEvent   = computed(() => props.formType === 'event')
+const isCancel  = computed(() => form.value.event_type === 'cancel')
+const isMakeup  = computed(() => form.value.event_type === 'makeup')
 const isRegularOrSpecial = computed(() => isRegular.value || isSpecial.value)
 const needPeriods = computed(() =>
-    isRegularOrSpecial.value || ['cancel','makeup'].includes(form.value.event_type)
+    isRegularOrSpecial.value || ['cancel', 'makeup'].includes(form.value.event_type)
 )
 const needTime = computed(() =>
     ['special','event'].includes(form.value.event_type)
 )
 
+// 타이틀 텍스트
 const titles = {
-  edit:   isRegularOrSpecial.value ? '수업 수정' : '이벤트 수정',
+  edit: isRegularOrSpecial.value ? '수업 수정' : '이벤트 수정',
   create: isRegularOrSpecial.value ? '수업 등록' : '이벤트 등록'
 }
 
-/* ----------------- Proxy for group_levels ----------------- */
+// 그룹 레벨 프록시 (배열 처리)
 const groupLevelProxy = computed({
   get: () => form.value.group_levels?.[0] ?? '',
   set: v => form.value.group_levels = v ? [v] : []
 })
 
-/* ----------------- 정규 과목 필터 (부모 subjects 사용) ----------------- */
-// 정규 폼은 부모에서 전달받은 subjects를 필터링 (is_special_lecture=0, year 일치)
+// 정규 수업의 경우 부모로 전달받은 subjects 필터링 (예: 연도와 특강 아님)
 const regularSubjectOpts = computed(() => {
   const semester = form.value.semester
   return props.subjects?.filter(s =>
       s.year === Number(selectedYear.value) &&
-      // TODO s.semester === semester && 추후 계절 구현
       s.is_special_lecture === 0
   ) || []
 })
 
+// 교시 선택 표시 여부 (정규/특강/보강 혹은 휴강 시)
 const showPeriodField = computed(() => {
-  // 정규/특강 수업 등록일 때만 교시 선택
   return isRegular.value || isSpecial.value || (isMakeup.value && classType.value === 'special')
 })
 
-/* ----------------- 과목 로딩 ----------------- */
-// 부모에서 전달받은 subjects를 사용할 경우, 정규 폼은 API 호출 없이 props.subjects로 처리
-// 특강 폼: selectedLevel과 groupLevelProxy 변화 시 API 호출 (getSpecialLectures)
+// 입력 필드 노출 조건
+const needsTimeInput = computed(() => form.value.event_type === 'event')
+const needsPeriodInput = computed(() =>
+    ['regular','cancel','makeup','special'].includes(form.value.event_type || '')
+)
+const needsSubjectSelect = computed(() =>
+    ['regular','makeup','special','event'].includes(form.value.event_type || '')
+)
+const needsTimetableSelect = computed(() =>
+    form.value.event_type === 'cancel'
+)
+const needsYearInput = computed(() => {
+  return form.value.event_type === 'regular' ||
+      (['cancel', 'makeup'].includes(form.value.event_type || '') && classType.value === 'regular')
+})
+const needsLevelInput = computed(() => {
+  return form.value.event_type === 'special' ||
+      (classType.value === 'special' && ['cancel', 'makeup'].includes(form.value.event_type || ''))
+})
+const needsGroupLevel = computed(() => {
+  return form.value.event_type === 'special' ||
+      (['cancel', 'makeup'].includes(form.value.event_type || '') && classType.value === 'special')
+})
+const needsDayInput = computed(() =>
+    ['regular','special','cancel'].includes(form.value.event_type || '')
+)
+const needsDateInput = computed(() =>
+    ['cancel','makeup','event'].includes(form.value.event_type || '')
+)
+
+// 필터링된 과목 목록
+const filteredSubjects = computed(() => {
+  if (!subjectOpts.value?.length) return []
+  let filtered = []
+  if (form.value.event_type === 'regular') {
+    filtered = subjectOpts.value.filter(s =>
+        (!s.is_special_lecture || s.is_special_lecture === 0) &&
+        (!s.year || s.year === selectedYear.value)
+    )
+  } else if (form.value.event_type === 'special') {
+    filtered = subjectOpts.value.filter(s => s.level === selectedLevel.value)
+  } else if (classType.value === 'special' && ['cancel','makeup'].includes(form.value.event_type)) {
+    filtered = subjectOpts.value.filter(s => (!s.level || s.level === selectedLevel.value))
+  } else if (classType.value === 'regular' && ['cancel','makeup'].includes(form.value.event_type)) {
+    filtered = subjectOpts.value.filter(s =>
+        (!s.is_special_lecture || s.is_special_lecture === 0) &&
+        (!s.year || s.year === selectedYear.value)
+    )
+  } else {
+    filtered = subjectOpts.value
+  }
+  return filtered
+})
+
+// (하단의 추가 컴퓨티드들은 기존 데이터 및 외부 스토어를 참조하므로 상황에 맞게 유지)
+const findExistingClasses = computed(() => {
+  if (!selectedDay.value || !selectedPeriod.value) return []
+  if (classType.value === 'regular') {
+    return timetableStore.timetables.filter(item =>
+        item.day === selectedDay.value &&
+        item.start_period <= selectedPeriod.value &&
+        item.end_period >= selectedPeriod.value &&
+        item.academic_year === currentYear.value
+    )
+  }
+  return timetableStore.events.filter(item => {
+    if (item.date !== selectedDate.value) return false
+    if (item.start_period > selectedPeriod.value || item.end_period < selectedPeriod.value) return false
+    if (classType.value === 'special' && item.level === selectedLevel.value) return true
+    if ((classType.value === 'cancel' || classType.value === 'makeup') &&
+        item.original_class &&
+        item.original_class.level === selectedLevel.value)
+      return true
+    return false
+  })
+})
+
+const isTimeOccupied = computed(() => {
+  if (holidayStore.isHoliday(selectedDate.value)) return true
+  if (findExistingClasses.value.length > 0) {
+    if (classType.value === 'special') {
+      return findExistingClasses.value.some(item =>
+          item.level === selectedLevel.value || !item.level
+      )
+    }
+    return true
+  }
+  return false
+})
+
+const occupiedMessage = computed(() => {
+  if (holidayStore.isHoliday(selectedDate.value))
+    return '공휴일에는 수업을 등록할 수 없습니다.'
+  if (findExistingClasses.value.length > 0) {
+    const classes = findExistingClasses.value
+    if (classType.value === 'special' && !classes.some(item => item.level === selectedLevel.value))
+      return null
+    return `이미 ${classes.length}개의 수업이 등록되어 있습니다.`
+  }
+  return null
+})
+
+// =========================================================
+// 5. Watchers
+// =========================================================
+
+// [특강/이벤트 과목 로딩]
 if (props.formType === 'special') {
   watch(
       [selectedLevel, groupLevelProxy],
       async ([lvl, grp]) => {
-        console.log('[watch] selectedLevel:', lvl, 'groupLevel:', grp)
         if (!lvl) {
           subjectOpts.value = props.subjects || []
           return
         }
         try {
-          const { specialLectures } = await getSpecialLectures({ level: lvl, group_level: grp, semester: props.semester })
-          console.log('[watch] getSpecialLectures returns:', specialLectures)
+          const { specialLectures } = await getSpecialLectures({
+            level: lvl,
+            group_level: grp,
+            semester: props.semester
+          })
           subjectOpts.value = specialLectures
         } catch (error) {
           console.error('특강 과목 불러오기 실패:', error)
@@ -270,9 +408,8 @@ if (props.formType === 'special') {
   )
 }
 
-// 이벤트 폼: 폼 초기화 시 event_type을 'event'로 설정하고, 해당 watcher로 API 호출
 if (props.formType === 'event') {
-  // 폼 초기화 시 자동으로 이벤트 타입 설정
+  // 이벤트 폼: 기본 event_type 설정 및 과목 로딩
   if (!form.value.event_type) {
     form.value.event_type = 'event'
   }
@@ -280,95 +417,71 @@ if (props.formType === 'event') {
       () => form.value.event_type,
       async (type) => {
         if (type === 'event') {
-          // ✅ 최소한 year, level은 넘기자
           const { subjects } = await getSubjectsForEvent({
             year: props.year,
             level: props.level,
             group_level: props.groupLevel || ''
-          });
-          subjectOpts.value = subjects;
+          })
+          subjectOpts.value = subjects
         }
       },
       { immediate: true }
   )
 }
 
-/* ----------------- Watch 과목 및 시간표 로딩 ----------------- */
+// [과목 및 시간표 로딩 관련]
 watch(
-    [() => form.value?.event_type, classType, selectedYear, selectedLevel],
+    [() => form.value.event_type, classType, selectedYear, selectedLevel],
     async ([eventType, type, yr, lvl]) => {
       if (!eventType) return
-
       try {
-        console.log('과목 로딩 시작:', { eventType, type, yr, lvl })
-        
-        // 이벤트 타입이 변경될 때마다 초기화
+        // 초기화
         subjectOpts.value = []
         timetableOpts.value = []
-        
-        // 정규 수업
-        if (eventType === 'regular') {
-          if (yr) {
-            console.log('정규 수업 로딩 시작:', { year: yr })
-            const { subjects } = await getSubjectsByYear(yr)
-            subjectOpts.value = subjects || []
-            console.log('정규 수업 로드 결과:', { 
-                total: subjects?.length,
-                filtered: subjectOpts.value?.length,
-                subjects: subjectOpts.value 
-            })
-          }
+
+        if (eventType === 'regular' && yr) {
+          const { subjects } = await getSubjectsByYear(yr)
+          subjectOpts.value = subjects || []
         }
-        // 특강
-        else if (eventType === 'special') {
-          if (lvl) {
-            const { specialLectures } = await getSpecialLectures({ 
-              level: lvl,
-              group_level: groupLevelProxy.value,
-              semester: props.semester
-            })
-            subjectOpts.value = specialLectures
-            console.log('특강 과목 로드:', { level: lvl, subjects: subjectOpts.value })
-          }
+        else if (eventType === 'special' && lvl) {
+          const { specialLectures } = await getSpecialLectures({
+            level: lvl,
+            group_level: groupLevelProxy.value,
+            semester: props.semester
+          })
+          subjectOpts.value = specialLectures
         }
-        // 휴강
         else if (eventType === 'cancel') {
           if (type === 'regular' && yr) {
             const { subjects } = await getSubjectsByYear({ year: yr })
             subjectOpts.value = subjects.filter(s => !s.is_special_lecture)
-            console.log('휴강-정규 과목 로드:', { year: yr, subjects: subjectOpts.value })
           } else if (type === 'special' && lvl) {
-            const { specialLectures } = await getSpecialLectures({ 
+            const { specialLectures } = await getSpecialLectures({
               level: lvl,
               group_level: groupLevelProxy.value,
               semester: props.semester
             })
             subjectOpts.value = specialLectures
-            console.log('휴강-특강 과목 로드:', { level: lvl, subjects: subjectOpts.value })
           }
         }
-        // 보강
         else if (eventType === 'makeup') {
           if (type === 'regular' && yr) {
             const { subjects } = await getSubjectsByYear({ year: yr })
             subjectOpts.value = subjects.filter(s => !s.is_special_lecture)
-            console.log('보강-정규 과목 로드:', { year: yr, subjects: subjectOpts.value })
           } else if (type === 'special' && lvl) {
-            const { specialLectures } = await getSpecialLectures({ 
+            const { specialLectures } = await getSpecialLectures({
               level: lvl,
               group_level: groupLevelProxy.value,
               semester: props.semester
             })
             subjectOpts.value = specialLectures
-            console.log('보강-특강 과목 로드:', { level: lvl, subjects: subjectOpts.value })
           }
         }
 
-        // 휴강인 경우 시간표도 로드
-        if (eventType === 'cancel' && form.value?.day) {
+        // 휴강일 경우 시간표 로드
+        if (eventType === 'cancel' && form.value.day) {
           await loadTimetables()
         }
-
       } catch (error) {
         console.error('데이터 로딩 실패:', error)
         subjectOpts.value = []
@@ -378,98 +491,45 @@ watch(
     { immediate: true }
 )
 
-// 시간표 로딩 함수
-async function loadTimetables() {
-  try {
-    const params = {
-      semester: props.semester,
-      day: form.value.day
-    }
-
-    // 정규 수업인 경우 학년 필터 추가
-    if (classType.value === 'regular' && selectedYear.value) {
-      params.year = selectedYear.value
-      params.is_special_lecture = 0  // 정규 수업만 조회
-    }
-    // 특강인 경우 레벨 필터 추가
-    else if (classType.value === 'special') {
-      // selectedLevel, props.level 둘 다 확인하고, 없을 경우 기본값 'N1' 사용
-      params.level = selectedLevel.value || props.level || 'N1'
-      params.group_level = groupLevelProxy.value
-      params.is_special_lecture = 1  // 특강만 조회
-    }
-
-    console.log('시간표 로딩 파라미터:', params)
-    const timetables = await fetchTimetables(params)
-    console.log('로딩된 시간표:', timetables)
-
-    // 수업 정보 가공
-    timetableOpts.value = timetables
-        .filter(tt => {
-          if (classType.value === 'regular') {
-            // 정규 수업: year가 있고 is_special_lecture가 0 (숫자 또는 문자열 "0") 인 경우
-            return tt.year && Number(tt.is_special_lecture) === 0
-          } else if (classType.value === 'special') {
-            return tt.level === (selectedLevel.value || props.level || 'N1') &&
-                (!groupLevelProxy.value || tt.group_level === groupLevelProxy.value) &&
-                Number(tt.is_special_lecture) === 1
-          }
-          return false
-        })
-        .map(tt => ({
-          ...tt,
-          display_name: `[${tt.level || (tt.year + '학년')}] ${tt.subject_name} ${tt.group_level ? `(${tt.group_level}분반)` : ''} - ${tt.start_period}~${tt.end_period}교시`
-        }))
-
-    // 디버깅: 반환된 각 시간표의 is_special_lecture 값 및 타입 출력
-    timetables.forEach(tt => {
-      console.log(`tt.id: ${tt.id}, is_special_lecture: ${tt.is_special_lecture}, type: ${typeof tt.is_special_lecture}`);
-    });
-
-    console.log('가공된 시간표:', {
-      type: classType.value,
-      filtered: timetableOpts.value,
-      count: timetableOpts.value.length
-    })
-  } catch (error) {
-    console.error('시간표 로딩 실패:', error)
-    timetableOpts.value = []
-  }
-}
-
-// 요일 변경 시 시간표 로드
-watch(() => form.value.day, async (newDay) => {
-  if ((form.value.event_type === 'cancel' || form.value.event_type === 'makeup') && newDay) {
+// 학년 또는 레벨이 변경될 때 (요일 선택이 되어 있다면 시간표 재로드)
+watch([selectedYear, selectedLevel], async () => {
+  if (form.value.event_type === 'cancel' && form.value.day) {
     await loadTimetables()
   }
 })
 
-// 수업 선택 시 자동 필드 설정
+// 요일 변경 시 시간표 로드 (휴강일 경우)
+watch(() => form.value.day, async (newDay) => {
+  if (form.value.event_type === 'cancel' && newDay) {
+    await loadTimetables()
+  }
+})
+
+// 수업 선택 시 자동 필드 설정 및 (보강일 경우) 시간대 제한 업데이트
 watch(() => form.value.timetable_id, async (newId) => {
   if (!newId) return
-
   const selected = timetableOpts.value.find(t => t.id === newId)
   if (!selected) return
 
-  // 공통 필드 설정
   form.value.subject_id = selected.subject_id
   form.value.year = selected.year
   form.value.level = selected.level
   form.value.group_levels = selected.group_level ? [selected.group_level] : []
 
-  // 휴강인 경우 시간 정보도 복사
   if (form.value.event_type === 'cancel') {
     form.value.start_period = selected.start_period
     form.value.end_period = selected.end_period
-  }
-  // 보강인 경우 시간대 제한 계산
-  else if (form.value.event_type === 'makeup') {
+  } else if (form.value.event_type === 'makeup') {
     await updateAvailableTimeSlots(selected)
   }
 })
 
-// 이벤트 타입 변경 시 초기화 및 기본값 설정
+// 이벤트 타입 변경 시 공통 필드 리셋 및 기본값 설정 (중복 워처 통합)
 watch(() => form.value.event_type, (newType) => {
+  // 'special'와 'event'에서 학년 초기화
+  if (['special', 'event'].includes(newType)) {
+    form.value.year = null
+  }
   // 공통 필드 초기화
   form.value.subject_id = ''
   form.value.timetable_id = null
@@ -478,39 +538,82 @@ watch(() => form.value.event_type, (newType) => {
   form.value.start_time = null
   form.value.end_time = null
   form.value.day = ''
-  
-  // 타입별 기본값 설정
+
+  // 타입별 기본 설정
   if (newType === 'regular') {
     form.value.year = selectedYear.value
     classType.value = 'regular'
-  } else if (newType === 'special') {
+  }
+  else if (newType === 'special') {
     form.value.start_period = 1
     form.value.end_period = 1
     classType.value = 'special'
-  } else if (newType === 'cancel') {
-    // 휴강은 수업 선택 시 자동으로 채워짐
-    classType.value = 'regular'  // 기본값은 정규 수업
-  } else if (newType === 'makeup') {
+  }
+  else if (newType === 'cancel') {
+    classType.value = 'regular'
+  }
+  else if (newType === 'makeup') {
     form.value.start_period = 1
     form.value.end_period = 1
-    classType.value = 'regular'  // 기본값은 정규 수업
-  } else if (newType === 'event') {
+    classType.value = 'regular'
+  }
+  else if (newType === 'event') {
     form.value.start_time = '09:00'
     form.value.end_time = '18:00'
   }
 })
 
-/* ----------------- 사용 가능한 시간대 계산 ----------------- */
+// =========================================================
+// 6. 함수 정의
+// =========================================================
+
+// [시간표 로드 함수]
+async function loadTimetables() {
+  try {
+    const semester = props.semester
+    if (classType.value === 'special') {
+      const { specialLectures } = await getSpecialLectures({
+        level: selectedLevel.value || props.level || 'ALL',
+        group_level: groupLevelProxy.value || 'ALL',
+        semester,
+        start_date: new Date().toISOString().split('T')[0],
+        end_date: new Date(new Date().setMonth(new Date().getMonth() + 6))
+            .toISOString().split('T')[0]
+      })
+      // 선택한 요일에 해당하는 특강만 필터링
+      const matching = specialLectures.filter(tt => tt.day === form.value.day)
+      timetableOpts.value = matching.map(tt => ({
+        ...tt,
+        display_name: `[${tt.level}] ${tt.subject_name} (${tt.group_level || '전체'}반) - ${tt.start_period}~${tt.end_period}교시`
+      }))
+      return
+    }
+    // 정규 수업의 경우: 학년 기준 조회
+    const params = {
+      semester,
+      day: form.value.day,
+      year: selectedYear.value,
+      is_special_lecture: 0
+    }
+    const timetables = await fetchTimetables(params)
+    timetableOpts.value = timetables.map(tt => ({
+      ...tt,
+      display_name: `[${tt.year}학년] ${tt.subject_name} - ${tt.start_period}~${tt.end_period}교시`
+    }))
+  } catch (err) {
+    console.error('시간표 로딩 실패:', err)
+    timetableOpts.value = []
+  }
+}
+
+// [보강 시간대 제한 업데이트 함수]
 async function updateAvailableTimeSlots(originalClass) {
   try {
-    // 원본 수업의 시간대만 제한
     const restrictedPeriods = new Set()
     for (let i = originalClass.start_period; i <= originalClass.end_period; i++) {
       restrictedPeriods.add(i)
     }
-    
-    // 모든 교시 중에서 원본 수업 시간대만 제외
-    const allPeriods = Array.from({length: 9}, (_, i) => i + 1)
+    const allPeriods = Array.from({ length: 9 }, (_, i) => i + 1)
     availableTimeSlots.value = allPeriods.filter(p => !restrictedPeriods.has(p))
   } catch (error) {
     console.error('시간대 계산 실패:', error)
@@ -518,93 +621,9 @@ async function updateAvailableTimeSlots(originalClass) {
   }
 }
 
-/* ----------------- Computed properties for form validation and display logic ----------------- */
-const needsTimeInput = computed(() => {
-  return form.value?.event_type === 'event'  // 일반 이벤트만 시간 입력
-})
-
-const needsPeriodInput = computed(() => {
-  return ['regular', 'cancel', 'makeup', 'special'].includes(form.value?.event_type || '')
-})
-
-const needsSubjectSelect = computed(() => {
-  return ['regular', 'makeup', 'special', 'event'].includes(form.value?.event_type || '')
-})
-
-const needsTimetableSelect = computed(() => {
-  return form.value?.event_type === 'cancel'
-})
-
-const needsYearInput = computed(() => {
-  // 정규 수업과 정규 수업 관련 휴강/보강에서만 학년 선택 필요
-  return form.value?.event_type === 'regular' || 
-         (['cancel', 'makeup'].includes(form.value?.event_type || '') && classType.value === 'regular')
-})
-
-const needsGroupLevel = computed(() => {
-  // 특강과 특강 관련 휴강/보강에서만 분반 선택 필요
-  return form.value?.event_type === 'special' || 
-         (['cancel', 'makeup'].includes(form.value?.event_type || '') && classType.value === 'special')
-})
-
-const showGroupLevel = computed(() => {
-  return ['special', 'makeup'].includes(form.value?.event_type || '')
-})
-
-const groupLevelOptions = ['A', 'B']
-const yearOptions = [1, 2, 3]
-const dayOptions = ['월', '화', '수', '목', '금']
-const availablePeriods = Array.from({length: 9}, (_, i) => i + 1)
-
-/* ----------------- Form validation ----------------- */
-const validateForm = () => {
-  // 공통 필수 필드
-  const requiredFields = {
-    event_type: '이벤트 유형',
-    event_date: '날짜'
-  }
-
-  // 이벤트 타입별 필수 필드
-  if (form.value.event_type === 'cancel') {
-    requiredFields.timetable_id = '수업'
-  } else if (['makeup', 'special'].includes(form.value.event_type)) {
-    requiredFields.subject_id = '과목'
-    requiredFields.start_period = '시작 교시'
-    requiredFields.end_period = '종료 교시'
-    requiredFields.year = '학년'
-  } else if (form.value.event_type === 'event') {
-    requiredFields.subject_id = '과목'
-    requiredFields.start_time = '시작 시간'
-    requiredFields.end_time = '종료 시간'
-  }
-
-  // 필수 필드 검증
-  for (const [field, label] of Object.entries(requiredFields)) {
-    if (!form.value[field]) {
-      alert(`${label}을(를) 입력해주세요.`)
-      return false
-    }
-  }
-
-  // 시간 범위 검증
-  if (needsTimeInput.value) {
-    if (form.value.start_time >= form.value.end_time) {
-      alert('종료 시간은 시작 시간보다 늦어야 합니다.')
-      return false
-    }
-  }
-
-  if (needsPeriodInput.value) {
-    if (form.value.start_period >= form.value.end_period) {
-      alert('종료 교시는 시작 교시보다 커야 합니다.')
-      return false
-    }
-  }
-
-  return true
-}
-
-/* ----------------- initialData 반영 ----------------- */
+// =========================================================
+// 7. 초기화 및 props 반영
+// =========================================================
 watch(() => props.initialData, (val) => {
   if (props.isEditMode && val) {
     form.value = {
@@ -613,16 +632,20 @@ watch(() => props.initialData, (val) => {
     }
     selectedYear.value = val.year || props.year || 1
     selectedLevel.value = val.level || props.level || ''
+    classType.value = val.is_special_lecture ? 'special' : 'regular'
+    if (val.event_type === 'cancel' && val.day) {
+      loadTimetables()
+    }
   } else {
     resetForm()
   }
-})
+}, { immediate: true })
 
 watch(() => props.isOpen, (v) => {
   if (!v) resetForm()
 })
 
-/* ----------------- 초기화 함수 ----------------- */
+// [폼 초기화 함수]
 function resetForm() {
   form.value = {
     id: null,
@@ -647,7 +670,9 @@ function resetForm() {
   availableTimeSlots.value = []
 }
 
-/* ----------------- 저장 함수 수정 ----------------- */
+// =========================================================
+// 8. 저장 및 삭제 함수
+// =========================================================
 const handleSubmit = async () => {
   if (!validateForm()) return
 
@@ -657,7 +682,6 @@ const handleSubmit = async () => {
     level: selectedLevel.value
   }
 
-  // null 처리
   if (!needsTimeInput.value) {
     formData.start_time = null
     formData.end_time = null
@@ -667,7 +691,6 @@ const handleSubmit = async () => {
     formData.end_period = null
   }
 
-  // 휴강인 경우 timetable에서 정보 복사
   if (formData.event_type === 'cancel' && formData.timetable_id) {
     const selected = timetableOpts.value.find(t => t.id === formData.timetable_id)
     if (selected) {
@@ -678,8 +701,6 @@ const handleSubmit = async () => {
       formData.end_period = selected.end_period
     }
   }
-
-  console.log('📝 등록할 데이터:', formData)
 
   try {
     loading.value = true
@@ -698,7 +719,6 @@ const handleSubmit = async () => {
   }
 }
 
-/* ----------------- 삭제 함수 ----------------- */
 async function handleDelete() {
   if (!confirm('삭제하시겠습니까?')) return
   loading.value = true
@@ -709,79 +729,54 @@ async function handleDelete() {
     emit('saved')
     emit('close')
   } catch (e) {
-    console.error('❌ 삭제 실패:', e)
+    console.error('삭제 실패:', e)
     alert('삭제 중 오류')
   } finally {
     loading.value = false
   }
 }
 
-// Computed properties for conditional rendering
-const needsLevelInput = computed(() => {
-  return form.value?.event_type === 'special' || 
-         (classType.value === 'special' && ['cancel', 'makeup'].includes(form.value?.event_type || ''))
-})
+// =========================================================
+// 9. 폼 검증 함수
+// =========================================================
+const validateForm = () => {
+  const requiredFields = {
+    event_type: '이벤트 유형',
+    event_date: '날짜'
+  }
 
-const needsDayInput = computed(() => {
-  return ['regular', 'special', 'cancel'].includes(form.value?.event_type || '')
-})
+  if (form.value.event_type === 'cancel') {
+    requiredFields.timetable_id = '수업'
+  } else if (['makeup', 'special'].includes(form.value.event_type)) {
+    requiredFields.subject_id = '과목'
+    requiredFields.start_period = '시작 교시'
+    requiredFields.end_period = '종료 교시'
+    requiredFields.year = '학년'
+  } else if (form.value.event_type === 'event') {
+    requiredFields.subject_id = '과목'
+    requiredFields.start_time = '시작 시간'
+    requiredFields.end_time = '종료 시간'
+  }
 
-const needsDateInput = computed(() => {
-  return ['cancel', 'makeup', 'event'].includes(form.value?.event_type || '')
-})
-
-// Filtered subjects based on type and year/level
-const filteredSubjects = computed(() => {
-    if (!subjectOpts.value?.length) return []
-    
-    console.log('필터링 전 과목:', {
-        type: form.value?.event_type,
-        classType: classType.value,
-        year: selectedYear.value,
-        level: selectedLevel.value,
-        subjects: subjectOpts.value
-    })
-    
-    let filtered = []
-    if (form.value?.event_type === 'regular') {
-        // 정규 수업인 경우
-        filtered = subjectOpts.value.filter(s => 
-            (!s.is_special_lecture || s.is_special_lecture === 0) && 
-            (!s.year || s.year === selectedYear.value)
-        )
-    } else if (form.value?.event_type === 'special') {
-        // 특강인 경우 - level만 확인 (이미 getSpecialLectures API에서 특강만 가져옴)
-        filtered = subjectOpts.value.filter(s => s.level === selectedLevel.value)
-    } else if (classType.value === 'special' && ['cancel', 'makeup'].includes(form.value?.event_type)) {
-        // 특강 휴강/보강인 경우
-        filtered = subjectOpts.value.filter(s => 
-            (!s.level || s.level === selectedLevel.value)
-        )
-    } else if (classType.value === 'regular' && ['cancel', 'makeup'].includes(form.value?.event_type)) {
-        // 정규 수업 휴강/보강인 경우
-        filtered = subjectOpts.value.filter(s => 
-            (!s.is_special_lecture || s.is_special_lecture === 0) && 
-            (!s.year || s.year === selectedYear.value)
-        )
-    } else {
-        filtered = subjectOpts.value
+  for (const [field, label] of Object.entries(requiredFields)) {
+    if (!form.value[field]) {
+      alert(`${label}을(를) 입력해주세요.`)
+      return false
     }
-    
-    console.log('필터링 후 과목:', {
-        filtered,
-        count: filtered.length,
-        criteria: {
-            type: form.value?.event_type,
-            classType: classType.value,
-            year: selectedYear.value,
-            level: selectedLevel.value
-        }
-    })
-    return filtered
-})
+  }
 
-/* ----------------- Computed properties for template ----------------- */
-const isCancelOrMakeup = computed(() => isCancel.value || isMakeup.value)
+  if (needsTimeInput.value && form.value.start_time >= form.value.end_time) {
+    alert('종료 시간은 시작 시간보다 늦어야 합니다.')
+    return false
+  }
+
+  if (needsPeriodInput.value && form.value.start_period >= form.value.end_period) {
+    alert('종료 교시는 시작 교시보다 커야 합니다.')
+    return false
+  }
+
+  return true
+}
 </script>
 
 <style scoped>
@@ -793,29 +788,104 @@ const isCancelOrMakeup = computed(() => isCancel.value || isMakeup.value)
   justify-content: center;
   align-items: center;
 }
+
+.modal-wrapper {
+  max-height: 85vh;
+  overflow: auto;
+}
+
 .modal-content {
   background: white;
   padding: 20px;
-  width: 420px;
   border-radius: 8px;
+  width: 500px;
+  max-width: 90vw;
 }
+
+.form-layout {
+  display: block;
+}
+
+.edit-form {
+  width: 100%;
+}
+
+.original-info-top {
+  margin-bottom: 20px;
+  background: #fff3bf;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #ffd43b;
+  font-size: 0.95em;
+}
+
+.original-info-top .info-box {
+  margin: 0;
+}
+
+.original-info-top .info-label {
+  font-weight: 600;
+  color: #e67700;
+  margin-bottom: 6px;
+  font-size: 0.9em;
+}
+
+.original-info-top .info-content {
+  color: #495057;
+  line-height: 1.4;
+}
+
 .form-group {
-  margin-bottom: 15px;
+  margin-bottom: 12px;
 }
+
 .form-group label {
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
+  font-size: 0.9em;
+  color: #495057;
 }
+
 input, select, textarea {
   width: 100%;
-  padding: 6px;
+  padding: 6px 8px;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  font-size: 0.95em;
 }
+
 .form-actions {
   display: flex;
-  justify-content: space-between;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 20px;
 }
-.danger {
-  background-color: crimson;
+
+.btn {
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9em;
+}
+
+.btn-primary {
+  background: #4263eb;
   color: white;
+}
+
+.btn-secondary {
+  background: #868e96;
+  color: white;
+}
+
+.btn-danger {
+  background: #fa5252;
+  color: white;
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 </style>
