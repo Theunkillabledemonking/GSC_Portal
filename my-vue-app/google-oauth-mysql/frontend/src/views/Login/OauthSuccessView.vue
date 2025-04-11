@@ -19,18 +19,17 @@ onMounted(() => {
   console.log("📌 쿼리 데이터:", route.query);
 
 
-  const { token, role, name, grade, level, status } = route.query;
+  const { token, id, role, name, grade, level, status } = route.query;
 
   if (token) {
-    console.log("✅ 토큰 감지됨:", token);
-
     const user = {
+      id: Number(id),
       role: Number(role),
       name,
       grade: Number(grade),
       level,
       status: Number(status),
-      email: '', // 필요시 추가
+      email: '', // 필요시
     };
 
     console.log("🧪 login 파라미터:", token, user);

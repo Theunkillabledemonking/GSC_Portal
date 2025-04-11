@@ -1,10 +1,14 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useAuthStore } from '@/store/authStore.js';
+import LineConnectModal from '@/components/LineConnectModal.vue';
 
 const authStore = useAuthStore();
 const isAdmin = computed(() => Number(authStore.role) === 1);
 const isAuthenticated = computed(() => !!authStore.token);
+
+// ✅ 모달 상태
+const showLineModal = ref(false);
 
 const logout = () => {
   authStore.logout();
@@ -40,11 +44,21 @@ const logout = () => {
           <router-link to="/admin" class="hover:text-idolPink transition">관리자 페이지</router-link>
         </li>
       </ul>
+      <!-- 우측 버튼: LINE 친구 + 로그아웃 -->
+      <div class="flex items-center">
+        <LineConnectModal v-if="showLineModal" @close="showLineModal = false" />
 
-      <!-- 로그아웃 -->
-      <button @click="logout" class="btn-soft text-sm font-semibold ml-4">
-        로그아웃
-      </button>
+        <!-- 버튼 -->
+        <button @click="showLineModal = true" class="btn-soft flex items-center gap-2 text-sm font-medium hover:opacity-80">
+          <img src="@/assets/line_88.png" alt="LINE" class="w-6 h-6" />
+          <span>LINE 연동</span>
+        </button>
+
+        <!-- 로그아웃 버튼 -->
+        <button @click="logout" class="btn-soft text-sm font-semibold">
+          로그아웃
+        </button>
+      </div>
     </div>
   </nav>
 </template>
