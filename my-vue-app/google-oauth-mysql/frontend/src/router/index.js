@@ -16,7 +16,7 @@ import NoticesView from '@/views/Notices/NoticesView.vue';
 import NoticeForm from "@/views/Notices/NoticeCreateView.vue";
 import NoticeDetailView from "@/views/Notices/NoticeDetailView.vue";
 import NoticeEditView from "@/views/Notices/NoticeEditView.vue";
-import SubjectManage from "@/components/admin/SubjectManage.vue";
+import SubjectList from "@/components/admin/SubjectList.vue";
 import TimetableView from "@/views/TimetableView.vue";
 
 import CalendarWithEvents from "@/components/specific/CalendarWithEvents.vue";
@@ -39,7 +39,7 @@ const routes = [
     { path: '/notices/:id', name: 'NoticeDetail', component: NoticeDetailView },
     { path: '/notices/edit/:id', name: 'NoticeEdit', component: NoticeEditView },
 
-    { path: '/admin/subjects', name: 'SubjectManage', component: SubjectManage, meta: { requiresAuth: true } },
+    { path: '/admin/subjects', name: 'SubjectManage', component: SubjectList, meta: { requiresAuth: true } },
 
     { path: '/timetables', name: 'TimetableView', component: TimetableView, meta: { requiresAuth: true } }
 ];
