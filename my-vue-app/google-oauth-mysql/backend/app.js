@@ -25,8 +25,7 @@ const calendarRoutes = require('./routes/calendarRoutes');
 const timetableRoutes = require('./routes/timetableRoutes');
 const eventRoutes = require('./routes/eventRoutes'); // 이벤트 (보강/휴강/특강)
 const holidayRoutes = require('./routes/holidayRoutes');
-
-
+const lineRoutes = require("./routes/lineRoutes");
 
 // =======================
 // ✅ Express 앱 초기화
@@ -58,6 +57,7 @@ app.use('/api/calendar', calendarRoutes); // 구글 캘린더 라우트
 app.use('/api/timetables', timetableRoutes) // ✅ 정규 시간표 관리
 app.use('/api/events', eventRoutes); // ✅ 이벤트 관리 (보강/휴강/특강)
 app.use('/api/holidays', holidayRoutes);
+app.use('/api/line', lineRoutes);
 
 
 // =======================
