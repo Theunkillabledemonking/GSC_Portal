@@ -17,6 +17,7 @@ export const useSubjectStore = defineStore("subjectStore", {
         },
 
         async loadSubjectsByYear(year) {
+            if (!year) return [];
             if (!this.byYear[year]) {
                 const { subjects } = await subjectApi.getSubjectsByYear(year);
                 this.byYear[year] = subjects;
@@ -25,6 +26,7 @@ export const useSubjectStore = defineStore("subjectStore", {
         },
 
         async loadSubjectsByLevel(level) {
+            if (!level) return [];
             if (!this.byLevel[level]) {
                 const { subjects } = await subjectApi.getSubjectsByLevel(level);
                 this.byLevel[level] = subjects;
@@ -33,6 +35,7 @@ export const useSubjectStore = defineStore("subjectStore", {
         },
 
         async loadSubjectsBySemester({ year, semester }) {
+            if (!year || !semester) return [];
             const key = `${year}-${semester}`;
             if (!this.bySemester[key]) {
                 const { subjects } = await subjectApi.getSubjectsBySemester({ year, semester });
@@ -41,8 +44,8 @@ export const useSubjectStore = defineStore("subjectStore", {
             return this.bySemester[key];
         },
 
-        async loadSpecialSubjects() {
-            const { specialLectures } = await subjectApi.getSpecialLectures();
+        async loadSpecialSubjects(filters = {}) {
+            const { specialLectures } = await subjectApi.getSpecialLectures(filters);
             this.special = specialLectures;
         },
 
