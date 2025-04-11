@@ -1,9 +1,45 @@
 <script setup>
-import { ref } from 'vue';
-import AdminUserTable from '@/components/admin/AdminUserTable.vue';
-import SubjectManage from '@/components/admin/SubjectManage.vue';
+import { ref, computed, onMounted } from 'vue';
+import { useUserStore } from '@/store/userStore'; // ✅ 스토어 import
 
-const currentTab = ref('users'); // default 탭
+import AdminUserApprovalTable from '@/components/admin/AdminUserApprovalTable.vue';
+import AdminUserListTable from '@/components/admin/AdminUserListTable.vue';
+import SubjectList from '@/components/admin/SubjectList.vue';
+
+const currentTab = ref('approval'); // 탭 선택 상태
+
+const userStore = useUserStore();
+
+// ✅ 유저 리스트 가져오기 (onMounted에 최초 호출)
+onMounted(() => {
+  userStore.fetchUsers(); // 서버에서 유저 전체 불러오기
+});
+
+// ✅ 승인 대기 유저
+const pendingUsers = computed(() =>
+    userStore.users.filter((u) => u.status === 0)
+);
+
+// ✅ 기존 유저 (승인됨 or 거부됨)
+const managedUsers = computed(() =>
+    userStore.users.filter((u) => u.status === 1 || u.status === 2)
+);
+
+// ✅ 이벤트 처리 함수들
+const updateStatus = async (id, status) => {
+  await userStore.updateStatus(id, status);
+  await userStore.fetchUsers();
+};
+
+const updateRole = async (id, role) => {
+  await userStore.updateRole(id, role);
+  await userStore.fetchUsers();
+};
+
+const updateUser = async (user) => {
+  await userStore.updateUser(user);
+  await userStore.fetchUsers();
+};
 </script>
 
 <template>
@@ -12,49 +48,41 @@ const currentTab = ref('users'); // default 탭
 
     <!-- 탭 버튼 -->
     <div class="tab-controls">
-      <button :class="{ active: currentTab === 'users' }" @click="currentTab = 'users'">승인 대기</button>
+      <button :class="{ active: currentTab === 'approval' }" @click="currentTab = 'approval'">승인 대기</button>
+      <button :class="{ active: currentTab === 'users' }" @click="currentTab = 'users'">유저 관리</button>
       <button :class="{ active: currentTab === 'subjects' }" @click="currentTab = 'subjects'">과목 관리</button>
     </div>
 
     <!-- 탭 내용 -->
     <div class="tab-content">
-      <AdminUserTable v-if="currentTab === 'users'"
-                      :users="dummyUsers"
-                      @updateStatus="handleUpdateStatus"
-                      @updateRole="handleUpdateRole" />
+      <AdminUserApprovalTable
+          v-if="currentTab === 'approval'"
+          :users="pendingUsers"
+          @updateStatus="updateStatus"
+          @updateRole="updateRole"
+      />
 
-      <SubjectManage v-else />
+      <AdminUserListTable
+          v-else-if="currentTab === 'users'"
+          :users="managedUsers"
+          @updateUser="updateUser"
+          @updateStatus="updateStatus"
+      />
+
+      <SubjectList v-else />
     </div>
   </div>
 </template>
-
-<script>
-// 여기선 API 연동 or store 가져오기로 교체 가능
-const dummyUsers = [
-  { id: 1, name: '홍길동', email: 'hong@example.com', phone: '010-0000-0000', grade: 1, level: 'N2', role: 3 },
-  { id: 2, name: '김영희', email: 'kim@example.com', phone: '010-1111-1111', grade: 2, level: 'TOPIK4', role: 3 },
-];
-
-const handleUpdateStatus = (id, status) => {
-  console.log('✅ 승인 상태 변경:', id, status);
-};
-
-const handleUpdateRole = (id, role) => {
-  console.log('✅ 권한 변경:', id, role);
-};
-</script>
 
 <style scoped>
 .admin-view {
   padding: 40px;
 }
-
 .tab-controls {
   margin-bottom: 20px;
   display: flex;
   gap: 10px;
 }
-
 .tab-controls button {
   padding: 10px 20px;
   border: 1px solid #ddd;
@@ -62,7 +90,6 @@ const handleUpdateRole = (id, role) => {
   cursor: pointer;
   font-weight: bold;
 }
-
 .tab-controls button.active {
   background-color: #1E3A8A;
   color: white;

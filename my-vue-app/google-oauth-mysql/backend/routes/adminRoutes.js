@@ -1,42 +1,24 @@
-// Express 모듈을 불러옵니다.
 const express = require('express');
-
-// JWT 인증 및 권한 검증을 위한 미들웨어를 불러옵니다.
-const { verifyToken, hasRole } = require('../middlewares/authMiddleware');
-
-// 관리자 컨트롤러 불러오기
-const { getUsers, updateUserStatus, updateUserRole, getPendingUsers } = require('../controllers/adminController');
-
-// Express의 라우터 객체를 생성합니다.
 const router = express.Router();
 
-// -------------------------------------------
-// 1. 사용자 목록 조회 (Get All Users)
-// -------------------------------------------
+const { verifyToken, hasRole } = require('../middlewares/authMiddleware');
+const {
+    getAllUsers,
+    getPendingUsers,
+    updateUserStatus,
+    updateUserInfo
+} = require('../controllers/adminController');
 
-// HTTP GET 요청을 처리합니다.
-// 엔드포인트: /api/admin/users
-router.get('/user', verifyToken, hasRole(1), getUsers);
+// ✅ 전체 유저 목록 조회
+router.get('/users', verifyToken, hasRole(1), getAllUsers);
 
-// -------------------------------------------
-// 2. 사용자 승인 상태 업데이트 (Update User Status)
-// -------------------------------------------
+// ✅ 승인 대기 유저만 조회
+router.get('/users/pending', verifyToken, hasRole(1), getPendingUsers);
 
-// HTTP PUT 요청을 처리합니다.
-// 엔드포인트: /api/admin/user/status
-router.put('/user/status', verifyToken, hasRole(1), updateUserStatus);
+// ✅ 유저 승인 상태 변경 (0:대기, 1:승인, 2:거부)
+router.patch('/users/:id/status', verifyToken, hasRole(1), updateUserStatus);
 
+// ✅ 유저 정보 및 권한 수정
+router.patch('/users/:id/info', verifyToken, hasRole(1), updateUserInfo);
 
-// -------------------------------------------
-// 3. 사용자 권한 및 정보 업데이트 (Update User Role and Info)
-// -------------------------------------------
-
-// HTTP PUT 요청을 처리합니다.
-// 엔드포인트: /api/admin/user/role
-router.put('/user/role', verifyToken, hasRole(1), updateUserRole);
-
-// 4. 승인 대기 중인 사용자 목록 조회 (Get Pending Users)
-router.get('/user/pending', verifyToken, hasRole(1), getPendingUsers);
-
-// 라우터 객체를 외부에서 사용할 수 있도록 내보냅니다.
 module.exports = router;
