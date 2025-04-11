@@ -89,7 +89,14 @@ exports.googleCallback = async (req, res) => {
         });
 
         // ✅ 프론트엔드로 리다이렉트하여 토큰 전달
-        const redirectURL = `${process.env.VITE_FRONTEND_URL}/oauth/success?token=${jwtToken}&role=${user.role}&name=${encodeURIComponent(user.name)}&grade=${user.grade}&level=${user.level}&status=${user.status}`;
+        const redirectURL = `${process.env.VITE_FRONTEND_URL}/oauth/success?` +
+            `token=${jwtToken}` +
+            `&role=${user.role}` +
+            `&name=${encodeURIComponent(user.name)}` +
+            `&id=${user.id}` +
+            `&grade=${user.grade}` +
+            `&level=${user.level}` +
+            `&status=${user.status}`;
         console.log("🔗 최종 리다이렉트 URL:", redirectURL);
         return res.redirect(redirectURL);
 

@@ -20,6 +20,7 @@ import SubjectList from "@/components/admin/SubjectList.vue";
 import TimetableView from "@/views/TimetableView.vue";
 
 import CalendarWithEvents from "@/components/specific/CalendarWithEvents.vue";
+import LineConnectModal from "@/components/LineConnectModal.vue";
 
 const routes = [
     { path: "/", redirect: "/login" },
@@ -41,7 +42,9 @@ const routes = [
 
     { path: '/admin/subjects', name: 'SubjectManage', component: SubjectList, meta: { requiresAuth: true } },
 
-    { path: '/timetables', name: 'TimetableView', component: TimetableView, meta: { requiresAuth: true } }
+    { path: '/timetables', name: 'TimetableView', component: TimetableView, meta: { requiresAuth: true } },
+    { path: '/line-connect', name: 'LineConnect', component: LineConnectModal },
+
 ];
 
 const router = createRouter({

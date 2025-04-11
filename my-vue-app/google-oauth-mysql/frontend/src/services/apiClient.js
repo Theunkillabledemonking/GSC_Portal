@@ -1,6 +1,6 @@
 import axios from "axios";
 import { useAuthStore } from "@/store/authStore";
-
+let authStore;
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 // ✅ axios 인스턴스 생성
@@ -31,12 +31,13 @@ apiClient.interceptors.response.use(
     response => response,
     async (error) => {
         if (error.response?.status === 401) {
-            console.warn("⚠️ 토큰 만료됨! 로그아웃 처리...");
-            const authStore = useAuthStore();
-            authStore.logout();
+            console.warn("🚨 토큰 만료 또는 인증 오류");
+            if (!authStore) authStore = useAuthStore();
+            authStore.logout(); // 이제 정확히 동작함!
         }
         return Promise.reject(error);
     }
 );
+
 
 export default apiClient;
