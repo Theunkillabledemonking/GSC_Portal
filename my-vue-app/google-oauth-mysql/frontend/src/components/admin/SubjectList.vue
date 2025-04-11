@@ -1,21 +1,31 @@
 <template>
   <div class="subject-manage">
-    <h2>📚 과목 목록 (유형별 보기)</h2>
+    <h2>📚 과목 목록</h2>
 
     <!-- ✅ 필터 -->
     <div class="filters">
       <div class="filter-group">
+        <span>유형:</span>
+        <button :class="{ active: filter.type === 'all' }" @click="filter.type = 'all'">전체</button>
+        <button :class="{ active: filter.type === 'regular' }" @click="filter.type = 'regular'">정규</button>
+        <button :class="{ active: filter.type === 'special' }" @click="filter.type = 'special'">특강</button>
+      </div>
+
+      <div class="filter-group">
         <span>📘 학년:</span>
-        <button @click="filter.year = ''">전체</button>
-        <button @click="filter.year = '1'">1학년</button>
-        <button @click="filter.year = '2'">2학년</button>
-        <button @click="filter.year = '3'">3학년</button>
+        <!-- 학년은 정규 과목일 경우에만 -->
+        <select v-model="filter.year">
+          <option value="">학년</option>
+          <option value="1">1학년</option>
+          <option value="2">2학년</option>
+          <option value="3">3학년</option>
+        </select>
       </div>
       <div class="filter-group">
         <span>🧪 레벨:</span>
-        <select v-model="form.level">
+        <select v-model="filter.level">
           <option value="">레벨</option>
-          <option v-for="level in availableLevels" :key="level" :value="level">{{ level }}</option>
+          <option v-for="level in allLevels" :key="level">{{ level }}</option>
         </select>
       </div>
       <div class="filter-group">
@@ -29,25 +39,47 @@
     </div>
 
     <!-- ✅ 과목 목록 -->
-    <div class="card-list">
-      <div class="subject-card" v-for="subject in filteredSubjects" :key="subject.id">
-        <div class="subject-header">
-          <strong>{{ subject.name }}</strong>
-          <span class="badge" :class="subject.is_special_lecture ? 'special' : 'regular'">
-            {{ subject.is_special_lecture ? '특강' : '정규' }}
-          </span>
-        </div>
-        <div class="meta">
-          <p>📚 학년: {{ subject.year || 'N/A' }} | 🎯 레벨: {{ subject.level || 'N/A' }}</p>
-          <p>👥 대상: {{ subject.is_foreigner_target === 1 ? '외국인' : subject.is_foreigner_target === 0 ? '한국인' : '공통' }}</p>
-          <p>📅 학기: {{ subject.semester || 'N/A' }} | 그룹: {{ subject.group_level || '전체' }}</p>
-        </div>
-        <div class="actions">
-          <button @click="openEditModal(subject)">✏️ 수정</button>
-          <button @click="deleteSubject(subject.id)">🗑 삭제</button>
-        </div>
-      </div>
-    </div>
+    <table>
+      <thead>
+      <tr>
+        <th>과목명</th>
+        <th>학년</th>
+        <th>레벨</th>
+        <th>대상</th>
+        <th>학기</th>
+        <th>분반</th>
+        <th>유형</th>
+        <th>관리</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr v-for="subject in filteredSubjects" :key="subject.id">
+        <td>{{ subject.name }}</td>
+        <td>{{ subject.year ? subject.year + '학년' : '전체' }}</td>
+        <td>{{ subject.level || 'N/A' }}</td>
+        <td>
+          {{
+            subject.is_foreigner_target === 1
+                ? '외국인'
+                : subject.is_foreigner_target === 0
+                    ? '한국인'
+                    : '전체'
+          }}
+        </td>
+        <td>{{ semesterLabelMap[subject.semester] || 'N/A' }}</td>
+        <td>{{ subject.group_level || '전체' }}</td>
+        <td>
+    <span class="badge" :class="subject.is_special_lecture ? 'special' : 'regular'">
+      {{ subject.is_special_lecture ? '특강' : '정규' }}
+    </span>
+        </td>
+        <td>
+          <button @click="openEditModal(subject)">수정</button>
+          <button @click="deleteSubject(subject.id)">삭제</button>
+        </td>
+      </tr>
+      </tbody>
+    </table>
 
     <!-- ✅ 과목 추가 버튼 -->
     <div style="margin-top: 20px;">
@@ -70,11 +102,10 @@
           <option :value="0">한국인</option>
           <option :value="1">외국인</option>
         </select>
-        <select v-if="form.is_foreigner_target !== null" v-model="form.level">
+        <select v-model="filter.level">
           <option value="">레벨</option>
-          <option v-for="level in availableLevels" :key="level" :value="level">{{ level }}</option>
+          <option v-for="level in allLevels" :key="level">{{ level }}</option>
         </select>
-
         <select v-model="form.semester">
           <option value="">학기 선택</option>
           <option value="spring">🌸 Spring</option>
@@ -86,7 +117,6 @@
           <option value="">전체</option>
           <option value="A">A반</option>
           <option value="B">B반</option>
-          <option value="C">C반</option>
         </select>
 
         <label><input type="checkbox" v-model="form.is_special_lecture" /> 특강 여부</label>
@@ -99,15 +129,29 @@
     </div>
   </div>
 </template>
-
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { useSubjectStore } from '@/store/subjectStore';
 
 const subjectStore = useSubjectStore();
-
-const filter = ref({ year: '', level: '', is_foreigner: '' });
 const isModalOpen = ref(false);
+
+const semesterLabelMap = {
+  spring: '봄학기',
+  summer: '여름학기',
+  fall: '가을학기',
+  winter: '겨울학기',
+  null: 'N/A',
+  '': 'N/A'
+};
+
+
+const filter = ref({
+  year: '',
+  level: '',
+  is_foreigner: '',
+  type: 'all' // all | regular | special
+});
 
 const form = reactive({
   id: null,
@@ -119,6 +163,8 @@ const form = reactive({
   group_level: '',
   is_foreigner_target: null
 });
+
+
 
 const resetForm = () => {
   Object.assign(form, {
@@ -133,18 +179,19 @@ const resetForm = () => {
   });
 };
 
+const allLevels = ['N1', 'N2', 'N3', 'TOPIK4', 'TOPIK6'];
+
 const availableLevels = computed(() => {
   if (form.is_foreigner_target === 0) return ['N1', 'N2', 'N3'];
   if (form.is_foreigner_target === 1) return ['TOPIK4', 'TOPIK6'];
-  return []; // 공통이면 아무것도 안 보임
+  return [];
 });
 
-watch(() => form.is_foreigner_target, (val) => {
+watch(() => form.is_foreigner_target, () => {
   if (!availableLevels.value.includes(form.level)) {
     form.level = '';
   }
 });
-
 
 const openEditModal = (subject = null) => {
   resetForm();
@@ -187,18 +234,43 @@ const deleteSubject = async (id) => {
 
 onMounted(() => {
   subjectStore.loadAllSubjects();
+  console.log("📥 과목 불러옴")
 });
 
 const filteredSubjects = computed(() => {
   return subjectStore.all.filter((s) => {
-    const matchYear = !filter.value.year || s.year == filter.value.year;
-    const matchLevel = !filter.value.level || s.level === filter.value.level;
+    const isSpecial = Number(s.is_special_lecture || 0) === 1;
+
+    const matchType =
+        filter.value.type === 'all' ||
+        (filter.value.type === 'regular' && !isSpecial) ||
+        (filter.value.type === 'special' && isSpecial);
+
+    const matchYear =
+        !filter.value.year || Number(s.year) === Number(filter.value.year);
+
+    const matchLevel =
+        !filter.value.level || s.level === filter.value.level;
+
     const matchTarget =
         filter.value.is_foreigner === '' ||
-        s.is_foreigner_target == filter.value.is_foreigner;
-    return matchYear && matchLevel && matchTarget;
+        (s.is_foreigner_target !== null &&
+            Number(s.is_foreigner_target) === Number(filter.value.is_foreigner));
+
+    const result = matchType && matchYear && matchLevel && matchTarget;
+
+    console.log({
+      name: s.name,
+      isSpecial,
+      matchType,
+      matchYear,
+      result
+    });
+
+    return result;
   });
 });
+
 
 
 </script>
@@ -218,48 +290,35 @@ const filteredSubjects = computed(() => {
   align-items: center;
   gap: 10px;
 }
-.card-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
-}
-.subject-card {
-  border: 1px solid #ccc;
-  border-radius: 12px;
-  padding: 16px;
-  background: #fff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-}
-.subject-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.meta {
-  font-size: 14px;
-  margin: 10px 0;
-}
-.actions {
-  display: flex;
-  justify-content: end;
-  gap: 8px;
-}
-.badge {
-  padding: 2px 8px;
-  border-radius: 8px;
-  font-size: 12px;
+.filter-group button.active {
+  background-color: #1E3A8A;
+  color: white;
   font-weight: bold;
 }
-.badge.regular {
-  background: #00c853;
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th, td {
+  border: 1px solid #ddd;
+  padding: 10px;
+  text-align: center;
+}
+.badge {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: bold;
   color: white;
 }
 .badge.special {
   background: #2962ff;
-  color: white;
+}
+.badge.regular {
+  background: #00c853;
 }
 
-/* Modal */
 .modal-overlay {
   position: fixed;
   top: 0;
