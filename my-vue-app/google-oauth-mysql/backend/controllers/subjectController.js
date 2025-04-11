@@ -6,6 +6,7 @@ const pool = require('../config/db');
 exports.getSpecialLectures = async (req, res) => {
     const userLevel = req.query.level || req.user?.level;
     const groupLevel = req.query.group_level || null;
+    const isForeigner = req.query.is_foreigner ?? req.user?.is_foreigner;
 
     if (!userLevel) {
         return res.status(403).json({ message: "레벨 정보가 없습니다. 관리자에게 문의하세요." });
@@ -18,8 +19,9 @@ exports.getSpecialLectures = async (req, res) => {
             FROM subjects
             WHERE is_special_lecture = 1
               AND (level = ? OR level IS NULL)
+              AND (is_foreigner_target = ? OR is_foreigner IS NULL)
         `;
-        const params = [userLevel];
+        const params = [userLevel, isForeigner];
 
         if (groupLevel) {
             query += ` AND (group_level = ? OR group_level IS NULL)`;
@@ -44,7 +46,7 @@ exports.getSpecialLectures = async (req, res) => {
 exports.getSubjectsForEvent = async (req, res) => {
     // year, level, group_level을 모두 고려해
     // "정규 과목(해당 year)" + "특강 과목(해당 level, group_level)"을 한 번에 조회
-    const { year, level, group_level } = req.query;
+    const { year, level, group_level, is_foreigner } = req.query;
 
     // year나 level이 없다면 기본값 설정 또는 에러 처리
     if (!year && !level) {
@@ -63,9 +65,10 @@ exports.getSubjectsForEvent = async (req, res) => {
                 (
                   is_special_lecture = 1
                   AND (level = ? OR level IS NULL)
+                  AND (is_foreigner_target = ? OR is_foreigner IS NULL)
         `;
 
-        const params = [year, level];
+        const params = [year, level, is_foreigner];
 
         // group_level이 있으면 AND (group_level=? OR group_level IS NULL) 추가
         if (group_level) {
@@ -107,13 +110,14 @@ exports.getSubjectsByYear = async (req, res) => {
  * ✅ 레벨별 과목 조회
  */
 exports.getSubjectsByLevel = async (req, res) => {
-    const { level } = req.query;
+    const { level, is_foreigner } = req.query;
 
     try {
         const [rows] = await pool.query(`
             SELECT * FROM subjects
-            WHERE level = ? OR level IS NULL
-        `, [level]);
+            WHERE (level = ? OR level IS NULL)
+              AND (is_foreigner_target = ? OR is_foreigner IS NULL)
+        `, [level, is_foreigner]);
 
         res.json({ subjects: rows });
     } catch (err) {
@@ -163,7 +167,7 @@ exports.getSubjects = async (req, res) => {
  * ✅ 과목 등록
  */
 exports.createSubject = async (req, res) => {
-    const { name, year, level, is_special_lecture, semester } = req.body;
+    const { name, year, level, is_special_lecture, semester, is_foreigner_target, group_level } = req.body;
 
     if (!name || (!year && !is_special_lecture)) {
         return res.status(400).json({ message: "과목명과 학년 또는 특강 여부를 입력해야 합니다." });
@@ -171,8 +175,8 @@ exports.createSubject = async (req, res) => {
 
     try {
         await pool.query(
-            "INSERT INTO subjects (name, year, level, is_special_lecture, semester) VALUES (?, ?, ?, ?, ?)",
-            [name, year || null, level || null, is_special_lecture || 0, semester || null]
+            "INSERT INTO subjects (name, year, level, is_special_lecture, semester, is_foreigner_target, group_level) VALUES (?, ?, ?, ?, ?, ? ,?)",
+            [name, year || null, level || null, is_special_lecture || 0, semester || null, is_foreigner_target ?? null, group_level || null]
         );
         res.status(201).json({ message: "과목이 추가되었습니다." });
     } catch (error) {
@@ -186,7 +190,7 @@ exports.createSubject = async (req, res) => {
  */
 exports.updateSubject = async (req, res) => {
     const { id } = req.params;
-    const { name, year, level, is_special_lecture, semester } = req.body;
+    const { name, year, level, is_special_lecture, semester, is_foreigner_target, group_level } = req.body;
 
     if (!name || (!year && !is_special_lecture)) {
         return res.status(400).json({ message: "과목명과 학년 또는 특강 여부를 입력해야 합니다." });
@@ -194,8 +198,8 @@ exports.updateSubject = async (req, res) => {
 
     try {
         const [result] = await pool.query(
-            "UPDATE subjects SET name = ?, year = ?, level = ?, is_special_lecture = ?, semester = ? WHERE id = ?",
-            [name, year || null, level || null, is_special_lecture || 0, semester || null, id]
+            "UPDATE subjects SET name = ?, year = ?, level = ?, is_special_lecture = ?, semester = ?, is_foreigner_target = ?, group_level = ? WHERE id = ?",
+            [name, year || null, level || null, is_special_lecture || 0, semester || null, is_foreigner_target ?? null, group_level || null, id]
         );
 
         if (result.affectedRows === 0) {
