@@ -24,7 +24,8 @@ const generateJWT = (user) => {
             name: user.name,
             grade: user.grade,
             level: user.level,
-            status: user.status
+            status: user.status,
+            is_foreigner: user.is_foreigner
         },
         process.env.JWT_SECRET,
         { expiresIn: "2h" }
@@ -102,7 +103,7 @@ exports.googleCallback = async (req, res) => {
  * ✅ 회원가입 API
  */
 exports.registerUser = async (req, res) => {
-    const { email, name, student_id, phone, role, grade, level } = req.body;
+    const { email, name, student_id, phone, role, grade, level, is_foreigner } = req.body;
 
     try {
         // ✅ 이메일 중복 확인
@@ -116,8 +117,8 @@ exports.registerUser = async (req, res) => {
 
         // ✅ 사용자 데이터 삽입
         const result = await pool.query(
-            "INSERT INTO users (email, name, student_id, phone, role, grade, level, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            [email, name, student_id, phone, role, grade, level, status]
+            "INSERT INTO users (email, name, student_id, phone, role, grade, level, status, is_foreigner) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [email, name, student_id, phone, role, grade, level, status, is_foreigner]
         );
 
         return res.status(201).json({ message: "회원가입 성공! 관리자의 승인을 기다려주세요." });
