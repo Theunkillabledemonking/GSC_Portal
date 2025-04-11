@@ -11,6 +11,7 @@ export const useAuthStore = defineStore("auth", {
         grade: localStorage.getItem("grade") || null,
         level: localStorage.getItem("level") || null,
         status: localStorage.getItem("status") ? Number(localStorage.getItem("status")) : null,
+        is_foreigner: localStorage.getItem("is_foreigner") ? Number(localStorage.getItem("is_foreigner")) : null,
     }),
 
     getters: {
@@ -45,6 +46,7 @@ export const useAuthStore = defineStore("auth", {
             this.grade = Number(user.grade);
             this.level = user.level;
             this.status = user.status;
+            this.is_foreigner = user.is_foreigner;
 
             localStorage.setItem("accessToken", token);
             localStorage.setItem("user", JSON.stringify(user));
@@ -53,6 +55,7 @@ export const useAuthStore = defineStore("auth", {
             localStorage.setItem("grade", String(user.grade));
             localStorage.setItem("level", user.level);
             localStorage.setItem("status", user.status);
+            localStorage.setItem("is_foreigner", user.is_foreigner);
         },
 
         // ✅ 로그아웃 처리
@@ -64,6 +67,7 @@ export const useAuthStore = defineStore("auth", {
             this.grade = null;
             this.level = null;
             this.status = null;
+            this.is_foreigner = null;
 
             localStorage.clear();
 
@@ -83,6 +87,7 @@ export const useAuthStore = defineStore("auth", {
                 this.grade = this.user.grade;
                 this.level = this.user.level;
                 this.status = this.user.status;
+                this.is_foreigner = this.user.is_foreigner;
             } else {
                 // user 객체가 없을 경우 개별 항목으로 불러오기
                 this.role = localStorage.getItem("role") ? Number(localStorage.getItem("role")) : null;
@@ -90,6 +95,7 @@ export const useAuthStore = defineStore("auth", {
                 this.grade = localStorage.getItem("grade") || null;
                 this.level = localStorage.getItem("level") || null;
                 this.status = localStorage.getItem("status") ? Number(localStorage.getItem("status")) : null;
+                this.is_foreigner = localStorage.getItem("is_foreigner") ? Number(localStorage.getItem("is_foreigner")) : null;
             }
         },
     },
