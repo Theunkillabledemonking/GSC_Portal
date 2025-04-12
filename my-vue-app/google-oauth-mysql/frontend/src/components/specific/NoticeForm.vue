@@ -56,6 +56,12 @@
         <input type="date" v-model="form.important_until" class="form-input" />
       </div>
     </div>
+    <div class="mb-4">
+      <label class="inline-flex items-center space-x-2 text-sm font-medium">
+        <input type="checkbox" v-model="form.notify_line" />
+        <span>LINE 알림 전송</span>
+      </label>
+    </div>
 
     <!-- 파일 업로드 -->
     <div class="mb-6">
@@ -98,7 +104,8 @@ const form = ref({
   grade: "",
   subject_id: "",
   level: "",
-  important_until: null
+  important_until: null,
+  notify_line: false
 });
 
 const isImportant = ref(false);
@@ -239,7 +246,9 @@ const handleSubmit = () => {
     ...form.value,
     files: uploadedFiles.value,
     grade: form.value.grade ? Number(form.value.grade) : 0,
-    subject_id: form.value.subject_id ? Number(form.value.subject_id) : 0,
+    subject_id: form.value.subject_id && form.value.subject_id !== "0"
+        ? Number(form.value.subject_id)
+        : null,
     level: form.value.level,
     author_id: authStore.user?.id || null,
     is_important: isImportant.value ? 1 : 0,
