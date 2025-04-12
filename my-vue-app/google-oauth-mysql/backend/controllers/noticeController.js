@@ -4,19 +4,66 @@ const fs = require("fs");
 
 const BASE_URL = "http://localhost:5000/uploads/";
 
+const isValidLevel = (level) =>
+    !level || level === "ALL" || ["N1", "N2", "N3", "TOPIK4", "TOPIK6"].includes(level);
+
+const isBooleanString = (val) => typeof val === "string" && (val === "true" || val === "false");
+
+const validateNoticeInput = ({ title, content }) => {
+    if (!title || !content) {
+        throw new Error("제목과 내용은 필수입니다.");
+    }
+};
+
 /**
  * ✅ 중요 공지사항 자동 해제 (기간 만료)
  */
 const clearExpiredImportantNotices = async () => {
     try {
         const now = new Date();
-        await pool.query("UPDATE notices SET is_important = 0 WHERE is_important = 1 AND important_until < ?", [now]);
+        await pool.query(
+            "UPDATE notices SET is_important = 0 WHERE is_important = 1 AND important_until < ?",
+            [now]
+        );
         console.log("✅ 만료된 중요 공지사항이 자동 해제되었습니다.");
     } catch (error) {
         console.error("중요 공지사항 해제 오류:", error);
     }
 };
 setInterval(clearExpiredImportantNotices, 10 * 60 * 1000);
+
+
+exports.sendLineNotification = async ({ title, content, grade, level, is_foreigner, isUpdate = false }) => {
+    let query = `SELECT line_user_id FROM users WHERE line_user_id IS NOT NULL`;
+    const params = [];
+
+    if (grade) {
+        query += " AND grade = ?";
+        params.push(grade);
+    }
+    if (level && level !== "ALL") {
+        query += " AND level = ?";
+        params.push(level);
+    }
+    if (is_foreigner !== undefined && is_foreigner !== null) {
+        query += " AND is_foreigner = ?";
+        params.push(is_foreigner);
+    }
+
+    const [targets] = await pool.query(query, params);
+    console.log("📨 LINE 전송 대상 수:", targets.length);
+
+    const message = `📢 [공지${isUpdate ? " 수정됨" : ""}] ${title}\n${content}\n👉 포털에서 확인하세요`;
+
+    for (const { line_user_id } of targets) {
+        try {
+            await sendLineMessage(line_user_id, message);
+            console.log("📤 전송 성공:", line_user_id);
+        } catch (e) {
+            console.error("❌ 전송 실패:", line_user_id, e.message);
+        }
+    }
+};
 
 /**
  * ✅ 공지사항 목록 조회 (필터링 & 정렬 적용)
@@ -30,7 +77,7 @@ exports.getNotices = async (req, res) => {
                 u.name AS author, n.created_at, n.updated_at,
                 n.is_important, n.notify_kakao, n.views,
                 n.is_foreigner,
-                s.name AS subject_name
+                IFNULL(s.name, '과목 없음') AS subject_name
             FROM notices n
                      JOIN users u ON n.author_id = u.id
                      LEFT JOIN subjects s ON n.subject_id = s.id
@@ -42,7 +89,8 @@ exports.getNotices = async (req, res) => {
             query += " AND (n.grade IS NULL OR n.grade = ?)";
             params.push(grade);
         }
-        if (level) {
+        // 레벨이 선택되지 않았거나 "ALL"인 경우에는 조건을 추가하지 않음.
+        if (level && level !== "ALL") {
             query += " AND (n.level IS NULL OR n.level = ?)";
             params.push(level);
         }
@@ -69,13 +117,13 @@ exports.getNotices = async (req, res) => {
     }
 };
 
+
 /**
  * ✅ 공지사항 상세 조회 (조회수 증가 포함)
  */
 exports.getNoticeById = async (req, res) => {
     try {
         const { id } = req.params;
-
         const noticeQuery = `
             SELECT
                 n.id, n.title, n.content, n.grade, n.subject_id, n.author_id,
@@ -95,20 +143,19 @@ exports.getNoticeById = async (req, res) => {
 
         const notice = notices[0];
 
-        // ✅ 첨부파일 조회
+        // 첨부파일 조회 및 URL 조립
         const [attachments] = await pool.query(
             "SELECT id, file_url, original_filename FROM notice_attachments WHERE notice_id = ?",
             [id]
         );
 
-        // ✅ 여기에서 BASE_URL을 붙여서 완전한 다운로드 링크로 만들어줌
         notice.attachments = attachments.map(file => ({
             id: file.id,
-            url: `${BASE_URL}${file.file_url}`,  // ✅ URL은 여기서만 조립
+            url: `${BASE_URL}${file.file_url}`,
             name: file.original_filename
         }));
 
-        // ✅ 조회수 증가
+        // 조회수 증가 처리
         await pool.query("UPDATE notices SET views = views + 1 WHERE id = ?", [id]);
 
         res.status(200).json(notice);
@@ -118,94 +165,67 @@ exports.getNoticeById = async (req, res) => {
     }
 };
 
+const { sendLineNotification } = require("../utils/lineNotification");
 /**
  * ✅ 공지사항 등록 (is_foreigner 포함) - 관리자(1) 또는 교수(2)만 가능
  */
 exports.createNotice = async (req, res) => {
-    try {
-        const { title, content, grade, level, subject_id, is_important, important_until, is_foreigner } = req.body;
-        const author_id = req.user?.id;
-        const role = req.user?.role;
+    const { title, content, grade, level, subject_id, is_important, important_until, is_foreigner, notify_line } = req.body;
+    const author_id = req.user?.id;
+    const role = req.user?.role;
 
-        if (!author_id || (role > 2)) {
-            return res.status(403).json({ message: "공지사항 작성 권한이 없습니다." });
-        }
-
-        const query = `
-            INSERT INTO notices (title, content, author_id, grade, level, subject_id, is_important, important_until, is_foreigner)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `;
-
-        const params = [
-            title,
-            content,
-            author_id,
-            grade || null,
-            level || null,
-            subject_id || null,
-            is_important || 0,
-            important_until || null,
-            is_foreigner ?? null
-        ];
-
-        await pool.query(query, params);
-        res.status(201).json({ message: "공지사항이 등록되었습니다." });
-    } catch (error) {
-        console.error("공지사항 등록 오류:", error);
-        res.status(500).json({ message: "서버 오류" });
+    if (!title || !content) {
+        return res.status(400).json({ message: "제목과 내용은 필수입니다." });
     }
+
+
+    if (!author_id || role > 2) {
+        return res.status(403).json({ message: "공지사항 작성 권한이 없습니다." });
+    }
+
+    await pool.query(`
+                INSERT INTO notices (title, content, author_id, grade, level, subject_id, is_important, important_until, is_foreigner)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [title, content, author_id, grade || null, level || null, subject_id || null, is_important || 0, important_until || null, is_foreigner ?? null]
+    );
+
+    if (notify_line === "true") {
+        await sendLineNotification({ title, content, grade, level, is_foreigner });
+    }
+
+    res.status(201).json({ message: "공지사항이 등록되었습니다." });
 };
 
-/**
- * ✅ 공지사항 수정 (is_foreigner 포함) - 관리자(1) 전부 / 교수(2)는 본인 작성만 가능
- */
 exports.updateNotice = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { title, content, grade, level, subject_id, is_important, important_until, is_foreigner } = req.body;
-        const userId = req.user.id;
-        const role = req.user.role;
+    const { id } = req.params;
+    const { title, content, grade, level, subject_id, is_important, important_until, is_foreigner, notify_line } = req.body;
+    const userId = req.user.id;
+    const role = req.user.role;
 
-        const [noticeRows] = await pool.query("SELECT author_id FROM notices WHERE id = ?", [id]);
-        const notice = noticeRows[0];
+    const [noticeRows] = await pool.query("SELECT author_id FROM notices WHERE id = ?", [id]);
+    const notice = noticeRows[0];
 
-        if (!notice || (role !== 1 && notice.author_id !== userId)) {
-            return res.status(403).json({ message: "공지사항 수정 권한이 없습니다." });
-        }
-
-        const query = `
-            UPDATE notices
-            SET title = ?, content = ?, grade = ?, level = ?, subject_id = ?,
-                is_important = ?, important_until = ?, is_foreigner = ?
-            WHERE id = ?
-        `;
-
-        const params = [
-            title,
-            content,
-            grade || null,
-            level || null,
-            subject_id || null,
-            is_important || 0,
-            important_until || null,
-            is_foreigner ?? null,
-            id
-        ];
-
-        await pool.query(query, params);
-        res.status(200).json({ message: "공지사항이 수정되었습니다." });
-    } catch (error) {
-        console.error("공지사항 수정 오류:", error);
-        res.status(500).json({ message: "서버 오류" });
+    if (!notice || (role !== 1 && notice.author_id !== userId)) {
+        return res.status(403).json({ message: "공지사항 수정 권한이 없습니다." });
     }
+
+    await pool.query(`
+                UPDATE notices SET title = ?, content = ?, grade = ?, level = ?, subject_id = ?, is_important = ?, important_until = ?, is_foreigner = ?
+                WHERE id = ?`,
+        [title, content, grade || null, level || null, subject_id || null, is_important || 0, important_until || null, is_foreigner ?? null, id]
+    );
+
+    if (notify_line === "true") {
+        await sendLineNotification({ title, content, grade, level, is_foreigner, isUpdate: true });
+    }
+
+    res.status(200).json({ message: "공지사항이 수정되었습니다." });
 };
 
 
 /**
  * ✅ 공지사항 삭제 (첨부파일도 삭제)
- */
-/**
- * ✅ 공지사항 삭제 - 관리자(1) 전부 / 교수(2)는 본인 작성만 가능
+ *    - 관리자(1) 전부 / 교수(2)는 본인 작성만 가능
  */
 exports.deleteNotice = async (req, res) => {
     try {
@@ -220,8 +240,11 @@ exports.deleteNotice = async (req, res) => {
             return res.status(403).json({ message: "공지사항 삭제 권한이 없습니다." });
         }
 
-        // 첨부파일 정보 조회 및 삭제
-        const [attachments] = await pool.query("SELECT file_url FROM notice_attachments WHERE notice_id = ?", [id]);
+        // 첨부파일 정보 조회 후 삭제
+        const [attachments] = await pool.query(
+            "SELECT file_url FROM notice_attachments WHERE notice_id = ?",
+            [id]
+        );
 
         await pool.query("DELETE FROM notices WHERE id = ?", [id]);
 
@@ -255,14 +278,10 @@ exports.downloadAttachment = async (req, res) => {
         }
 
         const file = attachments[0];
-        // 실제 저장된 파일명
         const storedFilename = path.basename(file.file_url);
-        // 다운로드 시 보여줄 파일명(한글 포함)
         const downloadName = file.original_filename;
-
         const filePath = path.join(__dirname, "../uploads", storedFilename);
 
-        // 두 번째 인자로 original_filename을 넘기면 정상 한글 파일명으로 다운로드됨
         res.download(filePath, downloadName);
     } catch (error) {
         console.error("파일 다운로드 오류:", error);
@@ -279,7 +298,7 @@ const saveAttachments = async (files, notice_id) => {
     if (!files || files.length === 0) return;
 
     const attachmentParams = files.map(file => {
-        const originalName = file.cleanedOriginal || file.originalname;  // ✅ 변경 포인트!
+        const originalName = file.cleanedOriginal || file.originalname;  // 파일 이름 가공
         const filename = file.storedFilename || file.filename;
 
         console.log("✅ 실제 저장된 파일명:", filename);
