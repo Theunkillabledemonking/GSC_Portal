@@ -37,20 +37,30 @@ export const useNoticeStore = defineStore("notices", {
         // ✅ 공지사항 작성
         async addNotice(noticeData, files) {
             try {
-                await createNotice(noticeData, files);
-                await this.loadNotices(); // 목록 새로고침
+                const res = await createNotice(noticeData, files); // ✅ 응답 받아오기
+                await this.loadNotices();
+                return { success: true, message: res.message || "공지 등록 성공" };
             } catch (error) {
                 console.error("공지사항 작성 실패:", error);
+                return {
+                    success: false,
+                    message: error.response?.data?.message || "공지 등록 중 오류 발생",
+                };
             }
         },
 
         // ✅ 공지사항 수정
         async editNotice(id, noticeData, files) {
             try {
-                await updateNotice(id, noticeData, files);
+                const res = await updateNotice(id, noticeData, files);
                 await this.loadNotices();
+                return { success: true, message: res.message || '공지 등록 성공' };
             } catch (error) {
                 console.error("공지사항 수정 실패:", error);
+                return {
+                    success: false,
+                    message: error.response?.data?.message || "공지 수정 중 오류 발생",
+                };
             }
         },
 
