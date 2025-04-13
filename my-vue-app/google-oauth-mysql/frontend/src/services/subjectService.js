@@ -21,7 +21,7 @@ export const getSubjectsByYear = (year) => {
     return handleResponse(apiClient.get(`/subjects/year/${year}`), { subjects: [] });
 };
 
-// 🔍 레벨 기준 과목 조회
+// 🔍 레벨 기준 과목 조회 (원래 형태로 복구)
 export const getSubjectsByLevel = (level) => {
     if (!level) return Promise.resolve({ subjects: [] });
     return handleResponse(apiClient.get("/subjects/level", { params: { level } }), { subjects: [] });
@@ -96,4 +96,13 @@ export const deleteSubject = async (id) => {
         console.error("❌ 과목 삭제 실패:", err);
         throw err;
     }
+};
+
+// 🔍 필터링된 과목 조회 (새 함수)
+export const getFilteredSubjects = (params = {}) => {
+    console.log('📡 [getFilteredSubjects]', params);
+    return handleResponse(
+        apiClient.get("/subjects/filter", { params }), 
+        { subjects: [] }
+    );
 };

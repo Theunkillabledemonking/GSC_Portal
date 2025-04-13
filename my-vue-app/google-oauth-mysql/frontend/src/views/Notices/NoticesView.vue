@@ -12,6 +12,13 @@
             class="search-box idol-style w-full md:flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-idolPink"
         />
 
+        <!-- ✅ 한국어/외국인 필터 추가 -->
+        <select v-model="selectedUserType" class="select-box">
+          <option value="">🌐 모든 사용자</option>
+          <option value="0">🇰🇷 한국인</option>
+          <option value="1">🌏 외국인</option>
+        </select>
+
         <div v-if="authStore.role <= 2" class="grade-buttons flex gap-2">
           <button
               v-for="grade in ['all', 1, 2, 3]"
@@ -25,12 +32,14 @@
 
         <select v-model="selectedLevel" class="select-box">
           <option value="">🔍 모든 레벨</option>
-          <option v-for="level in levels" :key="level">{{ level }}</option>
+          <option v-for="level in availableLevels" :key="level">{{ level }}</option>
         </select>
 
-        <select v-if="authStore.role <= 2 && selectedGrade !== 'all'" v-model="selectedSubject" class="select-box">
+        <select v-if="authStore.role <= 2 && selectedGrade !== 'all'" 
+               v-model="selectedSubject" 
+               class="select-box">
           <option value="">🔍 전체 과목</option>
-          <option v-for="subject in subjects" :key="subject.id" :value="subject.id">{{ subject.name }}</option>
+          <option v-for="subject in filteredSubjects" :key="subject.id" :value="subject.id">{{ subject.name }}</option>
         </select>
 
         <button
@@ -82,8 +91,14 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
-import { useNoticeStore } from '@/store/noticeStore.js';
-import { useAuthStore } from '@/store/authStore.js';
+import { useNoticeStore, useAuthStore } from '@/store';
+import {
+  getSubjectsByYear,
+  getAllSubjects,
+  getSpecialLectures,
+  getSubjectsByLevel,
+  getFilteredSubjects
+} from "@/services/subjectService";
 import { useRouter } from "vue-router";
 import axios from "axios";
 
@@ -94,51 +109,162 @@ const router = useRouter();
 const selectedGrade = ref('all');
 const selectedLevel = ref('');
 const selectedSubject = ref('');
+const selectedUserType = ref(''); // ✅ 유저 타입 추가 (0: 한국인, 1: 외국인)
 const searchQuery = ref('');
 const subjects = ref([]); // ✅ 과목 목록 추가
 const specialSubjects = ref([]); // ✅ 특강 과목 목록 추가
 
+// ✅ 레벨 분리
+const jlptLevels = ["N3", "N2", "N1"]; 
+const topikLevels = ["TOPIK4", "TOPIK6"];
 
-const levels = ["N3", "N2", "N1", "TOPIK4", "TOPIK6"]; // ✅ 레벨 리스트
+// ✅ 사용자 타입에 따른 레벨 표시
+const availableLevels = computed(() => {
+  if (selectedUserType.value === '0') {
+    return jlptLevels;
+  } else if (selectedUserType.value === '1') {
+    return topikLevels;
+  }
+  return [...jlptLevels, ...topikLevels]; // 전체 선택 시 모든 레벨
+});
 
-// ✅ 학년이 변경될 때만 해당 학년의 과목을 불러옴
-watch(selectedGrade, async (newGrade) => {
+// ✅ 과목 목록 필터링
+const filteredSubjects = computed(() => {
+  if (selectedUserType.value === '') {
+    return subjects.value; // 전체 사용자 선택 시 모든 과목
+  }
+  
+  const isForeigner = selectedUserType.value === '1';
+  
+  return subjects.value.filter(subject => {
+    // 외국인 선택 시 is_foreigner_target이 1인 과목만
+    if (isForeigner) {
+      return subject.is_foreigner_target === 1 || 
+             (subject.level && subject.level.startsWith('TOPIK'));
+    }
+    
+    // 한국인 선택 시 is_foreigner_target이 0이거나 없는 과목만
+    return !subject.is_foreigner_target || 
+           subject.is_foreigner_target === 0 ||
+           (subject.level && (subject.level === 'N1' || subject.level === 'N2' || subject.level === 'N3'));
+  });
+});
+
+// ✅ 레벨 변경 감지
+watch(selectedLevel, async (newLevel) => {
+  if (!newLevel || authStore.role > 2) return;
+  
+  try {
+    const isForeigner = selectedUserType.value === '1' ? 1 : 0;
+    
+    // 필터링된 과목 목록 가져오기
+    const { subjects: levelSubjects } = await getFilteredSubjects({
+      level: newLevel,
+      is_foreigner: isForeigner
+    });
+    
+    subjects.value = levelSubjects;
+    console.log(`🔍 레벨(${newLevel}) 과목 로드 완료: ${levelSubjects.length}개`);
+    
+    // 과목 선택 초기화
+    selectedSubject.value = '';
+    
+  } catch (error) {
+    console.error(`❌ 레벨별 과목 로드 오류:`, error);
+  }
+});
+
+// ✅ 사용자 타입, 학년 변경 감지
+watch([selectedGrade, selectedUserType], async ([grade, userType]) => {
   if (authStore.role > 2) return;
 
-  if (newGrade === 'all') {
-    subjects.value = [];
-    selectedSubject.value = '';
-    return;
-  }
-
   try {
-    const res = await axios.get(`/api/subjects/year/${newGrade}`, {
-      headers: { Authorization: `Bearer ${authStore.token}` },
-    }); // ✅ 선택한 학년의 과목 가져오기
-
-    subjects.value = res.data.subjects;
+    if (userType === '1') {
+      // ✅ 외국인: TOPIK 기준 과목 조회
+      console.log("🔍 외국인 과목 조회 시작");
+      
+      // 레벨 리셋 (TOPIK 전용 레벨로)
+      if (selectedLevel.value && !selectedLevel.value.startsWith('TOPIK')) {
+        selectedLevel.value = '';
+      }
+      
+      // 외국인 대상 과목 로딩 (필터링 API 사용)
+      const { subjects: foreignerSubjects } = await getFilteredSubjects({
+        level: selectedLevel.value || 'TOPIK4',
+        is_foreigner: 1
+      });
+      
+      subjects.value = foreignerSubjects;
+      console.log(`🔍 외국인 과목 로드 완료: ${foreignerSubjects.length}개`);
+      
+    } else if (userType === '0') {
+      // ✅ 한국인: 학년/JLPT 기준 과목 조회
+      console.log("🔍 한국인 과목 조회 시작");
+      
+      // 레벨 리셋 (JLPT 전용 레벨로)
+      if (selectedLevel.value && selectedLevel.value.startsWith('TOPIK')) {
+        selectedLevel.value = '';
+      }
+      
+      // JLPT 레벨이 선택된 경우
+      if (selectedLevel.value) {
+        const { subjects: koreanSubjects } = await getFilteredSubjects({
+          level: selectedLevel.value,
+          is_foreigner: 0
+        });
+        subjects.value = koreanSubjects;
+        console.log(`🔍 한국인 레벨별 과목 로드 완료: ${koreanSubjects.length}개`);
+      } 
+      // 학년이 선택된 경우
+      else if (grade !== 'all') {
+        const { subjects: byYear } = await getSubjectsByYear(grade);
+        subjects.value = byYear.filter(sub => !sub.is_foreigner_target || sub.is_foreigner_target === 0);
+        console.log(`🔍 한국인 학년별 과목 로드 완료: ${subjects.value.length}개`);
+      } 
+      // 전체 선택 시
+      else {
+        const { subjects: all } = await getAllSubjects();
+        subjects.value = all.filter(sub => !sub.is_foreigner_target || sub.is_foreigner_target === 0);
+        console.log(`🔍 한국인 전체 과목 로드 완료: ${subjects.value.length}개`);
+      }
+    } else {
+      // ✅ 전체 사용자 선택 시
+      if (grade === 'all') {
+        const { subjects: all } = await getAllSubjects();
+        subjects.value = all;
+      } else {
+        const { subjects: byYear } = await getSubjectsByYear(grade);
+        subjects.value = byYear;
+      }
+    }
+    
+    // 과목 선택 초기화
     selectedSubject.value = '';
+    
   } catch (error) {
-    console.log("과목 목록 불러오기 실패:", error);
+    console.error("❌ 과목 로드 오류:", error);
     subjects.value = [];
   }
 });
 
 onMounted(async () => {
   try {
-    // ✅ 공지사항과 특강 데이터를 동시에 가져오기
-    const [noticesRes, specialSubjectsRes] = await Promise.all([
-      noticeStore.loadNotices(),
-      axios.get("/api/subjects/special", {
-        headers: { Authorization: `Bearer ${authStore.token}` }
-      })
-    ]);
+    await noticeStore.loadNotices();
 
-    // ✅ 특강 과목 목록 저장
-    specialSubjects.value = specialSubjectsRes.data.specialLectures || [];
+    if (authStore.isLoggedIn) {
+      const today = new Date();
+      const currentSemester = today.getMonth() + 1 >= 3 && today.getMonth() + 1 <= 8 ? 'spring' : 'fall';
 
+      const { specialLectures } = await getSpecialLectures({
+        semester: currentSemester,
+        level: authStore.user?.level || 'ALL',
+      });
+
+      specialSubjects.value = specialLectures;
+      console.log("🔍 특강 과목 로드:", specialLectures.length);
+    }
   } catch (error) {
-    console.error("데이터 불러오기 오류:", error);
+    console.error("❌ 공지사항 데이터 로드 실패:", error);
   }
 });
 
@@ -151,14 +277,19 @@ const filteredNotices = computed(() => {
     filtered = filtered.filter(n => Number(n.grade) === Number(selectedGrade.value));
   }
 
-  // ✅ 레벨 필터링 (특강 과목 포함)
+  // ✅ 유저 타입 필터링 (한국인/외국인)
+  if (selectedUserType.value !== '') {
+    filtered = filtered.filter(n => n.is_foreigner === Number(selectedUserType.value));
+  }
+
+  // ✅ 레벨 필터링
   if (selectedLevel.value) {
     filtered = filtered.filter(n => n.level === selectedLevel.value);
   }
 
-  // ✅ 과목 필터링 (특강 포함)
+  // ✅ 과목 필터링
   if (selectedSubject.value) {
-    filtered = filtered.filter(n => n.subject_id === Number(selectedSubject.value) || specialSubjects.value.some(s => s.id === n.subject_id));
+    filtered = filtered.filter(n => n.subject_id === Number(selectedSubject.value));
   }
 
   // ✅ 검색 필터링 (제목, 작성자, 내용)
