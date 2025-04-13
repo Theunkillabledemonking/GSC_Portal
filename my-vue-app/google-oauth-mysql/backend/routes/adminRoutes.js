@@ -21,4 +21,35 @@ router.patch('/users/:id/status', verifyToken, hasRole(1), updateUserStatus);
 // ✅ 유저 정보 및 권한 수정
 router.patch('/users/:id/info', verifyToken, hasRole(1), updateUserInfo);
 
+// ✅ 데이터베이스 마이그레이션 - inherit_attributes 컬럼 추가
+router.post('/migrations/add-inherit-attributes', verifyToken, hasRole(1), async (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const migrationPath = path.join(__dirname, '../migrations/add_inherit_attributes_column.sql');
+    
+    if (!fs.existsSync(migrationPath)) {
+      return res.status(404).json({ message: "Migration file not found" });
+    }
+    
+    const migrationSql = fs.readFileSync(migrationPath, 'utf8');
+    const statements = migrationSql.split(';').filter(s => s.trim());
+    
+    const pool = require('../config/db');
+    for (const statement of statements) {
+      if (statement.trim()) {
+        await pool.query(statement);
+      }
+    }
+    
+    res.json({ 
+      message: "Migration completed: inherit_attributes column added to timetable_events table",
+      statements: statements.length
+    });
+  } catch (err) {
+    console.error("Migration error:", err);
+    res.status(500).json({ message: "Migration failed", error: err.message });
+  }
+});
+
 module.exports = router;

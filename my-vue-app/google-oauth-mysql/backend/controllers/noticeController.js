@@ -3,17 +3,7 @@ const path = require("path");
 const fs = require("fs");
 
 const BASE_URL = "http://localhost:5000/uploads/";
-
-const isValidLevel = (level) =>
-    !level || level === "ALL" || ["N1", "N2", "N3", "TOPIK4", "TOPIK6"].includes(level);
-
-const isBooleanString = (val) => typeof val === "string" && (val === "true" || val === "false");
-
-const validateNoticeInput = ({ title, content }) => {
-    if (!title || !content) {
-        throw new Error("제목과 내용은 필수입니다.");
-    }
-};
+const { sendLineNotification } = require("../utils/lineNotification");
 
 /**
  * ✅ 중요 공지사항 자동 해제 (기간 만료)
@@ -33,37 +23,37 @@ const clearExpiredImportantNotices = async () => {
 setInterval(clearExpiredImportantNotices, 10 * 60 * 1000);
 
 
-exports.sendLineNotification = async ({ title, content, grade, level, is_foreigner, isUpdate = false }) => {
-    let query = `SELECT line_user_id FROM users WHERE line_user_id IS NOT NULL`;
-    const params = [];
-
-    if (grade) {
-        query += " AND grade = ?";
-        params.push(grade);
-    }
-    if (level && level !== "ALL") {
-        query += " AND level = ?";
-        params.push(level);
-    }
-    if (is_foreigner !== undefined && is_foreigner !== null) {
-        query += " AND is_foreigner = ?";
-        params.push(is_foreigner);
-    }
-
-    const [targets] = await pool.query(query, params);
-    console.log("📨 LINE 전송 대상 수:", targets.length);
-
-    const message = `📢 [공지${isUpdate ? " 수정됨" : ""}] ${title}\n${content}\n👉 포털에서 확인하세요`;
-
-    for (const { line_user_id } of targets) {
-        try {
-            await sendLineMessage(line_user_id, message);
-            console.log("📤 전송 성공:", line_user_id);
-        } catch (e) {
-            console.error("❌ 전송 실패:", line_user_id, e.message);
-        }
-    }
-};
+// exports.sendLineNotification = async ({ title, content, grade, level, is_foreigner, isUpdate = false }) => {
+//     let query = `SELECT line_user_id FROM users WHERE line_user_id IS NOT NULL`;
+//     const params = [];
+//
+//     if (grade) {
+//         query += " AND grade = ?";
+//         params.push(grade);
+//     }
+//     if (level && level !== "ALL") {
+//         query += " AND level = ?";
+//         params.push(level);
+//     }
+//     if (is_foreigner !== undefined && is_foreigner !== null) {
+//         query += " AND is_foreigner = ?";
+//         params.push(is_foreigner);
+//     }
+//
+//     const [targets] = await pool.query(query, params);
+//     console.log("📨 LINE 전송 대상 수:", targets.length);
+//
+//     const message = `📢 [공지${isUpdate ? " 수정됨" : ""}] ${title}\n${content}\n👉 포털에서 확인하세요`;
+//
+//     for (const { line_user_id } of targets) {
+//         try {
+//             await sendLineMessage(line_user_id, message);
+//             console.log("📤 전송 성공:", line_user_id);
+//         } catch (e) {
+//             console.error("❌ 전송 실패:", line_user_id, e.message);
+//         }
+//     }
+// };
 
 /**
  * ✅ 공지사항 목록 조회 (필터링 & 정렬 적용)
@@ -165,61 +155,111 @@ exports.getNoticeById = async (req, res) => {
     }
 };
 
-const { sendLineNotification } = require("../utils/lineNotification");
 /**
  * ✅ 공지사항 등록 (is_foreigner 포함) - 관리자(1) 또는 교수(2)만 가능
  */
 exports.createNotice = async (req, res) => {
-    const { title, content, grade, level, subject_id, is_important, important_until, is_foreigner, notify_line } = req.body;
-    const author_id = req.user?.id;
-    const role = req.user?.role;
+    try {
+        const { title, content, grade, level, subject_id, is_important, important_until, is_foreigner, notify_line } = req.body;
+        const author_id = req.user?.id;
+        const role = req.user?.role;
 
-    if (!title || !content) {
-        return res.status(400).json({ message: "제목과 내용은 필수입니다." });
+        if (!title || !content || !author_id || role > 2) {
+            return res.status(400).json({ message: "입력값 누락 또는 권한 부족" });
+        }
+
+        const [result] = await pool.query(`
+            INSERT INTO notices (title, content, author_id, grade, level, subject_id, is_important, important_until, is_foreigner)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [title, content, author_id, grade || null, level || null, subject_id || null, is_important || 0, important_until || null, is_foreigner ?? null]
+        );
+
+        const noticeId = result.insertId;
+
+        // 알림 전송
+        if (notify_line === "true" || notify_line === true) {
+            // 작성자 정보 조회
+            const [[authorData]] = await pool.query("SELECT name FROM users WHERE id = ?", [author_id]);
+            const authorName = authorData?.name || "관리자";
+            
+            // 과목 정보 조회 (subject_id가 있을 경우)
+            let subjectName = null;
+            if (subject_id) {
+                const [[subjectData]] = await pool.query("SELECT name FROM subjects WHERE id = ?", [subject_id]);
+                subjectName = subjectData?.name;
+            }
+            
+            // LINE 알림 전송
+            await sendLineNotification({
+                id: noticeId,
+                title,
+                content,
+                grade,
+                level,
+                is_foreigner,
+                author: authorName,
+                subject_name: subjectName
+            });
+        }
+
+        res.status(201).json({ message: "공지사항이 등록되었습니다." });
+    } catch (error) {
+        console.error("공지사항 등록 오류:", error);
+        res.status(500).json({ message: "서버 오류" });
     }
-
-
-    if (!author_id || role > 2) {
-        return res.status(403).json({ message: "공지사항 작성 권한이 없습니다." });
-    }
-
-    await pool.query(`
-                INSERT INTO notices (title, content, author_id, grade, level, subject_id, is_important, important_until, is_foreigner)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [title, content, author_id, grade || null, level || null, subject_id || null, is_important || 0, important_until || null, is_foreigner ?? null]
-    );
-
-    if (notify_line === "true") {
-        await sendLineNotification({ title, content, grade, level, is_foreigner });
-    }
-
-    res.status(201).json({ message: "공지사항이 등록되었습니다." });
 };
 
 exports.updateNotice = async (req, res) => {
-    const { id } = req.params;
-    const { title, content, grade, level, subject_id, is_important, important_until, is_foreigner, notify_line } = req.body;
-    const userId = req.user.id;
-    const role = req.user.role;
+    try {
+        const { id } = req.params;
+        const { title, content, grade, level, subject_id, is_important, important_until, is_foreigner, notify_line } = req.body;
+        const userId = req.user.id;
+        const role = req.user.role;
 
-    const [noticeRows] = await pool.query("SELECT author_id FROM notices WHERE id = ?", [id]);
-    const notice = noticeRows[0];
+        const [noticeRows] = await pool.query("SELECT author_id FROM notices WHERE id = ?", [id]);
+        const notice = noticeRows[0];
 
-    if (!notice || (role !== 1 && notice.author_id !== userId)) {
-        return res.status(403).json({ message: "공지사항 수정 권한이 없습니다." });
+        if (!notice || (role !== 1 && notice.author_id !== userId)) {
+            return res.status(403).json({ message: "공지사항 수정 권한이 없습니다." });
+        }
+
+        await pool.query(`
+            UPDATE notices SET title = ?, content = ?, grade = ?, level = ?, subject_id = ?, is_important = ?, important_until = ?, is_foreigner = ?
+            WHERE id = ?`,
+            [title, content, grade || null, level || null, subject_id || null, is_important || 0, important_until || null, is_foreigner ?? null, id]
+        );
+
+        if (notify_line === "true" || notify_line === true) {
+            // 작성자 정보 조회
+            const [[authorData]] = await pool.query("SELECT name FROM users WHERE id = ?", [userId]);
+            const authorName = authorData?.name || "관리자";
+            
+            // 과목 정보 조회 (subject_id가 있을 경우)
+            let subjectName = null;
+            if (subject_id) {
+                const [[subjectData]] = await pool.query("SELECT name FROM subjects WHERE id = ?", [subject_id]);
+                subjectName = subjectData?.name;
+            }
+            
+            // LINE 알림 전송 (수정 모드)
+            await sendLineNotification({
+                id,
+                title,
+                content,
+                grade,
+                level,
+                is_foreigner,
+                author: authorName,
+                subject_name: subjectName,
+                isUpdate: true
+            });
+        }
+
+        res.status(200).json({ message: "공지사항이 수정되었습니다." });
+    } catch (error) {
+        console.error("공지사항 수정 오류:", error);
+        res.status(500).json({ message: "서버 오류" });
     }
-
-    await pool.query(`
-                UPDATE notices SET title = ?, content = ?, grade = ?, level = ?, subject_id = ?, is_important = ?, important_until = ?, is_foreigner = ?
-                WHERE id = ?`,
-        [title, content, grade || null, level || null, subject_id || null, is_important || 0, important_until || null, is_foreigner ?? null, id]
-    );
-
-    if (notify_line === "true") {
-        await sendLineNotification({ title, content, grade, level, is_foreigner, isUpdate: true });
-    }
-
-    res.status(200).json({ message: "공지사항이 수정되었습니다." });
 };
 
 
