@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
-import { useAuthStore } from "@/store/authStore.js";
+import { useAuthStore } from "@/store";
 
 import HomeView from '@/views/HomeView.vue';
 import LoginView from '@/views/Login/LoginView.vue';
@@ -52,24 +52,30 @@ const router = createRouter({
     routes
 });
 
-// ✅ 모든 라우트 이동 전에 실행
-router.beforeEach((to, from, next) => {
+// Navigation guard
+router.beforeEach(async (to, from, next) => {
+    // 로그인 페이지로 가는 경우는 항상 허용
+    if (to.path === '/login' || to.path === '/register' || to.path === '/oauth/success') {
+        return next();
+    }
+
     const authStore = useAuthStore();
-    const { isAuthenticated, status } = authStore;
+    const isAuthenticated = authStore.isLoggedIn;
 
-    const goingToLogin = to.path === '/login';
-
+    // 인증이 필요한 페이지인 경우
     if (to.meta.requiresAuth) {
         if (!isAuthenticated) {
-            return goingToLogin ? next() : next('/login');
+            return next('/login');
         }
 
-        if (status === 0) {
-            alert("⏳ 관리자 승인이 필요합니다.");
-            return goingToLogin ? next() : next('/login');
+        // 관리자 전용 페이지 체크
+        if (to.meta.adminOnly && !authStore.isAdmin) {
+            alert("관리자 권한이 필요합니다.");
+            return next('/dashboard');
         }
     }
 
     next();
 });
+
 export default router;
