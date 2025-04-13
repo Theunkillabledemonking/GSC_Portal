@@ -28,4 +28,4 @@ git rm --cached my-vue-app/google-oauth-mysql/.env
 git rm --cached my-vue-app/google-oauth-mysql/backend/.env
 git rm --cached my-vue-app/google-oauth-mysql/frontend/.env
 
-git commit -m "Remove .env files from tracking"
+git commit -m "Remove .env files from tracking"my-vue-app/google-oauth-mysql/backend/uploads/
