@@ -18,7 +18,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { fetchTimetableWithEvents } from '@/services/timetableService.js'
-import { useAuthStore } from '@/store/authStore.js'
+import { useAuthStore } from '@/store'
 
 const router = useRouter()
 const authStore = useAuthStore()

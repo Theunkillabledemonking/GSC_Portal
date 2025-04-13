@@ -4,23 +4,33 @@
       {{ isEdit ? '공지사항 수정' : '공지사항 등록' }}
     </h2>
 
-    <!-- 제목 -->
+    <!-- 🔸 제목 입력 -->
     <div class="mb-5">
       <label class="form-label">제목</label>
       <input v-model="form.title" type="text" class="form-input" placeholder="공지 제목을 입력해주세요" />
     </div>
 
-    <!-- 내용 -->
+    <!-- 🔸 내용 입력 -->
     <div class="mb-5">
       <label class="form-label">내용</label>
       <textarea v-model="form.content" class="form-textarea" rows="6" placeholder="공지 내용을 입력해주세요"></textarea>
     </div>
 
-    <!-- 학년 / 과목 / 레벨 -->
+    <!-- 🔸 대상 (한국인/외국인/전체) -->
+    <div class="flex-1 mb-5">
+      <label class="form-label">대상</label>
+      <select v-model="form.is_foreigner_target" class="form-select">
+        <option :value="null">전체</option>
+        <option :value="0">한국인</option>
+        <option :value="1">외국인</option>
+      </select>
+    </div>
+
+    <!-- 🔸 학년/과목/레벨 선택 필드 -->
     <div class="flex flex-col md:flex-row gap-4 mb-6">
       <div class="flex-1">
         <label class="form-label">학년</label>
-        <select v-model="form.grade" class="form-select">
+        <select v-model="form.grade" class="form-select" :disabled="form.is_foreigner_target === 1">
           <option value="">전체</option>
           <option value="1">1학년</option>
           <option value="2">2학년</option>
@@ -32,7 +42,7 @@
         <label class="form-label">과목</label>
         <select v-model="form.subject_id" class="form-select">
           <option value="">전체</option>
-          <option v-for="subject in subjects" :key="subject.id" :value="subject.id">{{ subject.name }}</option>
+          <option v-for="subject in filteredSubjects" :key="subject.id" :value="subject.id">{{ subject.name }}</option>
         </select>
       </div>
 
@@ -40,12 +50,12 @@
         <label class="form-label">레벨</label>
         <select v-model="form.level" class="form-select">
           <option value="">전체</option>
-          <option v-for="level in levels" :key="level">{{ level }}</option>
+          <option v-for="level in availableLevels" :key="level">{{ level }}</option>
         </select>
       </div>
     </div>
 
-    <!-- 중요 공지 -->
+    <!-- 🔸 중요 공지 여부 및 만료일 -->
     <div class="mb-4">
       <label class="inline-flex items-center space-x-2 text-sm font-medium">
         <input type="checkbox" v-model="isImportant" @change="handleImportantChange" />
@@ -56,6 +66,8 @@
         <input type="date" v-model="form.important_until" class="form-input" />
       </div>
     </div>
+
+    <!-- 🔸 LINE 알림 여부 -->
     <div class="mb-4">
       <label class="inline-flex items-center space-x-2 text-sm font-medium">
         <input type="checkbox" v-model="form.notify_line" />
@@ -63,7 +75,7 @@
       </label>
     </div>
 
-    <!-- 파일 업로드 -->
+    <!-- 🔸 파일 업로드 -->
     <div class="mb-6">
       <label class="form-label block mb-2">파일 업로드 (최대 5개)</label>
       <input id="file-upload" type="file" multiple hidden @change="handleFileChange" />
@@ -71,22 +83,19 @@
       <p class="text-sm text-gray-500 mt-1">선택된 파일: {{ uploadedFiles.length }}개</p>
     </div>
 
-    <!-- 🔽 등록/취소 버튼 영역 -->
+    <!-- 🔸 등록/취소 버튼 -->
     <div class="mt-8 flex justify-center gap-4">
-      <button @click="$router.back()" class="btn-cancel">
-        ← 돌아가기
-      </button>
+      <button @click="$router.back()" class="btn-cancel">← 돌아가기</button>
       <button @click="handleSubmit" class="btn-idol px-6">
         {{ isEdit ? '수정하기' : '등록하기' }}
       </button>
     </div>
   </section>
 </template>
-
 <script setup>
-import { ref, defineProps, defineEmits, watch, onMounted } from "vue";
+import { ref, defineProps, defineEmits, watch, onMounted, computed } from "vue";
 import axios from 'axios';
-import {useAuthStore} from "@/store/authStore.js";
+import { useAuthStore } from '@/store';
 
 const authStore = useAuthStore();
 
@@ -95,8 +104,7 @@ const props = defineProps({
   initialData: Object
 });
 
-// emits: 폼 전송 후 상위에게 알릴 수도 있음 (옵션)
-const emit = defineEmits(["submitted"]);
+const emit = defineEmits(["submitted", "updated"]);
 
 const form = ref({
   title: "",
@@ -105,8 +113,18 @@ const form = ref({
   subject_id: "",
   level: "",
   important_until: null,
-  notify_line: false
+  notify_line: false,
+  is_foreigner_target: null
 });
+
+const allLevels = ['N1', 'N2', 'N3', 'TOPIK4', 'TOPIK6'];
+
+const availableLevels = computed(() => {
+  if (form.value.is_foreigner_target === 0) return ['N1', 'N2', 'N3'];
+  if (form.value.is_foreigner_target === 1) return ['TOPIK4', 'TOPIK6'];
+  return allLevels; // 전체일 경우
+});
+
 
 const isImportant = ref(false);
 // ✅ 중요 공지 체크박스 변경 감지
@@ -119,8 +137,6 @@ const handleImportantChange = () => {
 const uploadedFiles = ref([]);
 const subjects = ref([]);
 const levels = ["ALL", "N3", "N2", "N1", "TOPIK4", "TOPIK6"]; // ✅ 레벨 리스트
-
-
 
 // ✅ 학년 변경 시 과목 자동 불러오기
 const loadSubjectsByGrade = async () => {
@@ -147,6 +163,29 @@ const loadSubjectsByGrade = async () => {
   }
 };
 
+const filteredSubjects = computed(() => {
+  return subjects.value.filter((s) => {
+    const target = form.value.is_foreigner_target;
+
+    // 🔹 대상 필터링
+    const matchesTarget =
+        target === null
+            ? true
+            : s.is_foreigner_target !== null &&
+            Number(s.is_foreigner_target) === Number(target);
+
+    // 🔹 학년 필터링 (외국인은 학년 무시됨)
+    const matchesGrade =
+        target === 1 ? true : !form.value.grade || s.year === Number(form.value.grade);
+
+    // 🔹 레벨 필터링
+    const matchesLevel =
+        !form.value.level || s.level === form.value.level;
+
+    return matchesTarget && matchesGrade && matchesLevel;
+  });
+});
+
 // ✅ 기존 데이터 로드 (수정 모드)
 watch(
     () => props.initialData,
@@ -158,7 +197,8 @@ watch(
           grade: newData.grade || "",
           subject_id: newData.subject_id || "",
           level: newData.level || "",
-          important_until: newData.important_until || null
+          important_until: newData.important_until || null,
+          is_foreigner_target: newData.is_foreigner_target || null
         };
 
         // 🟣 중요 공지값도 반영!

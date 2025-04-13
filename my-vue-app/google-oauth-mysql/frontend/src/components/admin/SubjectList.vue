@@ -13,7 +13,6 @@
 
       <div class="filter-group">
         <span>📘 학년:</span>
-        <!-- 학년은 정규 과목일 경우에만 -->
         <select v-model="filter.year">
           <option value="">학년</option>
           <option value="1">1학년</option>
@@ -21,6 +20,7 @@
           <option value="3">3학년</option>
         </select>
       </div>
+
       <div class="filter-group">
         <span>🧪 레벨:</span>
         <select v-model="filter.level">
@@ -28,6 +28,7 @@
           <option v-for="level in allLevels" :key="level">{{ level }}</option>
         </select>
       </div>
+
       <div class="filter-group">
         <span>👤 대상:</span>
         <select v-model="filter.is_foreigner">
@@ -69,12 +70,12 @@
         <td>{{ semesterLabelMap[subject.semester] || 'N/A' }}</td>
         <td>{{ subject.group_level || '전체' }}</td>
         <td>
-    <span class="badge" :class="subject.is_special_lecture ? 'special' : 'regular'">
-      {{ subject.is_special_lecture ? '특강' : '정규' }}
-    </span>
+            <span class="badge" :class="subject.is_special_lecture ? 'special' : 'regular'">
+              {{ subject.is_special_lecture ? '특강' : '정규' }}
+            </span>
         </td>
         <td>
-          <button @click="openEditModal(subject)">수정</button>
+          <button @click="openModal(subject)">수정</button>
           <button @click="deleteSubject(subject.id)">삭제</button>
         </td>
       </tr>
@@ -83,58 +84,37 @@
 
     <!-- ✅ 과목 추가 버튼 -->
     <div style="margin-top: 20px;">
-      <button @click="openEditModal()">➕ 과목 추가</button>
+      <button @click="openModal()">➕ 과목 추가</button>
     </div>
 
-    <!-- ✅ 수정/추가 모달 -->
+    <!-- ✅ 모달 -->
     <div v-if="isModalOpen" class="modal-overlay">
-      <div class="modal">
-        <h3>{{ form.id ? '✏️ 과목 수정' : '➕ 과목 추가' }}</h3>
-        <input v-model="form.name" placeholder="과목명" />
-        <select v-model="form.year">
-          <option value="">학년</option>
-          <option value="1">1학년</option>
-          <option value="2">2학년</option>
-          <option value="3">3학년</option>
-        </select>
-        <select v-model="form.is_foreigner_target">
-          <option :value="null">공통</option>
-          <option :value="0">한국인</option>
-          <option :value="1">외국인</option>
-        </select>
-        <select v-model="filter.level">
-          <option value="">레벨</option>
-          <option v-for="level in allLevels" :key="level">{{ level }}</option>
-        </select>
-        <select v-model="form.semester">
-          <option value="">학기 선택</option>
-          <option value="spring">🌸 Spring</option>
-          <option value="summer">☀️ Summer</option>
-          <option value="fall">🍂 Fall</option>
-          <option value="winter">❄️ Winter</option>
-        </select>
-        <select v-model="form.group_level">
-          <option value="">전체</option>
-          <option value="A">A반</option>
-          <option value="B">B반</option>
-        </select>
-
-        <label><input type="checkbox" v-model="form.is_special_lecture" /> 특강 여부</label>
-
-        <div class="actions">
-          <button @click="submit">💾 저장</button>
-          <button @click="closeModal">취소</button>
-        </div>
-      </div>
+      <SubjectManage
+          :subject="editingSubject"
+          @close="closeModal"
+          @saved="handleSaved"
+      />
     </div>
   </div>
 </template>
+
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue';
-import { useSubjectStore } from '@/store/subjectStore';
+import { ref, computed, onMounted } from 'vue';
+import { useSubjectStore } from '@/store';
+import SubjectManage from './SubjectManage.vue';
 
 const subjectStore = useSubjectStore();
 const isModalOpen = ref(false);
+const editingSubject = ref(null);
+
+const allLevels = ['N1', 'N2', 'N3', 'TOPIK4', 'TOPIK6'];
+
+const filter = ref({
+  year: '',
+  level: '',
+  is_foreigner: '',
+  type: 'all'
+});
 
 const semesterLabelMap = {
   spring: '봄학기',
@@ -145,84 +125,19 @@ const semesterLabelMap = {
   '': 'N/A'
 };
 
-
-const filter = ref({
-  year: '',
-  level: '',
-  is_foreigner: '',
-  type: 'all' // all | regular | special
-});
-
-const form = reactive({
-  id: null,
-  name: '',
-  year: '',
-  level: '',
-  is_special_lecture: false,
-  semester: '',
-  group_level: '',
-  is_foreigner_target: null
-});
-
-
-
-const resetForm = () => {
-  Object.assign(form, {
-    id: null,
-    name: '',
-    year: '',
-    level: '',
-    is_special_lecture: false,
-    semester: '',
-    group_level: '',
-    is_foreigner_target: null
-  });
-};
-
-const allLevels = ['N1', 'N2', 'N3', 'TOPIK4', 'TOPIK6'];
-
-const availableLevels = computed(() => {
-  if (form.is_foreigner_target === 0) return ['N1', 'N2', 'N3'];
-  if (form.is_foreigner_target === 1) return ['TOPIK4', 'TOPIK6'];
-  return [];
-});
-
-watch(() => form.is_foreigner_target, () => {
-  if (!availableLevels.value.includes(form.level)) {
-    form.level = '';
-  }
-});
-
-const openEditModal = (subject = null) => {
-  resetForm();
-  if (subject) Object.assign(form, subject);
+const openModal = (subject = null) => {
+  editingSubject.value = subject;
   isModalOpen.value = true;
 };
 
 const closeModal = () => {
   isModalOpen.value = false;
+  editingSubject.value = null;
 };
 
-const submit = async () => {
-  if (!form.name) return alert('과목명을 입력하세요');
-
-  const payload = {
-    ...form,
-    is_special_lecture: form.is_special_lecture ? 1 : 0,
-    year: form.is_special_lecture ? null : form.year,
-    level: form.level || null,
-    group_level: form.group_level || null,
-    is_foreigner_target: form.is_foreigner_target
-  };
-
-  if (form.id) {
-    await subjectStore.updateSubject(payload);
-  } else {
-    await subjectStore.addSubject(payload);
-  }
-
+const handleSaved = () => {
   closeModal();
-  await subjectStore.loadAllSubjects(); // 갱신
+  subjectStore.loadAllSubjects();
 };
 
 const deleteSubject = async (id) => {
@@ -231,11 +146,6 @@ const deleteSubject = async (id) => {
     await subjectStore.loadAllSubjects();
   }
 };
-
-onMounted(() => {
-  subjectStore.loadAllSubjects();
-  console.log("📥 과목 불러옴")
-});
 
 const filteredSubjects = computed(() => {
   return subjectStore.all.filter((s) => {
@@ -254,28 +164,32 @@ const filteredSubjects = computed(() => {
 
     const matchTarget =
         filter.value.is_foreigner === '' ||
-        (s.is_foreigner_target !== null &&
-            Number(s.is_foreigner_target) === Number(filter.value.is_foreigner));
+        s.is_foreigner_target === null ||
+        Number(s.is_foreigner_target) === Number(filter.value.is_foreigner);
 
-    const result = matchType && matchYear && matchLevel && matchTarget;
-
-    console.log({
-      name: s.name,
-      isSpecial,
-      matchType,
-      matchYear,
-      result
-    });
-
-    return result;
+    return matchType && matchYear && matchLevel && matchTarget;
   });
 });
 
-
-
+onMounted(() => {
+  subjectStore.loadAllSubjects();
+});
 </script>
 
 <style scoped>
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .subject-manage {
   padding: 20px;
 }
@@ -295,7 +209,6 @@ const filteredSubjects = computed(() => {
   color: white;
   font-weight: bold;
 }
-
 table {
   width: 100%;
   border-collapse: collapse;
@@ -317,32 +230,5 @@ th, td {
 }
 .badge.regular {
   background: #00c853;
-}
-
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.3);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
-.modal {
-  background: white;
-  padding: 20px;
-  border-radius: 12px;
-  width: 400px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.modal input,
-.modal select {
-  padding: 6px;
-  font-size: 14px;
 }
 </style>

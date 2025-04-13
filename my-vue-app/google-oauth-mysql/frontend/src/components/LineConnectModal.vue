@@ -30,9 +30,7 @@
 
 <script setup>
 import { onMounted, onUnmounted } from 'vue'
-import { useAuthStore } from '@/store/authStore'
-import { useLineStore } from '@/store/lineStore'
-import { useLineSocketStore } from '@/store/lineSocketStore'
+import { useAuthStore, useLineStore, useLineSocketStore } from '@/store'
 
 const authStore = useAuthStore()
 const lineStore = useLineStore()
