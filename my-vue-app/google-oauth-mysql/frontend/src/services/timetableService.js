@@ -1,13 +1,4 @@
 // services/timetableService.js -------------------------------------------------
-// 백엔드 라우팅 구조(리팩터링된 TimetableController)에 맞춰 전체 API 래퍼를 재정비했다.
-// 주요 변경 사항
-//   1. 엔드포인트 상수화 → 한 곳에서 경로 관리.
-//   2. 날짜 범위(resolveDateRange) 유틸 → start_date·end_date가 없으면 학기 범위 자동 계산.
-//   3. fetchTimetableWithEvents → /timetable-with-events 로 경로 통일, group_level·type 파라미터 추가.
-//   4. fetchSpecialLectures → /special-lectures 로 경로 통일.
-//   5. fetchTimetables → 정규 수업 전용, level 파라미터 제거(백엔드에서 무시하므로).
-//   6. CRUD 함수는 ENDPOINTS.timetables 기반으로 경로 일원화.
-// ---------------------------------------------------------------------------
 
 import apiClient from "@/services/apiClient.js";
 import { getSemesterRange } from "@/utils/semester";
@@ -20,7 +11,8 @@ import dayjs from "dayjs";
 const ENDPOINTS = {
     timetableWithEvents: "/timetables/full",
     specialLectures:     "/timetables/special",
-    timetables:          "/timetables"                // 정규 수업 CRUD
+    timetables:          "/timetables",               // 정규 수업 CRUD
+    semester:            "/timetable/semester"        // 학기별 조회
 };
 
 /**
@@ -29,6 +21,18 @@ const ENDPOINTS = {
 function resolveDateRange(year, semester, start_date, end_date) {
     if (start_date && end_date) return { start_date, end_date };
     return getSemesterRange(year, semester);
+}
+
+// ---------------------------------------------------------------------------
+// API Functions
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch all timetable data for a semester
+ */
+export const fetchAllBySemester = async (params) => {
+  const response = await apiClient.get(ENDPOINTS.semester, { params })
+  return response.data
 }
 
 // ---------------------------------------------------------------------------
@@ -269,7 +273,7 @@ export const fetchTimetables = async ({ year, semester, day }) => {
         if (day) params.day = day
 
         const { data } = await apiClient.get(ENDPOINTS.timetables, { params });
-        return data?.timetables || [];  // 백엔드 응답 구조에 맞춰 수정
+        return data?.timetables || [];
     } catch (err) {
         console.error("❌ fetchTimetables failed:", err);
         return [];
@@ -277,9 +281,12 @@ export const fetchTimetables = async ({ year, semester, day }) => {
 };
 
 // ---------------------------------------------------------------------------
-// 4) CRUD – 정규·특강 모두 사용
+// 4) CRUD Operations
 // ---------------------------------------------------------------------------
 
+/**
+ * Create a new timetable entry
+ */
 export const createTimetable = async timetableData => {
     try {
         const { data } = await apiClient.post(ENDPOINTS.timetables, timetableData);
@@ -291,6 +298,9 @@ export const createTimetable = async timetableData => {
     }
 };
 
+/**
+ * Update an existing timetable entry
+ */
 export const updateTimetable = async (id, timetableData) => {
     try {
         const { data } = await apiClient.put(`${ENDPOINTS.timetables}/${id}`, timetableData);
@@ -301,6 +311,9 @@ export const updateTimetable = async (id, timetableData) => {
     }
 };
 
+/**
+ * Delete a timetable entry
+ */
 export const deleteTimetable = async id => {
     try {
         const { data } = await apiClient.delete(`${ENDPOINTS.timetables}/${id}`);
@@ -310,3 +323,14 @@ export const deleteTimetable = async id => {
         throw err;
     }
 };
+
+// Export all functions as a service object
+export default {
+  fetchAllBySemester,
+  createTimetable,
+  updateTimetable,
+  deleteTimetable,
+  fetchTimetableWithEvents,
+  fetchSpecialLectures,
+  fetchTimetables
+}
