@@ -9,13 +9,17 @@ const {
     getSubjectsForEvent,
     createSubject,
     updateSubject,
-    deleteSubject
+    deleteSubject,
+    getFilteredSubjects
 } = require('../controllers/subjectController');
 
 const router = express.Router();
 
 // ✅ 전체 과목 목록 조회 (모든 사용자 가능)
 router.get("/", getSubjects);
+
+// ✅ 필터링된 과목 조회 (구체적인 조건으로 필터링)
+router.get("/filter", getFilteredSubjects);
 
 // ✅ 학년별 과목 조회 (정규 수업만, 학생은 본인 학년만)
 router.get("/year/:year", verifyToken, getSubjectsByYear);

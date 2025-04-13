@@ -30,7 +30,7 @@ exports.buildSubjectQuery = ({ isSpecial, year, level, isForeigner, groupLevel, 
         params.push(level);
     }
 
-    if (isForeigner !== undefined) {
+    if (isForeigner !== undefined && isForeigner !== null && (isForeigner === 0 || isForeigner === 1)) {
         query += ` AND (is_foreigner_target = ? OR is_foreigner_target IS NULL)`;
         params.push(isForeigner);
     }
