@@ -8,8 +8,9 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useNoticeStore } from "@/store/noticeStore.js";
-import NoticeForm from "@/components/specific/NoticeForm.vue";
+import { useNoticeStore } from "@/store";
+// FIXME: NoticeForm 컴포넌트가 존재하지 않음
+// import NoticeForm from "@/components/specific/NoticeForm.vue";
 
 const noticeStore = useNoticeStore();
 const route = useRoute();

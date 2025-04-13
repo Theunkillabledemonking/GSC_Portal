@@ -1,7 +1,9 @@
 <script setup>
-import RegisterUserForm from '@/components/specific/RegisterUserForm.vue';
-import { useAuthStore } from "@/store/authStore.js";
-import { useRouter } from 'vue-router';
+// FIXME: RegisterUserForm 컴포넌트가 존재하지 않음
+// import RegisterUserForm from '@/components/specific/RegisterUserForm.vue';
+import { ref } from "vue";
+import { useAuthStore } from "@/store";
+import { useRouter } from "vue-router";
 
 // Pinia 스토어 및 Vue Router 초기화
 const authStore = useAuthStore();

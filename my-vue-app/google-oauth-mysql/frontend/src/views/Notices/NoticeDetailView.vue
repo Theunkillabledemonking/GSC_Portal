@@ -55,8 +55,7 @@
 <script setup>
 import { computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useNoticeStore } from '@/store/noticeStore.js';
-import { useAuthStore } from '@/store/authStore.js';
+import { useNoticeStore, useAuthStore } from '@/store';
 
 const route = useRoute();
 const router = useRouter();
@@ -64,7 +63,7 @@ const noticeStore = useNoticeStore();
 const authStore = useAuthStore();
 
 const notice = computed(() => noticeStore.selectedNotice);
-const canEdit = computed(() => authStore.role === 1 || (authStore.role === 2 && notice.value?.author_id === authStore.userId));
+const canEdit = computed(() => authStore.role === 1 || (authStore.role === 2 && notice.value?.author_id === authStore.user?.id));
 
 const goBack = () => router.push('/notices');
 const goToEditNotice = () => router.push(`/notices/edit/${route.params.id}`);

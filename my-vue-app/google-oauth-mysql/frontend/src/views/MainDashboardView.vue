@@ -59,7 +59,7 @@
 <script setup>
 import {ref, onMounted, nextTick} from "vue";
 import { useRouter } from "vue-router";
-import { useAuthStore} from "@/store/authStore.js";
+import { useAuthStore } from "@/store";
 import { fetchNotices } from "@/services/noticeService.js";
 import { listEvents } from "@/services/calendarApi.js";
 import CalendarView from "@/components/specific/CalendarView.vue";

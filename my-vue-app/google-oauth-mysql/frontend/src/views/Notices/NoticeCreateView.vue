@@ -1,6 +1,6 @@
 <script setup>
 import { useRouter } from "vue-router";
-import { useNoticeStore } from "@/store/noticeStore.js";
+import { useNoticeStore } from "@/store";
 import NoticeForm from "@/components/specific/NoticeForm.vue";
 
 const router = useRouter();

@@ -1,7 +1,7 @@
 <script setup>
 // Pinia 스토어와 Vue Router 사용
 import { onMounted} from "vue";
-import { useAuthStore } from "@/store/authStore";
+import { useAuthStore } from "@/store";
 import { useRouter } from 'vue-router';
 
 // Pinia 스토어와 Vue Router 인스턴스 초기화

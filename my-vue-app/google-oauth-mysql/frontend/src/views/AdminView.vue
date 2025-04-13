@@ -1,10 +1,11 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { useUserStore } from '@/store/userStore'; // ✅ 스토어 import
+import { useUserStore } from '@/store';
 
-import AdminUserApprovalTable from '@/components/admin/AdminUserApprovalTable.vue';
-import AdminUserListTable from '@/components/admin/AdminUserListTable.vue';
-import SubjectList from '@/components/admin/SubjectList.vue';
+// FIXME: 관리자 컴포넌트들이 존재하지 않음
+// import AdminUserApprovalTable from '@/components/admin/AdminUserApprovalTable.vue';
+// import AdminUserListTable from '@/components/admin/AdminUserListTable.vue';
+// import SubjectList from '@/components/admin/SubjectList.vue';
 
 const currentTab = ref('approval'); // 탭 선택 상태
 
@@ -55,7 +56,8 @@ const updateUser = async (user) => {
 
     <!-- 탭 내용 -->
     <div class="tab-content">
-      <AdminUserApprovalTable
+      <!-- FIXME: 관리자 컴포넌트들이 존재하지 않음 -->
+      <!-- <AdminUserApprovalTable
           v-if="currentTab === 'approval'"
           :users="pendingUsers"
           @updateStatus="updateStatus"
@@ -69,7 +71,7 @@ const updateUser = async (user) => {
           @updateStatus="updateStatus"
       />
 
-      <SubjectList v-else />
+      <SubjectList v-else /> -->
     </div>
   </div>
 </template>
