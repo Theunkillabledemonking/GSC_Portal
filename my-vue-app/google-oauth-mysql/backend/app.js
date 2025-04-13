@@ -54,7 +54,7 @@ app.use('/api/admin', adminRoutes);     // ✅ 관리자 라우트 (승인 및 �
 app.use('/api/notices', noticeRoutes);  // ✅ 공지사항 라우트
 app.use('/api/subjects', subjectRoutes);
 app.use('/api/calendar', calendarRoutes); // 구글 캘린더 라우트
-app.use('/api/timetables', timetableRoutes) // ✅ 정규 시간표 관리
+app.use('/api/timetable', timetableRoutes) // ✅ 정규 시간표 관리
 app.use('/api/events', eventRoutes); // ✅ 이벤트 관리 (보강/휴강/특강)
 app.use('/api/holidays', holidayRoutes);
 app.use('/api/line', lineRoutes);
