@@ -52,103 +52,197 @@ export const useTimetableStore = defineStore('timetable', () => {
   })
   // Getters
   const filteredEvents = computed(() => {
-    // 기본 이벤트 목록
-    const allEvents = events.value || [];
+    // 선택된 학년이 없으면 빈 배열 반환
+    if (!currentGrade.value && !currentLevel.value) {
+      console.log('🚨 선택된 학년/레벨이 없습니다.');
+      return [];
+    }
+
+    // 필터링을 위한 환경 변수
+    const currentGradeInt = parseInt(currentGrade.value, 10) || 0;
+    const eventYearFilter = currentGradeInt > 0 ? currentGradeInt : null;
     
-    // console.log('🔍 필터링 전체 이벤트 수:', allEvents.length);
-    
-    // 특강 필터링을 위한 현재 학기 정보
-    const currentSem = getCurrentSemester();
+    // 현재 학기와 년도 가져오기
     const currentYear = new Date().getFullYear();
-    const semesterRange = getSemesterRange(currentYear, currentSem);
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD 형식
+    const currentSemesterName = getCurrentSemester();
     
-    // 선택된 주가 학기 범위 내에 있는지 확인
-    const isSelectedWeekInSemesterRange = 
-      dateRange.value && 
-      dateRange.value.start && 
-      dateRange.value.end &&
-      dateRange.value.start >= semesterRange.start_date && 
-      dateRange.value.end <= semesterRange.end_date;
+    // 학기 범위 가져오기 - 년도는 문자열로 전달
+    const semesterRange = getSemesterRange(String(currentYear), currentSemesterName);
     
-    console.log(`🗓️ 선택된 주(${dateRange.value?.start || 'unknown'} ~ ${dateRange.value?.end || 'unknown'})는 학기 기간 내 ${isSelectedWeekInSemesterRange ? '✅' : '❌'}`);
+    console.log('🔍 필터링 시작...');
+    console.log(`  📆 현재 학기 범위: ${semesterRange.start_date} - ${semesterRange.end_date}`);
+    console.log(`  👥 선택된 학년: ${currentGradeInt || 'ALL'}, 레벨: ${currentLevel.value || 'ALL'}`);
     
-    // 필터링 로직
-    const filtered = allEvents.filter(event => {
+    // 필터링 결과를 위한 카운터 초기화
+    let regularClassesCount = 0;
+    let specialLecturesCount = 0;
+    let topikCount = 0;
+    let canceledCount = 0;
+    let makeupCount = 0;
+    let holidaysCount = 0;
+    
+    // 이벤트 필터링
+    const filtered = events.value.filter((event) => {
       if (!event) return false;
       
-      // 특강 여부 확인
+      // 이벤트 학년 추출 - 학생과 매칭시키는데 사용
+      const eventYear = 
+        typeof event.grade === 'number' ? event.grade : 
+        typeof event.grade === 'string' ? parseInt(event.grade, 10) : 
+        typeof event.year === 'number' ? event.year : 
+        typeof event.year === 'string' ? parseInt(event.year, 10) : null;
+      
+      // 특강 여부
       const isSpecialLecture = 
         event.is_special_lecture === 1 || 
         event.is_special_lecture === true || 
         event.is_special_lecture === '1' ||
         event.type === 'special' || 
-        event.event_type === 'special' ||
-        (event.level && String(event.level).startsWith('N'));
+        event.event_type === 'special';
       
-      // TOPIK 수업 여부 확인
+      // 공휴일 여부
+      const isHoliday = 
+        event.type === 'holiday' || 
+        event.event_type === 'holiday';
+      
+      const isCancellation = 
+        event.type === 'cancel' || 
+        event.event_type === 'cancel' || 
+        event.status === 'canceled';
+      
+      const isMakeup = 
+        event.type === 'makeup' || 
+        event.event_type === 'makeup';
+      
       const isTopikClass = 
-        event.is_foreigner_target === 1 || 
-        event.is_foreigner_target === true || 
-        event.is_foreigner_target === '1' ||
-        (event.level && String(event.level).startsWith('TOPIK'));
+        (event.is_foreigner_target === 1 || 
+         event.is_foreigner_target === true || 
+         event.is_foreigner_target === '1') ||
+        (event.level && String(event.level).includes('TOPIK')) ||
+        event.type === 'topik' || 
+        event.event_type === 'topik';
       
-      // 특강인 경우 레벨 필터링 확인
-      if (isSpecialLecture) {
-        // 학기 범위 체크 - 특강은 해당 학기 내에만 표시
-        if (!isSelectedWeekInSemesterRange) {
-          console.log(`⏱️ 특강 '${event.subject_name || event.title}' 필터링됨: 선택된 주가 학기 기간을 벗어남`);
-          return false;
-        }
-        
-        // 레벨 필터링이 설정된 경우 확인
-        if (currentLevel.value && event.level) {
-          // 현재 선택된 레벨과 일치하는지 확인
-          const eventLevelMatches = String(event.level).includes(currentLevel.value);
-          
-          if (!eventLevelMatches) {
-            console.log(`🏷️ 특강 레벨 불일치로 필터링됨: ${event.subject_name || event.title}, 레벨: ${event.level}, 선택 레벨: ${currentLevel.value}`);
-            return false;
-          }
-        }
-        
-        console.log(`✅ 특강 표시: ${event.subject_name || event.title}, 레벨: ${event.level || 'N/A'}`);
-        return true;
-      } 
-      
-      // 일반 수업인 경우 학년 필터링
-      if (currentGrade.value && !isSpecialLecture && !isTopikClass) {
-        const eventGrade = parseInt(String(event.year || event.grade || '0'));
-        const currentGradeInt = parseInt(String(currentGrade.value));
-        
-        if (eventGrade !== 0 && eventGrade !== currentGradeInt) {
-          return false;
-        }
-      } else if (isTopikClass) {
-        // TOPIK 수업인 경우 레벨 필터링
-        if (currentLevel.value && event.level) {
-          // 현재 선택된 레벨과 일치하는지 확인
-          const eventLevelMatches = String(event.level).includes(currentLevel.value);
-          
-          if (!eventLevelMatches) {
-            console.log(`🏷️ TOPIK 수업 레벨 불일치로 필터링됨: ${event.subject_name || event.title}, 레벨: ${event.level}, 선택 레벨: ${currentLevel.value}`);
-            return false;
-          }
-        }
-        
-        console.log(`✅ TOPIK 수업 표시: ${event.subject_name || event.title}, 레벨: ${event.level || 'N/A'}`);
+      // 1. 공휴일 - 모든 학년에 표시
+      if (isHoliday) {
+        holidaysCount++;
+        console.log(`🏖️ 공휴일 포함됨: ${event.title || event.name || '공휴일'}, 날짜: ${event.date || event.event_date}`);
         return true;
       }
       
+      // 2. 휴강 이벤트 
+      if (isCancellation) {
+        // 휴강 대상 수업의 학년 정보를 확인
+        const relatedGrade = event.grade || (event.timetable_id ? event.timetable?.grade : null);
+        
+        // 휴강이 속한 원 수업의 학년과 현재 선택된 학년이 다르면 필터링
+        if (relatedGrade && currentGradeInt && parseInt(relatedGrade, 10) !== currentGradeInt) {
+          console.log(`🚫 학년 불일치로 휴강 필터링 제외: ${event.subject_name || event.title}, ID: ${event.id}, 휴강학년: ${relatedGrade}, 현재학년: ${currentGradeInt}`);
+          return false;
+        }
+        
+        canceledCount++;
+        console.log(`🛑 휴강 이벤트 포함됨: ${event.subject_name || event.title}, 날짜: ${event.date || event.event_date}, ID: ${event.id}, 학년: ${relatedGrade || '미지정'}`);
+        return true;
+      }
+      
+      // 3. 보강 이벤트 
+      if (isMakeup) {
+        // 보강 대상 수업의 학년 정보를 확인
+        const relatedGrade = event.grade || (event.timetable_id ? event.timetable?.grade : null);
+        
+        // 보강이 속한 원 수업의 학년과 현재 선택된 학년이 다르면 필터링
+        if (relatedGrade && currentGradeInt && parseInt(relatedGrade, 10) !== currentGradeInt) {
+          console.log(`🚫 학년 불일치로 보강 필터링 제외: ${event.subject_name || event.title}, ID: ${event.id}, 보강학년: ${relatedGrade}, 현재학년: ${currentGradeInt}`);
+          return false;
+        }
+        
+        makeupCount++;
+        console.log(`🔄 보강 이벤트 포함됨: ${event.subject_name || event.title}, 날짜: ${event.date || event.event_date}, ID: ${event.id}, 학년: ${relatedGrade || '미지정'}`);
+        return true;
+      }
+      
+      // 4. 특강 - 모든 학년에 표시 (학기 범위 및 레벨 필터링만 적용)
+      if (isSpecialLecture) {
+        // 학기 범위 내 확인
+        const eventDate = event.date ? new Date(event.date) : null;
+        const eventStartDate = event.start_date ? new Date(event.start_date) : null;
+        const effectiveDate = eventDate || eventStartDate;
+        
+        if (effectiveDate && (effectiveDate < new Date(semesterRange.start_date) || effectiveDate > new Date(semesterRange.end_date))) {
+          console.log(`⏱️ 특강 "${event.subject_name || event.title}" (${effectiveDate.toISOString().split('T')[0]})이(가) 현재 학기 범위를 벗어나 필터링됨`);
+          return false;
+        }
+        
+        // 레벨 필터링 확인
+        if (currentLevel.value && event.level) {
+          const eventLevel = String(event.level).toLowerCase();
+          const userLevel = String(currentLevel.value).toLowerCase();
+          
+          if (eventLevel !== userLevel && !eventLevel.includes(userLevel)) {
+            console.log(`🔍 레벨 불일치로 특강 필터링 제외: ${event.subject_name || event.title} (${eventLevel}, 현재 ${userLevel})`);
+            return false;
+          }
+        }
+        
+        specialLecturesCount++;
+        console.log(`✨ 특강 이벤트 포함됨: ${event.subject_name || event.title}, 레벨: ${event.level || 'N/A'}, ID: ${event.id}`);
+        return true;
+      }
+      
+      // 5. TOPIK 수업 - 모든 학년에 표시 (레벨 필터링만 적용)
+      if (isTopikClass) {
+        // TOPIK은 레벨 필터링만 적용
+        if (currentLevel.value && event.level) {
+          const eventLevel = String(event.level).toLowerCase();
+          const userLevel = String(currentLevel.value).toLowerCase();
+          
+          if (eventLevel !== userLevel && !eventLevel.includes(userLevel)) {
+            console.log(`🔍 레벨 불일치로 TOPIK 수업 필터링 제외: ${event.subject_name || event.title} (${eventLevel}, 현재 ${userLevel})`);
+            return false;
+          }
+        }
+        
+        topikCount++;
+        console.log(`🌏 TOPIK 수업 포함됨: ${event.subject_name || event.title}, 레벨: ${event.level || 'N/A'}, ID: ${event.id}`);
+        return true;
+      }
+      
+      // 6. 정규 수업 - 학년(year) 기준으로 엄격하게 필터링
+      
+      // 이벤트에 학년 정보가 없거나 현재 선택된 학년과 일치하지 않으면 제외
+      if (eventYear === null || eventYear !== currentGradeInt) {
+        console.log(`🚫 학년 불일치로 제외: ${event.subject_name || event.title || '이름 없음'} (이벤트 학년: ${eventYear !== null ? eventYear : 'NULL'}, 현재 학년: ${currentGradeInt})`);
+        return false;
+      }
+      
+      // 정규 수업
+      regularClassesCount++;
+      console.log(`📚 정규 수업 포함됨 (학년 일치): ${event.subject_name || event.title}, 학년: ${eventYear}, ID: ${event.id}`);
       return true;
     });
     
-    console.log(`🔍 필터링 결과: ${filtered.length}개 (특강: ${filtered.filter(e => 
-      e.type === 'special' || 
-      e.event_type === 'special' || 
-      e.is_special_lecture === 1 || 
-      e.is_special_lecture === true
-    ).length}개)`);
+    console.log(`🔍 필터링 결과: 총 ${filtered.length}개 이벤트 (정규: ${regularClassesCount}, 특강: ${specialLecturesCount}, 휴강: ${canceledCount}, 보강: ${makeupCount}, 공휴일: ${holidaysCount}, TOPIK: ${topikCount})`);
+    
+    // 각 이벤트 유형별 개수 출력
+    const eventsByType = filtered.reduce((acc, event) => {
+      if (event.type === 'holiday' || event.event_type === 'holiday') {
+        acc.holiday = (acc.holiday || 0) + 1;
+      } else if (event.type === 'cancel' || event.event_type === 'cancel') {
+        acc.cancel = (acc.cancel || 0) + 1;
+      } else if (event.type === 'makeup' || event.event_type === 'makeup') {
+        acc.makeup = (acc.makeup || 0) + 1;
+      } else if (event.is_special_lecture === 1 || event.type === 'special' || event.event_type === 'special') {
+        acc.special = (acc.special || 0) + 1;
+      } else if (event.is_foreigner_target === 1 || event.type === 'topik' || event.event_type === 'topik' || 
+                 (event.level && event.level.includes('TOPIK'))) {
+        acc.topik = (acc.topik || 0) + 1;
+      } else {
+        acc.regular = (acc.regular || 0) + 1;
+      }
+      return acc;
+    }, {});
+    
+    console.log('📊 필터링 후 이벤트 유형별 개수:', eventsByType);
     
     return filtered;
   })
@@ -231,8 +325,10 @@ export const useTimetableStore = defineStore('timetable', () => {
 
   // 필터 변경 함수들
   function setCurrentGrade(grade) {
-    currentGrade.value = grade
-    console.log(`🔄 현재 학년 설정: ${grade}학년`)
+    if (grade && grade >= 1 && grade <= 3) {
+      console.log(`📝 학년 변경: ${currentGrade.value} → ${grade}`);
+      currentGrade.value = grade;
+    }
   }
 
   function setCurrentWeek(week) {
@@ -264,11 +360,8 @@ export const useTimetableStore = defineStore('timetable', () => {
 
   // 통합 데이터 처리 함수: 이벤트 유형에 따라 적절한 API 호출 실행
   async function processScheduleAction(data, actionType) {
-    loading.value = true
-    error.value = null
-
     try {
-      // 이벤트 타입에 따른 API 엔드포인트 결정
+      loading.value = true;
       let endpoint = '';
       let payload = {};
 
@@ -387,13 +480,20 @@ export const useTimetableStore = defineStore('timetable', () => {
         case 'delete':
           // 이벤트 삭제
           if (data.id) {
+            // ID를 항상 문자열로 변환하여 안전하게 처리
+            const idStr = String(data.id);
+            console.log('🔹 삭제할 ID:', idStr, '타입:', data.event_type || 'regular');
+            
+            // 이벤트 타입에 따라 엔드포인트 결정
             if (data.is_special_lecture === 1 || data.event_type === 'special') {
-              endpoint = `/timetable/${data.id}`;
+              endpoint = `/timetable/${idStr}`;
             } else if (data.event_type === 'cancel' || data.event_type === 'makeup') {
-              endpoint = `/timetable/events/${data.id}`;
+              endpoint = `/timetable/events/${idStr}`;
             } else {
-              endpoint = `/timetable/${data.id}`;
+              endpoint = `/timetable/${idStr}`;
             }
+            
+            console.log('🔍 DELETE 요청 경로:', endpoint);
             
             // DELETE 요청은 페이로드 없음
             payload = null;
@@ -411,11 +511,26 @@ export const useTimetableStore = defineStore('timetable', () => {
       let response;
       
       if (actionType === 'delete') {
-        response = await apiClient.delete(endpoint, {
-          headers: {
-            Authorization: `Bearer ${authStore.token}`
+        // 확인: 엔드포인트가 정상적인 문자열인지 확인
+        if (typeof endpoint !== 'string' || !endpoint) {
+          throw new Error(`유효하지 않은 엔드포인트: ${endpoint}`);
+        }
+        
+        try {
+          response = await apiClient.delete(endpoint, {
+            headers: {
+              Authorization: `Bearer ${authStore.token}`
+            }
+          });
+          console.log(`✅ DELETE 요청 성공: ${endpoint}`);
+        } catch (error) {
+          console.error(`❌ DELETE 요청 실패 (${endpoint}):`, error);
+          if (error.response) {
+            console.error('응답 상태:', error.response.status);
+            console.error('응답 데이터:', error.response.data);
           }
-        });
+          throw error;
+        }
       } else if (actionType === 'update') {
         response = await apiClient.put(endpoint, payload, {
           headers: {
@@ -648,13 +763,23 @@ export const useTimetableStore = defineStore('timetable', () => {
     return monday.toISOString().split('T')[0]
   }
 
-  // 현재 학기 구하기
+  // 현재 학기 가져오기
   function getCurrentSemester() {
-    const now = new Date()
-    const month = now.getMonth() + 1
+    const now = new Date();
+    const month = now.getMonth() + 1; // JavaScript months are 0-based
     
-    // 3월~8월: 봄학기, 9월~2월: 가을학기
-    return month >= 3 && month <= 8 ? 'spring' : 'fall'
+    if (month >= 3 && month <= 6) return 'spring';
+    if (month >= 7 && month <= 8) return 'summer';
+    if (month >= 9 && month <= 12) return 'fall';
+    return 'winter';
+  }
+
+  // 학기 범위 정보 구하기
+  function getSemesterRangeForFiltering() {
+    const currentYear = new Date().getFullYear();
+    const currentSemesterName = getCurrentSemester();
+    // 숫자를 문자열로 변환하여 전달
+    return getSemesterRange(String(currentYear), currentSemesterName);
   }
 
   function showCancelClassModal(day, period) {
@@ -775,6 +900,7 @@ export const useTimetableStore = defineStore('timetable', () => {
       return { events: [] }
     }
 
+    // 파라미터 기본값 및 변수 처리
     const {
       grade = currentGrade.value,
       level = currentLevel.value,
@@ -783,7 +909,11 @@ export const useTimetableStore = defineStore('timetable', () => {
       student_type = studentType.value,
       semester = getCurrentSemester(),
       week,
-      year = new Date().getFullYear()
+      year = new Date().getFullYear(),
+      skipGradeFilter = false, // 기본값 false: 정규 수업은 학년별로 구분함
+      includeHolidays = true,  // 기본값 true: 공휴일 포함
+      includeCancellations = true, // 기본값 true: 휴강 포함
+      includeMakeups = true    // 기본값 true: 보강 포함
     } = params
 
     // 날짜 검증: week 파라미터가 유효한 날짜 형식인지 확인
@@ -802,7 +932,7 @@ export const useTimetableStore = defineStore('timetable', () => {
       level, semester, year, week: targetWeek
     })
     
-    // 일반 수업용 캐시 키 생성 (기존 로직)
+    // 일반 수업용 캐시 키 생성 (학년 포함)
     const regularCacheKey = getCacheKey('weekly', {
       grade, level, group_level, is_foreigner, student_type, semester, week: targetWeek, year
     })
@@ -863,15 +993,26 @@ export const useTimetableStore = defineStore('timetable', () => {
         is_foreigner: String(isForeigner)
       }
       
-      // 정규 수업은 grade(year)로만 필터링
+      // 정규 수업은 grade(year)로 필터링 (학년별로 구분)
       if (grade) {
         requestParams.grade = String(grade)
       }
       
-      // 특강은 level로 필터링하되, 무조건 전송하여 특강이 항상 표시되도록 함
-      // 특강이 레벨별로 모든 학년에 공통으로 표시되도록 ignoreGradeFilter 파라미터 추가
-      requestParams.level = level ? String(level) : 'ALL'
-      requestParams.ignoreGradeFilter = 'true'
+      // 특강 등은 level로 필터링
+      if (level && level !== 'ALL') {
+        requestParams.level = String(level)
+      }
+      
+      // 학년 무시 플래그 설정 (optional)
+      // 특강은 학년과 무관하게 모든 학년에 표시해야 함
+      if (skipGradeFilter) {
+        requestParams.ignoreGradeFilter = 'true'
+      }
+      
+      // 특정 이벤트 유형 포함/제외 설정
+      requestParams.includeHolidays = String(includeHolidays)
+      requestParams.includeCancellations = String(includeCancellations)
+      requestParams.includeMakeups = String(includeMakeups)
       
       if (group_level && group_level !== 'ALL') {
         requestParams.group_level = String(group_level)
@@ -883,12 +1024,14 @@ export const useTimetableStore = defineStore('timetable', () => {
       }
       
       console.log('🔍 요청 파라미터:', requestParams)
-      console.log('📮 특강 포함 요청 파라미터 → ignoreGradeFilter:', requestParams.ignoreGradeFilter)
       console.log('🎯 API 요청 전 중요 파라미터 확인:')
-      console.log('  - 학년 무시 설정 (특강용):', requestParams.ignoreGradeFilter === 'true' ? '✅ 활성화' : '❌ 비활성화')
-      console.log('  - 레벨 필터:', requestParams.level || '없음')
       console.log('  - 학년 정보:', requestParams.grade || '전체')
+      console.log('  - 레벨 필터:', requestParams.level || '전체')
       console.log('  - 학기:', requestParams.semester || '전체')
+      console.log('  - 학년 무시 설정:', requestParams.ignoreGradeFilter === 'true' ? '✅ 활성화' : '❌ 비활성화')
+      console.log('  - 공휴일 포함:', requestParams.includeHolidays === 'true' ? '✅ 포함' : '❌ 제외')
+      console.log('  - 휴강 포함:', requestParams.includeCancellations === 'true' ? '✅ 포함' : '❌ 제외')
+      console.log('  - 보강 포함:', requestParams.includeMakeups === 'true' ? '✅ 포함' : '❌ 제외')
       
       // API 요청 전송
       const response = await apiClient.get('/timetable/weekly', {
@@ -923,14 +1066,51 @@ export const useTimetableStore = defineStore('timetable', () => {
           event.id = `temp-${Date.now()}-${Math.floor(Math.random() * 10000)}`
         }
         
-        // 타입 필드 확인
+        // 타입 필드 확인 및 정규화
         if (!event.type && !event.event_type) {
           event.type = 'regular'
           event.event_type = 'regular'
         }
         
+        // 이벤트 타입 정규화 (type과 event_type 동기화)
+        if (!event.type && event.event_type) {
+          event.type = event.event_type
+        } else if (event.type && !event.event_type) {
+          event.event_type = event.type
+        }
+        
         return event
       })
+      
+      // 이벤트 유형별 분류 카운터
+      const eventTypeCounts = {
+        special: 0,
+        regular: 0,
+        cancel: 0,
+        makeup: 0,
+        holiday: 0,
+        topik: 0
+      }
+      
+      // 이벤트 유형별 분류
+      validEvents.forEach(event => {
+        if (event.type === 'holiday' || event.event_type === 'holiday') {
+          eventTypeCounts.holiday++
+        } else if (event.type === 'cancel' || event.event_type === 'cancel') {
+          eventTypeCounts.cancel++
+        } else if (event.type === 'makeup' || event.event_type === 'makeup') {
+          eventTypeCounts.makeup++
+        } else if (event.is_special_lecture === 1 || event.type === 'special' || event.event_type === 'special') {
+          eventTypeCounts.special++
+        } else if (event.is_foreigner_target === 1 || event.type === 'topik' || event.event_type === 'topik' || 
+                  (event.level && event.level.includes('TOPIK'))) {
+          eventTypeCounts.topik++
+        } else {
+          eventTypeCounts.regular++
+        }
+      })
+      
+      console.log('📊 가져온 이벤트 유형별 개수:', eventTypeCounts)
       
       // 특강과 일반 수업 분리
       const specialEvents = validEvents.filter(event => 
@@ -1085,52 +1265,26 @@ export const useTimetableStore = defineStore('timetable', () => {
    * @returns {Array} - 처리된 이벤트 배열
    */
   function processEvents(eventList = []) {
-    if (!eventList || !Array.isArray(eventList)) {
-      console.warn('이벤트 목록이 배열이 아닙니다:', eventList)
+    if (!eventList || eventList.length === 0) {
+      console.log('ℹ️ 처리할 이벤트가 없습니다.')
       return []
     }
-
-    // 특강이 있는지 확인
-    try {
-      const specialLectures = eventList.filter(event => 
-        event && (
-          event.type === 'special' || 
-          event.event_type === 'special' || 
-          event.is_special_lecture === 1 || 
-          event.is_special_lecture === true
-        )
-      );
-      
-      console.log(`🔍 processEvents - 특강 확인: ${specialLectures.length}개`);
-      
-      // 특강 목록 로깅
-      if (specialLectures.length > 0) {
-        console.log('특강 목록:', specialLectures.map(e => ({
-          id: e.id,
-          title: e.subject_name || e.title,
-          semester: e.semester,
-          year: e.year,
-          level: e.level
-        })));
-        
-        // 현재 선택된 학기와 비교
-        const currentSem = getCurrentSemester();
-        const currentYear = new Date().getFullYear();
-        
-        // utils/semester.js의 getSemesterRange 함수 사용
-        const semesterRange = getSemesterRange(currentYear, currentSem);
-        console.log(`🗓️ 현재 학기(${currentSem}) 기간:`, semesterRange);
-        
-        // 현재 날짜가 학기 범위 내에 있는지 확인
-        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD 형식
-        const isInSemesterRange = today >= semesterRange.start_date && today <= semesterRange.end_date;
-        
-        console.log(`📅 오늘(${today})은 학기 기간 내 ${isInSemesterRange ? '✅' : '❌'}`);
-      }
-    } catch (error) {
-      console.error('특강 확인 중 오류:', error);
-    }
-
+    
+    console.log(`🔄 이벤트 처리 시작: ${eventList.length}개`)
+    
+    // 특강 개수 확인
+    const specialLectures = eventList.filter(event => 
+      event && (
+        event.is_special_lecture === 1 || 
+        event.is_special_lecture === true || 
+        event.is_special_lecture === '1' ||
+        event.type === 'special' || 
+        event.event_type === 'special'
+      )
+    )
+    
+    console.log(`✨ 특강 ${specialLectures.length}개 발견됨`)
+    
     // null 제거 및 데이터 정규화
     const processedEvents = eventList
       .filter(event => {
@@ -1138,127 +1292,76 @@ export const useTimetableStore = defineStore('timetable', () => {
           console.warn('⚠️ null/undefined 이벤트 필터링됨')
           return false
         }
-        
-        // 특강 여부 확인 - 모든 형태의 특강 식별
-        const isSpecialLecture = 
-          event.is_special_lecture === 1 || 
-          event.is_special_lecture === true || 
-          event.is_special_lecture === '1' ||
-          event.type === 'special' || 
-          event.event_type === 'special' ||
-          (event.level && String(event.level).startsWith('N'));
-        
-        // TOPIK 수업 여부 확인
-        const isTopikClass = 
-          event.is_foreigner_target === 1 || 
-          event.is_foreigner_target === true || 
-          event.is_foreigner_target === '1' ||
-          (event.level && String(event.level).startsWith('TOPIK'));
-        
-        // 학년 필터링 (특강과 TOPIK은 모든 학년에 표시, 정규 수업은 학년 필터링)
-        if (currentGrade.value && !isSpecialLecture && !isTopikClass) {
-          const eventGrade = parseInt(String(event.year || event.grade || '0'))
-          const currentGradeInt = parseInt(String(currentGrade.value))
-          
-          // 학년이 일치하지 않으면 필터링 제외 (특강과 TOPIK은 예외)
-          if (eventGrade !== 0 && eventGrade !== currentGradeInt) {
-            console.log(`🔍 학년 불일치로 필터링 제외: ${event.subject_name || event.title} (${eventGrade}학년, 현재 ${currentGradeInt}학년)`)
-            return false
-          }
-        } else if (isSpecialLecture) {
-          // 특강 이벤트 확인 로그
-          console.log(`✨ 특강 이벤트 포함됨 (모든 학년 표시): ${event.subject_name || event.title}, 레벨: ${event.level || 'N/A'}, ID: ${event.id}`);
-        } else if (isTopikClass) {
-          // TOPIK 이벤트 확인 로그
-          console.log(`🌏 TOPIK 이벤트 포함됨 (레벨 기반): ${event.subject_name || event.title}, 레벨: ${event.level || 'N/A'}, ID: ${event.id}`);
-        }
-        
         return true
       })
       .map(event => {
-        // ID 필드 확인 (localeCompare 오류 방지)
-        if (!event.id) {
-          event.id = `temp-${Date.now()}-${Math.floor(Math.random() * 10000)}`
-        } else if (typeof event.id !== 'string' && typeof event.id !== 'number') {
-          // 객체나 다른 타입인 경우 문자열로 변환
-          event.id = String(event.id)
-        }
-        
-        // 필수 필드 누락 확인 및 로깅
-        if (!event.subject_name && !event.title) {
-          console.warn('⚠️ 제목 없는 이벤트:', { 
-            id: event.id, 
-            type: event.type || event.event_type,
-            date: event.date || event.event_date
-          })
-        }
-        
-        // 타입 정규화
-        const eventType = event.type || event.event_type || 'regular'
-        
-        // 날짜 데이터 정규화 (이벤트 날짜)
-        let eventDate = event.date || event.event_date
-        if (eventDate && typeof eventDate === 'string') {
-          // 날짜 형식 유효성 확인 (YYYY-MM-DD)
-          if (!/^\d{4}-\d{2}-\d{2}/.test(eventDate)) {
-            console.warn(`⚠️ 잘못된 날짜 형식: ${eventDate}, 이벤트 ID: ${event.id}`)
-            eventDate = null
-          }
-        }
-        
-        // 교시 정보 숫자로 변환
-        const startPeriod = parseInt(event.start_period) || 1
-        const endPeriod = parseInt(event.end_period) || startPeriod
-        
-        // 정규화된 새 이벤트 객체 생성
-        return {
+        // 이벤트 기본 정보
+        const normalized = {
           ...event,
-          // 필수 텍스트 필드
-          id: event.id, // 이미 처리됨
-          subject_name: event.subject_name || event.title || '미지정 과목',
-          title: event.title || event.subject_name || '미지정 이벤트',
-          professor: event.professor || '미지정',
-          room: event.room || '',
-          
-          // 타입 관련 필드 (양쪽 필드 모두 설정)
-          type: eventType,
-          event_type: eventType,
-          
-          // 날짜 관련 필드 (양쪽 필드 모두 설정)
-          date: eventDate,
-          event_date: eventDate,
-          
-          // 기간 관련 필드
-          start_period: startPeriod,
-          end_period: endPeriod,
-          
-          // 추가 메타데이터
-          processed: true,
-          priority: EVENT_PRIORITIES[eventType] !== undefined ? EVENT_PRIORITIES[eventType] : 999
+          id: event.id || `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          title: event.subject_name || event.title || '제목 없음',
+          description: event.description || '',
+          start_period: parseInt(event.start_period || 1),
+          end_period: parseInt(event.end_period || event.start_period || 1)
         }
+        
+        // 날짜 정규화 (ISO 문자열로 변환)
+        if (event.date) {
+          normalized.date = typeof event.date === 'string' ? event.date : new Date(event.date).toISOString().split('T')[0]
+        } else if (event.event_date) {
+          normalized.date = typeof event.event_date === 'string' ? event.event_date : new Date(event.event_date).toISOString().split('T')[0]
+        }
+        
+        // 레벨 정규화
+        if (event.level) {
+          normalized.level = Array.isArray(event.level) ? event.level.join(',') : String(event.level)
+        }
+        
+        // 이벤트 색상 설정
+        normalized.color = getEventColor(event)
+        
+        return normalized
       })
-      
-    // 추가: 처리 후 특강 로그
-    const specials = processedEvents.filter(e =>
-      e.type === CLASS_TYPES.SPECIAL || 
-      e.event_type === CLASS_TYPES.SPECIAL || 
-      e.is_special_lecture === 1 || 
-      e.is_special_lecture === true
-    )
     
-    console.log(`✨ processEvents 처리 후 특강: ${specials.length}개`);
-    if (specials.length > 0) {
-      console.log('🔍 특강 상세 정보:', specials.map(e => ({
-        id: e.id,
-        subject: e.subject_name,
-        date: e.date,
-        day: e.day,
-        level: e.level,
-        is_special_lecture: e.is_special_lecture
-      })));
-    }
-    
+    console.log(`✅ 이벤트 처리 완료: ${processedEvents.length}개`)
     return processedEvents
+  }
+
+  /**
+   * 이벤트 유형에 따라 색상을 반환하는 함수
+   */
+  function getEventColor(event) {
+    if (!event) return '#6B7280' // 기본 회색
+    
+    // 이벤트 유형 확인
+    const isHoliday = 
+      event.type === 'holiday' || 
+      event.event_type === 'holiday'
+    
+    const isCancelled = 
+      event.type === 'cancel' || 
+      event.event_type === 'cancel' || 
+      event.status === 'canceled'
+    
+    const isMakeup = 
+      event.type === 'makeup' || 
+      event.event_type === 'makeup'
+    
+    const isSpecialLecture = 
+      event.is_special_lecture === 1 || 
+      event.is_special_lecture === true || 
+      event.is_special_lecture === '1' ||
+      event.type === 'special' || 
+      event.event_type === 'special'
+    
+    // 유형별 색상 반환
+    if (isHoliday) return '#EF4444' // 공휴일 - 빨간색
+    if (isCancelled) return '#F97316' // 휴강 - 주황색
+    if (isMakeup) return '#22C55E' // 보강 - 초록색
+    if (isSpecialLecture) return '#8B5CF6' // 특강 - 보라색
+    
+    // 기본 색상 (정규 수업)
+    return '#3B82F6' // 파란색
   }
 
   // 통합 일정 등록 폼 열기
@@ -1294,6 +1397,40 @@ export const useTimetableStore = defineStore('timetable', () => {
     })
   }
 
+  // 추가: 셀 액션 통합 처리 함수
+  function handleCellAction(data) {
+    console.log('🔄 셀 액션 처리:', data)
+    
+    const { dayIndex, timeIndex, hasEvents, events, action, event } = data
+    const day = ['mon', 'tue', 'wed', 'thu', 'fri'][dayIndex]
+    
+    if (action === 'edit' && event) {
+      // 수정 버튼 클릭시 처리
+      openUnifiedScheduleForm({
+        isEdit: true,
+        modalData: {
+          ...event,
+          type: event.type || event.event_type || 'regular',
+          timetable_id: event.timetable_id || event.id,
+          professor_name: event.professor_name || event.inherited_professor_name,
+          room: event.room || event.inherited_room,
+          subject_id: event.subject_id
+        },
+        showTypeSelector: false,
+        allowCancel: true,
+        eventType: event.type || event.event_type || 'regular',
+        timetableData: event
+      })
+    } else if (hasEvents && events.length > 0) {
+      // 일반 셀 클릭시 이벤트가 있으면 상세 보기
+      showDetailModal(events)
+    } else {
+      // 빈 셀 클릭시 새 이벤트 등록
+      const dayCode = day || `day${dayIndex+1}`
+      showCancelClassModal(dayCode, timeIndex)
+    }
+  }
+
   return {
     // State
     events,
@@ -1316,6 +1453,8 @@ export const useTimetableStore = defineStore('timetable', () => {
     modalType,
     modalData,
     showModal,
+    showUnifiedModal,
+    unifiedModalData,
     
     // Modal actions
     showRegisterModal,
@@ -1351,6 +1490,7 @@ export const useTimetableStore = defineStore('timetable', () => {
     validateRequiredFields,
     invalidateEventCache,
     sendLineNotification,
-    openUnifiedScheduleForm
+    openUnifiedScheduleForm,
+    handleCellAction
   }
 }) 
