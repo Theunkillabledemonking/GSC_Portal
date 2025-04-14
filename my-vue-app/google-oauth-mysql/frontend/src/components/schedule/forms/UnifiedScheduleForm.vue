@@ -305,8 +305,8 @@ import { ref, computed, reactive, onMounted, watch } from 'vue'
 // import { useTimetableStore } from '@/store/modules/timetable'
 // import { useI18n } from 'vue-i18n'
 // import { useStore } from 'vuex'
-import DetailEventModal from './modals/DetailEventModal.vue'
-import { getSemesterRange } from '@/utils/semester'
+import DetailEventModal from '../../modals/DetailEventModal.vue'
+import { getSemesterRange } from '@/utils/semester.js'
 
 // Simple toast replacement
 const simpleToast = {

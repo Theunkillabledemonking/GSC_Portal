@@ -179,9 +179,9 @@ import { useTimetableStore } from '@/store/modules/timetable'
 import { useAuthStore } from '@/store/modules/auth'
 import { useSubjectStore } from '@/store/modules/subject'
 import TimetableCell from '../TimetableCell.vue'
-import RegisterEventModal from '../modals/RegisterEventModal.vue'
+import RegisterEventModal from './forms/RegisterEventModal.vue'
 import DetailEventModal from '../modals/DetailEventModal.vue'
-import UnifiedScheduleForm from '../UnifiedScheduleForm.vue'
+import UnifiedScheduleForm from './forms/UnifiedScheduleForm.vue'
 import { CLASS_TYPES } from '@/constants/timetable'
 
 // 요일 및 교시 상수

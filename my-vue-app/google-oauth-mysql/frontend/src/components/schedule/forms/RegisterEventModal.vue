@@ -3,7 +3,7 @@
     <div class="modal-container">
       <div class="modal-header">
         <h3 class="modal-title">수업 등록</h3>
-        <button 
+        <button
           class="close-button"
           @click="emit('close')"
         >
@@ -16,7 +16,7 @@
           <!-- 수업 제목 -->
           <div class="form-group">
             <label>수업 제목</label>
-            <input 
+            <input
               v-model="formData.title"
               type="text"
               required
@@ -39,8 +39,8 @@
             <div class="form-group flex-1">
               <label>시작 교시</label>
               <select v-model="formData.startPeriod" required>
-                <option 
-                  v-for="period in 9" 
+                <option
+                  v-for="period in 9"
                   :key="period"
                   :value="period"
                 >
@@ -50,13 +50,13 @@
             </div>
             <div class="form-group flex-1">
               <label>종료 교시</label>
-              <select 
-                v-model="formData.endPeriod" 
+              <select
+                v-model="formData.endPeriod"
                 required
                 :disabled="!formData.startPeriod"
               >
-                <option 
-                  v-for="period in remainingPeriods" 
+                <option
+                  v-for="period in remainingPeriods"
                   :key="period"
                   :value="period"
                 >
@@ -67,15 +67,15 @@
           </div>
 
           <div class="button-group">
-            <button 
-              type="button" 
+            <button
+              type="button"
               class="cancel-button"
               @click="emit('close')"
             >
               취소
             </button>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               class="submit-button"
               :disabled="!isFormValid"
             >
@@ -204,4 +204,4 @@ const handleSubmit = () => {
   @apply hover:bg-blue-700;
   @apply disabled:opacity-50 disabled:cursor-not-allowed;
 }
-</style> 
+</style>

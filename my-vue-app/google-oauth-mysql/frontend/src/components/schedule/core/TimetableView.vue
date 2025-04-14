@@ -116,7 +116,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useTimetableStore } from '@/store/modules/timetable'
 import { useToast } from '@/composables/useToast'
 import TimetableCell from './TimetableCell.vue'
-import UnifiedScheduleForm from './UnifiedScheduleForm.vue'
+import UnifiedScheduleForm from './WeeklyTimetable/forms/UnifiedScheduleForm.vue'
 import DetailEventModal from './DetailEventModal.vue'
 // import { getWeekRange, formatDateRange } from '@/utils/date'
 
