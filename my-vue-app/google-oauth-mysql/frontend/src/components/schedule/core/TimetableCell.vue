@@ -27,7 +27,7 @@
           <span class="event-professor">{{ getEffectiveProfessorName(mainEvent) }}</span>
           <span class="event-room">{{ getEffectiveRoom(mainEvent) }}</span>
         </div>
-        
+
         <!-- Additional event count -->
         <div v-if="eventCount > 1" class="event-count" :class="{'has-tooltip': isHovered}">
           <span class="event-count-badge">+{{ eventCount - 1 }}</span>
@@ -47,7 +47,12 @@
         :class="{ 'tooltip-right': tooltipPosition === 'right', 'tooltip-left': tooltipPosition === 'left', 'tooltip-bottom': tooltipPosition === 'bottom' }"
       >
         <div class="tooltip-header">이벤트 목록 ({{ eventCount }}개)</div>
-        <div v-for="(event, index) in sortedEvents" :key="index" class="tooltip-event">
+        <div v-for="(event, index) in sortedEvents"
+             :key="index"
+             class="tooltip-event"
+             :class="getEventType(event)"
+             @click.stop="handleTooltipClick(event)"
+        >
           <div class="tooltip-event-type" :class="getEventTypeClass(event)">
             [{{ getEventTypeLabel(event) }}]
           </div>
@@ -119,7 +124,7 @@ const dragData = ref(null)
 const isAdmin = ref(false) // 관리자 권한은 부모에서 받아오거나 이벤트로 확인
 
 // Emits definition
-const emit = defineEmits(['click', 'dragstart', 'dragover', 'dragend', 'cell-click', 'dragStart', 'drop'])
+const emit = defineEmits(['click', 'dragstart', 'dragover', 'dragend', 'cell-click', 'dragStart', 'drop', 'edit'])
 
 // Reactive state
 const isHovered = ref(false)
@@ -133,8 +138,9 @@ const EVENT_TYPE_PRIORITIES = {
   cancel: 1,     // 휴강
   makeup: 2,     // 보강
   special: 3,    // 특강
-  event: 4,      // 기타 이벤트
-  regular: 5     // 정규 수업
+  topik: 4,      // TOPIK 수업
+  event: 5,      // 기타 이벤트
+  regular: 6     // 정규 수업
 }
 
 /**
@@ -142,24 +148,54 @@ const EVENT_TYPE_PRIORITIES = {
  */
 const validEvents = computed(() => {
   if (!props.events || !Array.isArray(props.events)) {
-    return []
+    return [];
   }
   
-  // 이벤트 필터링
-  const filteredEvents = props.events.filter(event => !!event);
+  // 이벤트 필터링 - 유효한 객체만 포함
+  const filteredEvents = props.events.filter(event => event && typeof event === 'object');
   
-  // 휴강이 있는지 확인
+  // 유형별 이벤트 개수 (디버깅)
+  const eventCounts = {
+    holiday: 0,
+    cancel: 0,
+    makeup: 0,
+    special: 0,
+    topik: 0,
+    regular: 0
+  };
+  
+  // 각 이벤트의 유형 디버깅
+  filteredEvents.forEach(event => {
+    // 이벤트 타입 안전 접근
+    const eventType = getEventType(event);
+    if (eventCounts[eventType] !== undefined) {
+      eventCounts[eventType]++;
+    } else {
+      eventCounts.regular++;
+    }
+  });
+  
+  // 디버깅 로그
+  if (filteredEvents.length > 0) {
+    console.log(`📎 셀(${props.day}, ${props.period}) 이벤트 유형:`, eventCounts);
+  }
+  
+  // 휴강이 있는지 확인 (타입 안전 접근)
   const hasCancel = filteredEvents.some(event => 
-    event && (event.type === 'cancel' || event.event_type === 'cancel' || event.status === 'canceled')
+    event.type === 'cancel' || 
+    event.event_type === 'cancel' || 
+    event.status === 'canceled'
   );
   
   // 휴강이 있으면 정규 수업 제외
   if (hasCancel) {
     return filteredEvents.filter(event => {
+      const eventType = event.type || '';
+      const eventEventType = event.event_type || '';
+      
       // 정규 수업이면 제외
-      if ((!event.type || event.type === 'regular') && 
-          (!event.event_type || event.event_type === 'regular')) {
-        // 같은 과목의 정규 수업만 제외
+      if ((eventType === '' || eventType === 'regular') && 
+          (eventEventType === '' || eventEventType === 'regular')) {
         return false;
       }
       return true;
@@ -198,8 +234,22 @@ function getEventType(event) {
         event.is_special_lecture === 1 || 
         String(event.is_special_lecture) === '1' ||
         event.type === 'special' || 
-        event.event_type === 'special' || 
-        (event.level && String(event.level).startsWith('N'))) {
+        event.event_type === 'special') {
+      return 'special'
+    }
+    
+    // TOPIK 수업
+    if (event.is_foreigner_target === 1 || 
+        event.is_foreigner_target === true || 
+        event.is_foreigner_target === '1' ||
+        event.type === 'topik' || 
+        event.event_type === 'topik' ||
+        (event.level && String(event.level).includes('TOPIK'))) {
+      return 'topik'
+    }
+    
+    // JLPT 수업 (N1, N2, N3)
+    if ((event.level && String(event.level).startsWith('N'))) {
       return 'special'
     }
     
@@ -405,24 +455,36 @@ const cellClasses = computed(() => {
 
 // 셀 클릭 핸들러
 const handleClick = () => {
-  // dayIndex와 timeIndex가 있으면 해당 정보로 이벤트 발생 (새 구조)
-  if (props.dayIndex !== undefined && props.timeIndex !== undefined) {
-    emit('cell-click', {
-      dayIndex: props.dayIndex,
-      timeIndex: props.timeIndex,
-      hasEvents: hasEvents.value,
-      events: sortedEvents.value,
-      isHoliday: isCellHoliday.value
-    })
-  } else {
-    // 기존 방식 유지
-    emit('click', {
-      day: props.day,
-      period: props.period,
-      events: sortedEvents.value,
-      isHoliday: isCellHoliday.value
-    })
-  }
+  emit('click', { day: props.day, period: props.period })
+  emit('cell-click', {
+    dayIndex: props.dayIndex,
+    timeIndex: props.period,
+    hasEvents: hasEvents.value,
+    events: validEvents.value,
+    action: 'view' // 기본 액션은 보기
+  })
+}
+
+// 수정 버튼 클릭 핸들러 (추가)
+const handleEditClick = (e) => {
+  e.stopPropagation() // 이벤트 버블링 중지
+  
+  // cell-click 이벤트 발생
+  emit('cell-click', {
+    dayIndex: props.dayIndex,
+    timeIndex: props.period,
+    hasEvents: hasEvents.value,
+    events: validEvents.value,
+    event: mainEvent.value, // 현재 이벤트 전달
+    action: 'edit' // 액션 타입 지정
+  })
+  
+  // edit 이벤트도 발생시켜 이전 구현과 호환성 유지
+  emit('edit', {
+    event: mainEvent.value,
+    day: props.day,
+    period: props.period
+  })
 }
 
 // 드래그 시작 핸들러
@@ -606,108 +668,106 @@ const handleMouseEnter = (event) => {
   if (period >= 9) tooltipPosition.value = 'bottom'; // Bottom edge cells
 }
 
-// 이벤트 색상 결정
-const cellColor = computed(() => {
-  if (!mainEvent.value) return 'transparent';
-  if (props.isHoliday) return '#fee2e2'; // 공휴일 - 빨간색 배경
+const handleTooltipClick = (event) => {
+  emit('cell-click', {
+    fromTooltip: true,
+    event, // 선택한 이벤트만 전달
+    events: sortedEvents.value,
+    hasEvents: true
+  })
+}
+
+// 이벤트 유형별 스타일 및 표시 데이터 계산
+const eventTypeCounts = computed(() => {
+  const counts = {
+    holiday: 0,
+    cancel: 0,
+    makeup: 0,
+    special: 0,
+    topik: 0,
+    regular: 0
+  };
   
-  const event = mainEvent.value;
-  const type = event.type || event.event_type;
-  
-  // 특강은 눈에 띄게 보라색으로 표시
-  if (type === 'special' || event.is_special_lecture === 1 || event.is_special_lecture === true) {
-    return '#c4b5fd'; // 보라색 (특강)
-  }
-  
-  // 다른 이벤트 타입에 따른 색상
-  switch (type) {
-    case 'cancel': return '#fecaca'; // 휴강 - 연한 빨간색
-    case 'makeup': return '#bfdbfe'; // 보강 - 연한 파란색
-    case 'event': return '#fef08a'; // 일반 이벤트 - 연한 노란색
-    case 'holiday': return '#fee2e2'; // 공휴일 - 연한 빨간색
-    default: return '#e5e7eb'; // 기본 - 회색
-  }
-});
-
-const isFirstEventOfDay = (cellEvents = []) => {
-  if (!cellEvents.length) return false;
-  const firstEvent = cellEvents[0];
-  return firstEvent && hasId(firstEvent) && firstEvent.start_period === 1;
-};
-
-const showEvent = computed(() => {
-  if (!props.events || props.events.length === 0) return null;
-  return props.events[0];
-});
-
-const hasMultipleEvents = computed(() => {
-  return props.events && props.events.length > 1;
-});
-
-const eventTypeDisplay = computed(() => {
-  if (!showEvent.value) return '';
-  
-  const type = showEvent.value.type || '';
-  
-  if (type === 'cancel') return '취소';
-  if (type === 'makeup') return '보강';
-  if (type === 'special') return '특강';
-  if (type === 'holiday') return '휴일';
-  return '';
-});
-
-const hasId = (event) => {
-  return event && (event.id !== undefined || event.timetable_id !== undefined);
-};
-
-const getEventTitle = (event) => {
-  if (!event) return '';
-  return event.title || event.subject_name || '';
-};
-
-const tooltipEvents = computed(() => {
-  return props.events && props.events.length > 0 ? props.events : [];
-});
-
-const additionalEventCount = computed(() => {
-  return Math.max(0, eventCount.value - 1);
-});
-
-const hasTooltip = computed(() => {
-  return hasMultipleEvents.value || (showEvent.value && showEvent.value.description);
-});
-
-const eventColor = computed(() => {
-  if (!showEvent.value) return '#e5e7eb'; // Default gray
-  
-  const event = showEvent.value;
-  
-  // 특강인 경우 레벨별 다른 색상 적용
-  if (event.type === 'special' || event.event_type === 'special' || event.is_special_lecture) {
-    if (event.level === 'N1') {
-      return '#c7d2fe'; // 연한 인디고 (N1)
-    } else if (event.level === 'N2') {
-      return '#ddd6fe'; // 연한 보라색 (N2)
-    } else if (event.level === 'N3') {
-      return '#e9d5ff'; // 연한 자주색 (N3)
+  props.events.forEach(event => {
+    if (event.type === 'holiday' || event.event_type === 'holiday') {
+      counts.holiday++;
+    } else if (event.type === 'cancel' || event.event_type === 'cancel') {
+      counts.cancel++;
+    } else if (event.type === 'makeup' || event.event_type === 'makeup') {
+      counts.makeup++;
+    } else if (event.is_special_lecture === 1 || event.type === 'special' || event.event_type === 'special') {
+      counts.special++;
+    } else if (event.is_foreigner_target === 1 || event.type === 'topik' || event.event_type === 'topik' || 
+              (event.level && event.level.includes('TOPIK'))) {
+      counts.topik++;
+    } else {
+      counts.regular++;
     }
-    return '#d8b4fe'; // 기본 보라색 (특강)
-  }
+  });
   
-  if (!event.type) return '#e5e7eb';
+  console.log(`📎 셀(${props.day}, ${props.period}) 이벤트 유형:`, counts);
+  return counts;
+});
+
+// 셀 배경색 계산
+const cellBackgroundColor = computed(() => {
+  if (props.isHoliday) return 'bg-red-100'; // 공휴일: 연한 빨강
+  if (eventTypeCounts.value.cancel > 0) return 'bg-amber-100'; // 휴강: 연한 주황
+  if (eventTypeCounts.value.makeup > 0) return 'bg-green-100'; // 보강: 연한 초록
+  if (eventTypeCounts.value.special > 0) return 'bg-purple-100'; // 특강: 연한 보라
+  if (eventTypeCounts.value.topik > 0) return 'bg-indigo-100'; // TOPIK: 연한 남색
+  return 'bg-white'; // 기본 배경색
+});
+
+// 셀 텍스트 스타일 계산
+const cellTextClass = computed(() => {
+  if (props.isHoliday) return 'text-red-700'; // 공휴일: 빨간색
+  if (eventTypeCounts.value.cancel > 0) return 'text-amber-700'; // 휴강: 주황색
+  if (eventTypeCounts.value.makeup > 0) return 'text-green-700'; // 보강: 초록색
+  if (eventTypeCounts.value.special > 0) return 'text-purple-700'; // 특강: 보라색
+  if (eventTypeCounts.value.topik > 0) return 'text-indigo-700'; // TOPIK: 남색
+  return 'text-gray-700'; // 기본 텍스트 색상
+});
+
+// 이벤트 아이콘 계산
+const eventTypeIcon = computed(() => {
+  if (props.isHoliday) return '🏝️'; // 공휴일: 해변
+  if (eventTypeCounts.value.cancel > 0) return '❌'; // 휴강: X
+  if (eventTypeCounts.value.makeup > 0) return '🔄'; // 보강: 새로고침
+  if (eventTypeCounts.value.special > 0) return '✨'; // 특강: 반짝이
+  if (eventTypeCounts.value.topik > 0) return '🌏'; // TOPIK: 지구본
+  return '📚'; // 정규 수업: 책
+});
+
+// 이벤트 툴팁 텍스트 계산 
+const tooltipText = computed(() => {
+  if (props.events.length === 0) return '';
   
-  switch (event.type) {
-    case 'regular':
-      return '#dcfce7'; // Light green
-    case 'makeup':
-      return '#ffedd5'; // Light orange
-    case 'cancel':
-      return '#fee2e2'; // Light red
-    case 'holiday':
-      return '#f3e8ff'; // Light purple
-    default:
-      return '#e5e7eb'; // Light gray
-  }
+  // 유형별 목록으로 정리
+  const regClasses = props.events.filter(e => 
+    !e.is_special_lecture && e.type !== 'cancel' && e.type !== 'makeup' && 
+    e.type !== 'holiday' && e.event_type !== 'holiday'
+  ).map(e => e.subject_name || e.title).join('\n');
+  
+  const specialClasses = props.events.filter(e => 
+    e.is_special_lecture === 1 || e.type === 'special' || e.event_type === 'special'
+  ).map(e => e.subject_name || e.title).join('\n');
+  
+  const canceledClasses = props.events.filter(e => 
+    e.type === 'cancel' || e.event_type === 'cancel'
+  ).map(e => `[휴강] ${e.subject_name || e.title}`).join('\n');
+  
+  const makeupClasses = props.events.filter(e => 
+    e.type === 'makeup' || e.event_type === 'makeup'
+  ).map(e => `[보강] ${e.subject_name || e.title}`).join('\n');
+  
+  const holidayEvents = props.events.filter(e => 
+    e.type === 'holiday' || e.event_type === 'holiday'
+  ).map(e => e.title || e.name).join('\n');
+  
+  return [regClasses, specialClasses, canceledClasses, makeupClasses, holidayEvents]
+    .filter(text => text.length > 0)
+    .join('\n');
 });
 </script>
 
