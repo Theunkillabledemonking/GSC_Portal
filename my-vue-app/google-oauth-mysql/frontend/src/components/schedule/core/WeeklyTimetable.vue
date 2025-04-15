@@ -2,49 +2,51 @@
   <div class="flex flex-col space-y-4">
     <!-- 주 변경 컨트롤 -->
     <div class="flex justify-between items-center mb-2">
-      <button 
-        @click="changeWeek(-1)" 
-        class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-      >
-        이전 주
-      </button>
-      
-      <div class="text-center">
+      <div class="text-center flex items-center space-x-4">
         <span class="font-semibold">
-          {{ new Date(currentWeek).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }) }}
-          ~
-          {{ new Date(new Date(currentWeek).setDate(new Date(currentWeek).getDate() + 6)).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }) }}
+          {{ formatWeekDateRange(currentWeek) }}
         </span>
+        <div class="flex space-x-2">
+          <button 
+            @click="changeWeek(-1)" 
+            class="px-2 py-1 bg-blue-500 text-white rounded-l hover:bg-blue-600"
+          >
+            ←
+          </button>
+          <button 
+            @click="changeWeek(1)" 
+            class="px-2 py-1 bg-blue-500 text-white rounded-r hover:bg-blue-600"
+          >
+            →
+          </button>
+        </div>
       </div>
       
-      <button 
-        @click="changeWeek(1)" 
-        class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-      >
-        다음 주
-      </button>
+      <div>
+        <!-- 이 부분은 나중에 다른 컨트롤이 필요하면 추가 -->
+      </div>
     </div>
     
-    <!-- 범례 표시 -->
+    <!-- 범례 표시 - 색상 업데이트 -->
     <div class="flex justify-start gap-4 text-sm">
       <div class="flex items-center">
-        <div class="w-4 h-4 bg-white border border-gray-300 mr-1"></div>
+        <div class="w-4 h-4 rounded-sm bg-blue-500 mr-1"></div>
         <span>정규 수업</span>
       </div>
       <div class="flex items-center">
-        <div class="w-4 h-4 bg-purple-100 border border-purple-300 mr-1"></div>
+        <div class="w-4 h-4 rounded-sm bg-orange-400 mr-1"></div>
         <span>특강</span>
       </div>
       <div class="flex items-center">
-        <div class="w-4 h-4 bg-amber-100 border border-amber-300 mr-1"></div>
+        <div class="w-4 h-4 rounded-sm bg-red-500 mr-1"></div>
         <span>휴강</span>
       </div>
       <div class="flex items-center">
-        <div class="w-4 h-4 bg-green-100 border border-green-300 mr-1"></div>
+        <div class="w-4 h-4 rounded-sm bg-green-600 mr-1"></div>
         <span>보강</span>
       </div>
       <div class="flex items-center">
-        <div class="w-4 h-4 bg-red-100 border border-red-300 mr-1"></div>
+        <div class="w-4 h-4 rounded-sm bg-purple-500 mr-1"></div>
         <span>공휴일</span>
       </div>
     </div>
@@ -86,56 +88,93 @@
                 :timeIndex="period"
                 @click="handleCellClick(day, period)"
                 @cell-click="handleCellClick"
-                @edit="handleEdit"
+                @edit="handleEditEvent"
               />
             </td>
           </tr>
         </tbody>
       </table>
     </div>
-
-    <!-- 이벤트 등록 모달 -->
-    <RegisterEventModal 
-      v-if="timetableStore.showModal && timetableStore.modalType === 'register'"
-      :initial-data="timetableStore.modalData || {}"
-      @close="timetableStore.closeModal"
-      @submit="handleRegisterEvent"
-    />
-
-    <!-- 이벤트 상세 모달 -->
-    <DetailEventModal
-      v-if="timetableStore.showModal && timetableStore.modalType === 'detail'"
-      :events="timetableStore.modalData?.events || []"
-      @edit="handleEdit"
-      @cancel="handleCancelEvent"
-      @close="timetableStore.closeModal"
-    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useTimetableStore } from '@/store/modules/timetable.js'
+import { useAuthStore } from '@/store'
 import TimetableCell from './TimetableCell.vue'
-import RegisterEventModal from '../forms/RegisterEventModal.vue'
-import DetailEventModal from '../modals/DetailEventModal.vue'
 import { nextTick } from 'vue'
 import { useRoute } from 'vue-router'
+import { format } from 'date-fns'
+import { startOfWeek, endOfWeek } from 'date-fns'
 //import { DAYS_OF_WEEK, CLASS_TYPES } from '@/constants/timetable/index.js'
+
+// 이벤트 정의 - 부모 컴포넌트에 모달 관련 데이터 전달
+const emit = defineEmits(['open-modal', 'edit-event'])
+
+// Authentication store for admin role check
+const authStore = useAuthStore()
 
 // 현재 주 구하기
 const getCurrentWeek = () => {
-  // 테스트용 날짜 지정 (2025-04-13이 속한 주)
-  const testDate = new Date('2025-04-13'); // 이 날짜는 2025년 4월 13일
-  return testDate.toISOString().split('T')[0];
+  // 스토어의 currentWeek 값 사용
+  const storeWeek = timetableStore.currentWeek;
   
-  // 실제 현재 날짜 기준
-  // const now = new Date()
-  // 기준일(일요일)
-  // const sunday = new Date(now.setDate(now.getDate() - now.getDay()))
-  // 
-  // console.log(`🗓️ 현재 주 기준 일요일: ${sunday.toISOString().split('T')[0]}`)
-  // return sunday.toISOString().split('T')[0]
+  try {
+    // 스토어 값이 Date 객체인 경우
+    if (storeWeek instanceof Date && !isNaN(storeWeek.getTime())) {
+      console.log(`🗓️ 스토어에서 가져온 현재 주: ${storeWeek.toISOString().split('T')[0]}`);
+      return storeWeek;
+    }
+    
+    // 스토어 값이 문자열인 경우
+    if (typeof storeWeek === 'string') {
+      // 문자열을 Date로 변환
+      const dateObj = new Date(storeWeek);
+      if (!isNaN(dateObj.getTime())) {
+        console.log(`🗓️ 스토어에서 가져온 현재 주(문자열): ${dateObj.toISOString().split('T')[0]}`);
+        return dateObj;
+      }
+    }
+  } catch (e) {
+    console.error('날짜 변환 오류:', e);
+  }
+  
+  // 유효하지 않은 경우 현재 날짜 사용
+  const now = new Date();
+  console.log(`🗓️ 현재 날짜 사용: ${now.toISOString().split('T')[0]}`);
+  return now;
+}
+
+// 주 날짜 범위 포맷팅 함수 추가
+const formatWeekDateRange = (weekDate) => {
+  try {
+    // 안전하게 Date 객체로 변환
+    const weekDateObj = weekDate instanceof Date ? weekDate : new Date(weekDate);
+    
+    if (isNaN(weekDateObj.getTime())) {
+      console.error('Invalid date value for currentWeek:', weekDate);
+      return 'Invalid date range';
+    }
+    
+    // 월요일 계산 (일요일 기준이면 +1, 다른 날이면 요일값에 따라 조정)
+    const mondayDate = new Date(weekDateObj);
+    const day = mondayDate.getDay(); // 0: 일요일, 1: 월요일, ...
+    mondayDate.setDate(mondayDate.getDate() - (day === 0 ? 6 : day - 1));
+    
+    // 금요일 계산 (월요일 + 4일)
+    const fridayDate = new Date(mondayDate);
+    fridayDate.setDate(mondayDate.getDate() + 4);
+    
+    // YYYY-MM-DD 포맷으로 변환
+    const mondayStr = mondayDate.toISOString().split('T')[0];
+    const fridayStr = fridayDate.toISOString().split('T')[0];
+    
+    return `${mondayStr} ~ ${fridayStr}`;
+  } catch (error) {
+    console.error('날짜 범위 포맷 중 오류 발생:', error);
+    return 'Date range error';
+  }
 }
 
 // props 정의
@@ -157,13 +196,6 @@ const route = useRoute()
 const selectedGrade = ref(props.selectedGrade)
 const currentWeek = ref(getCurrentWeek())
 
-const showScheduleModal = ref(false)
-const modalType = ref('regular')
-const modalData = ref({})
-const selectedTimetable = ref(null)
-const showTypeSelector = ref(true)
-
-
 const dragState = ref({
   isDragging: false,
   startDay: null,
@@ -179,155 +211,216 @@ watch(() => props.selectedGrade, (newGrade) => {
 
 // 이벤트 날짜가 현재 표시 중인 주에 해당하는지 확인
 const isDateInCurrentWeek = (eventDate) => {
-  if (!eventDate) return false
+  if (!eventDate) return false;
   
   try {
-    // 현재 선택된 주의 시작일(일요일) 구하기
-    const startDate = new Date(currentWeek.value)
-    startDate.setHours(0, 0, 0, 0)
+    // 현재 선택된 주의 시작일(월요일) 구하기
+    let weekDate;
     
-    // 주의 마지막 날(토요일) 구하기
-    const endDate = new Date(startDate)
-    endDate.setDate(startDate.getDate() + 6)
-    endDate.setHours(23, 59, 59, 999)
-    
-    // 이벤트 날짜
-    const date = new Date(eventDate)
-    
-    // 날짜 비교 로그
-    console.log(`📅 날짜 비교: 이벤트=${date.toISOString().split('T')[0]}, 주 범위=${startDate.toISOString().split('T')[0]} ~ ${endDate.toISOString().split('T')[0]}`)
-    
-    // 날짜 범위 검사
-    const isInRange = date >= startDate && date <= endDate
-    if (isInRange) {
-      console.log(`✅ 이벤트 날짜 ${date.toISOString().split('T')[0]}은(는) 현재 선택된 주(${startDate.toISOString().split('T')[0]} ~ ${endDate.toISOString().split('T')[0]})에 포함됩니다.`)
+    // currentWeek 안전하게 처리
+    if (currentWeek.value instanceof Date) {
+      weekDate = new Date(currentWeek.value);
+    } else if (typeof currentWeek.value === 'string') {
+      weekDate = new Date(currentWeek.value);
     } else {
-      console.log(`❌ 이벤트 날짜 ${date.toISOString().split('T')[0]}은(는) 현재 선택된 주(${startDate.toISOString().split('T')[0]} ~ ${endDate.toISOString().split('T')[0]})에 포함되지 않습니다.`)
+      console.warn('currentWeek가 예상치 못한 형식입니다. 현재 날짜를 사용합니다.');
+      weekDate = new Date();
     }
     
-    return isInRange
+    const day = weekDate.getDay();
+    const startDate = new Date(weekDate);
+    startDate.setDate(weekDate.getDate() - (day === 0 ? 6 : day - 1)); // 월요일로 설정
+    startDate.setHours(0, 0, 0, 0);
+    
+    // 주의 마지막 날(금요일) 구하기 (월요일 + 4)
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 4);
+    endDate.setHours(23, 59, 59, 999);
+    
+    // 이벤트 날짜
+    const date = new Date(eventDate);
+    
+    // 날짜 비교 로그
+    console.log(`📅 날짜 비교: 이벤트=${date.toISOString().split('T')[0]}, 주 범위=${startDate.toISOString().split('T')[0]} ~ ${endDate.toISOString().split('T')[0]}`);
+    
+    // 날짜 범위 검사
+    const isInRange = date >= startDate && date <= endDate;
+    if (isInRange) {
+      console.log(`✅ 이벤트 날짜 ${date.toISOString().split('T')[0]}은(는) 현재 선택된 주(${startDate.toISOString().split('T')[0]} ~ ${endDate.toISOString().split('T')[0]})에 포함됩니다.`);
+    } else {
+      console.log(`❌ 이벤트 날짜 ${date.toISOString().split('T')[0]}은(는) 현재 선택된 주(${startDate.toISOString().split('T')[0]} ~ ${endDate.toISOString().split('T')[0]})에 포함되지 않습니다.`);
+    }
+    
+    return isInRange;
   } catch (error) {
-    console.error('❌ 날짜 비교 중 오류 발생:', error, '이벤트 날짜:', eventDate)
-    return false
+    console.error('❌ 날짜 비교 중 오류 발생:', error, '이벤트 날짜:', eventDate);
+    return false;
   }
 }
 
 // 주 이동 함수 (이전, 다음 주 이동)
 const changeWeek = (offset = 0) => {
-  // 현재 주의 시작일(일요일) 가져오기
-  const currentDate = new Date(currentWeek.value)
-  
-  // offset 주 만큼 이동 (예: -1은 이전 주, 1은 다음 주)
-  currentDate.setDate(currentDate.getDate() + (offset * 7))
-  
-  // 새 주 설정 (항상 일요일 기준으로)
-  const newWeek = currentDate.toISOString().split('T')[0]
-  currentWeek.value = newWeek
-  
-  console.log(`📆 주 변경: ${newWeek} (${offset > 0 ? '다음' : '이전'} 주)`)
-  console.log(`🔍 선택된 주 범위 확인:`)
-  
-  // 현재 선택된 주의 범위 확인 (디버깅용)
-  const startOfWeek = new Date(newWeek)
-  startOfWeek.setHours(0, 0, 0, 0)
-  
-  const endOfWeek = new Date(startOfWeek)
-  endOfWeek.setDate(startOfWeek.getDate() + 6)
-  endOfWeek.setHours(23, 59, 59, 999)
-  
-  console.log(`📆 조회 주 시작일(일): ${startOfWeek.toISOString().split('T')[0]}`)
-  console.log(`📆 조회 주 종료일(토): ${endOfWeek.toISOString().split('T')[0]}`)
-  
-  fetchEvents() // 새 주 데이터 조회
+  try {
+    // 현재 주의 시작일(일요일) 가져오기
+    let currentDate;
+    
+    // currentWeek가 Date 객체인지 확인하고 안전하게 처리
+    if (currentWeek.value instanceof Date) {
+      currentDate = new Date(currentWeek.value);
+    } else if (typeof currentWeek.value === 'string') {
+      currentDate = new Date(currentWeek.value);
+    } else {
+      // 안전 조치: 현재 날짜로 설정
+      console.warn('currentWeek가 예상치 못한 형식입니다. 현재 날짜를 사용합니다.');
+      currentDate = new Date();
+    }
+    
+    // offset 주 만큼 이동 (예: -1은 이전 주, 1은 다음 주)
+    currentDate.setDate(currentDate.getDate() + (offset * 7));
+    
+    // 새 주 설정
+    currentWeek.value = currentDate;
+    
+    console.log(`📆 주 변경: ${formatWeekDateRange(currentDate)} (${offset > 0 ? '다음' : '이전'} 주)`);
+    
+    // 현재 선택된 주의 범위 확인 (디버깅용)
+    const startOfWeek = new Date(currentDate);
+    const day = startOfWeek.getDay();
+    startOfWeek.setDate(startOfWeek.getDate() - (day === 0 ? 6 : day - 1)); // 월요일로 설정
+    startOfWeek.setHours(0, 0, 0, 0);
+    
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 4); // 금요일 (월요일 + 4)
+    endOfWeek.setHours(23, 59, 59, 999);
+    
+    console.log(`📆 조회 주 시작일(월): ${startOfWeek.toISOString().split('T')[0]}`);
+    console.log(`📆 조회 주 종료일(금): ${endOfWeek.toISOString().split('T')[0]}`);
+    
+    fetchEvents(); // 새 주 데이터 조회
+  } catch (error) {
+    console.error('주 변경 중 오류 발생:', error);
+    // 오류 발생 시 currentWeek를 현재 날짜로 리셋
+    currentWeek.value = new Date();
+    fetchEvents();
+  }
 }
 
 // 이벤트 조회 (학년별 필터링 포함)
 const fetchEvents = async () => {
-  console.log(`학년 ${selectedGrade.value}에 대한 데이터 조회 중...`)
-  console.log(`📆 조회 주: ${currentWeek.value}`)
+  console.log(`학년 ${selectedGrade.value}에 대한 데이터 조회 중...`);
   
-  // 현재 선택된 주의 시작일(일요일)과 종료일(토요일) 계산
-  const startDate = new Date(currentWeek.value)
-  const endDate = new Date(startDate)
-  endDate.setDate(startDate.getDate() + 6)
-  
-  console.log(`📅 조회 주 범위: ${startDate.toISOString().split('T')[0]} ~ ${endDate.toISOString().split('T')[0]}`)
-  
-  // 현재 선택된 학년을 timetableStore의 currentGrade로 설정
-  timetableStore.setCurrentGrade(selectedGrade.value)
-  
-  // 현재 선택된 주를 store에 설정
-  timetableStore.setCurrentWeek(currentWeek.value)
-  
-  // 파라미터 구성
-  const params = {
-    grade: selectedGrade.value,                // 현재 선택된 학년
-    week: currentWeek.value,                   // 현재 선택된 주
-    semester: timetableStore.getCurrentSemester(), // 현재 학기
-    year: new Date().getFullYear(),           // 현재 년도
-    skipGradeFilter: false,                   // 정규 수업은 학년별로 필터링 (false)
-    level: timetableStore.currentLevel        // 현재 선택된 레벨 (ref 직접 참조)
-  }
-  
-  console.log('📝 시간표 조회 파라미터:', params)
-  
-  // 주간 이벤트 조회 (모든 필요 파라미터 포함)
-  await timetableStore.fetchWeeklyEvents(params)
-  
-  // 이벤트 로딩 후 필터링 결과 로깅
-  console.log(`📊 최종 이벤트 로드 완료: 총 ${timetableStore.events.length}개, 필터링 후: ${timetableStore.filteredEvents.length}개`)
-  
-  // 날짜 기반 이벤트(makeups, cancellations) 검사
-  const makeupEvents = timetableStore.events.filter(e => 
-    e.type === 'makeup' || e.event_type === 'makeup'
-  )
-  
-  const cancelEvents = timetableStore.events.filter(e => 
-    e.type === 'cancel' || e.event_type === 'cancel'
-  )
-  
-  // 현재 주에 해당하는 makeup/cancel 이벤트 찾기
-  if (makeupEvents.length > 0) {
-    console.log(`🔄 보강 이벤트 ${makeupEvents.length}개 발견:`)
-    makeupEvents.forEach(event => {
-      const eventDate = event.event_date || event.date
-      const isInCurrentWeek = isDateInCurrentWeek(eventDate)
-      console.log(`  - ID: ${event.id}, 날짜: ${eventDate}, 과목: ${event.subject_name || event.title}, 현재 주에 포함: ${isInCurrentWeek ? '✅' : '❌'}`)
-    })
-  }
-  
-  if (cancelEvents.length > 0) {
-    console.log(`🛑 휴강 이벤트 ${cancelEvents.length}개 발견:`)
-    cancelEvents.forEach(event => {
-      const eventDate = event.event_date || event.date
-      const isInCurrentWeek = isDateInCurrentWeek(eventDate)
-      console.log(`  - ID: ${event.id}, 날짜: ${eventDate}, 과목: ${event.subject_name || event.title}, 현재 주에 포함: ${isInCurrentWeek ? '✅' : '❌'}`)
-    })
-  }
-  
-  // 특강 데이터 확인
-  const specialLectures = timetableStore.events.filter(e => 
-    e.is_special_lecture === 1 || 
-    e.type === 'special' || 
-    e.event_type === 'special'
-  )
-  
-  console.log(`📊 특강 데이터: ${specialLectures.length}개`)
-  
-  // 학년별 정규 수업 데이터 확인
-  const regularByGrade = {}
-  timetableStore.events.forEach(e => {
-    const isRegular = (!e.is_special_lecture || e.is_special_lecture === 0) && 
-                       (!e.type || e.type === 'regular') &&
-                       (e.year !== null && e.year !== undefined)
+  try {
+    let weekDateStr;
     
-    if (isRegular) {
-      const grade = e.year
-      regularByGrade[grade] = (regularByGrade[grade] || 0) + 1
+    // currentWeek 값 안전하게 처리
+    if (currentWeek.value instanceof Date) {
+      weekDateStr = currentWeek.value.toISOString().split('T')[0];
+    } else if (typeof currentWeek.value === 'string') {
+      weekDateStr = currentWeek.value;
+    } else {
+      // 안전 조치: 현재 날짜를 문자열로 변환
+      weekDateStr = new Date().toISOString().split('T')[0];
     }
-  })
-  
-  console.log('📊 학년별 정규 수업:', regularByGrade)
+    
+    console.log(`📆 조회 주: ${weekDateStr}`);
+    
+    // 현재 선택된 주의 시작일(월요일)과 종료일(금요일) 계산
+    const weekDate = new Date(weekDateStr);
+    const day = weekDate.getDay(); // 0: 일요일, 1: 월요일, ...
+    
+    // 월요일로 조정
+    const startDate = new Date(weekDate);
+    startDate.setDate(weekDate.getDate() - (day === 0 ? 6 : day - 1));
+    
+    // 금요일로 조정 (월요일 + 4)
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 4);
+    
+    console.log(`📅 조회 주 범위: ${startDate.toISOString().split('T')[0]} ~ ${endDate.toISOString().split('T')[0]}`);
+    
+    // 현재 선택된 학년을 timetableStore의 currentGrade로 설정
+    timetableStore.setCurrentGrade(selectedGrade.value);
+    
+    // 현재 선택된 주를 store에 설정 (Date 객체 그대로 전달)
+    timetableStore.setCurrentWeek(weekDate);
+    
+    // 관리자 여부 확인
+    const isAdmin = authStore.isAdmin;
+    
+    // 파라미터 구성
+    const params = {
+      grade: selectedGrade.value,                // 현재 선택된 학년
+      week: startDate.toISOString().split('T')[0], // 시작일(월요일)
+      semester: timetableStore.getCurrentSemester(), // 현재 학기
+      year: new Date().getFullYear(),           // 현재 년도
+      skipGradeFilter: isAdmin,                 // 관리자면 학년 필터링 건너뛰기
+      level: timetableStore.currentLevel,       // 현재 선택된 레벨
+      isAdmin: isAdmin                         // 관리자 여부 추가
+    };
+    
+    console.log('📝 시간표 조회 파라미터:', params);
+    
+    // 주간 이벤트 조회 (모든 필요 파라미터 포함)
+    await timetableStore.fetchWeeklyEvents(params);
+    
+    // 이벤트 로딩 후 필터링 결과 로깅
+    console.log(`📊 최종 이벤트 로드 완료: 총 ${timetableStore.events.length}개, 필터링 후: ${timetableStore.filteredEvents.length}개`)
+    
+    // 날짜 기반 이벤트(makeups, cancellations) 검사
+    const makeupEvents = timetableStore.events.filter(e => 
+      e.type === 'makeup' || e.event_type === 'makeup'
+    )
+    
+    const cancelEvents = timetableStore.events.filter(e => 
+      e.type === 'cancel' || e.event_type === 'cancel'
+    )
+    
+    // 현재 주에 해당하는 makeup/cancel 이벤트 찾기
+    if (makeupEvents.length > 0) {
+      console.log(`🔄 보강 이벤트 ${makeupEvents.length}개 발견:`)
+      makeupEvents.forEach(event => {
+        const eventDate = event.event_date || event.date
+        const isInCurrentWeek = isDateInCurrentWeek(eventDate)
+        console.log(`  - ID: ${event.id}, 날짜: ${eventDate}, 과목: ${event.subject_name || event.title}, 현재 주에 포함: ${isInCurrentWeek ? '✅' : '❌'}`)
+      })
+    }
+    
+    if (cancelEvents.length > 0) {
+      console.log(`🛑 휴강 이벤트 ${cancelEvents.length}개 발견:`)
+      cancelEvents.forEach(event => {
+        const eventDate = event.event_date || event.date
+        const isInCurrentWeek = isDateInCurrentWeek(eventDate)
+        console.log(`  - ID: ${event.id}, 날짜: ${eventDate}, 과목: ${event.subject_name || event.title}, 현재 주에 포함: ${isInCurrentWeek ? '✅' : '❌'}`)
+      })
+    }
+    
+    // 특강 데이터 확인
+    const specialLectures = timetableStore.events.filter(e => 
+      e.is_special_lecture === 1 || 
+      e.type === 'special' || 
+      e.event_type === 'special'
+    )
+    
+    console.log(`📊 특강 데이터: ${specialLectures.length}개`)
+    
+    // 학년별 정규 수업 데이터 확인
+    const regularByGrade = {}
+    timetableStore.events.forEach(e => {
+      const isRegular = (!e.is_special_lecture || e.is_special_lecture === 0) && 
+                         (!e.type || e.type === 'regular') &&
+                         (e.year !== null && e.year !== undefined)
+      
+      if (isRegular) {
+        const grade = e.year
+        regularByGrade[grade] = (regularByGrade[grade] || 0) + 1
+      }
+    })
+    
+    console.log('📊 학년별 정규 수업:', regularByGrade)
+  } catch (error) {
+    console.error('이벤트 조회 중 오류 발생:', error);
+    // 오류 처리 로직
+  }
 }
 
 // 초기 학년 설정을 위한 함수
@@ -353,182 +446,232 @@ const changeGrade = (grade) => {
   }
 }
 
-// 셀별 이벤트 조회
-const getEventsForCell = (day, period) => {
-  console.log(`🔍 셀(${day}, ${period}) 이벤트 조회 시작 - 총 ${timetableStore.events.length}개 중`)
+// Days for timetable view (in English)
+const days = ref(['mon', 'tue', 'wed', 'thu', 'fri'])
+const koreanDays = ['월', '화', '수', '목', '금']
+
+// Map Korean day names to English
+const koreanDayMap = {
+  '월': 'mon',
+  '화': 'tue',
+  '수': 'wed',
+  '목': 'thu',
+  '금': 'fri'
+}
+
+// Map numeric days to English (1-based, Monday = 1)
+const numDayMap = {
+  1: 'mon',
+  2: 'tue',
+  3: 'wed',
+  4: 'thu',
+  5: 'fri'
+}
+
+// Auth store for admin check
+const isAdmin = computed(() => authStore.isAdmin)
+
+/**
+ * Gets all events for a specific cell (day/period combination)
+ * Admin users see all events without filtering
+ */
+function getEventsForCell(day, period) {
+  // Logging purpose
+  const dayIndex = days.value.indexOf(day)
+  const koreanDay = dayIndex >= 0 ? koreanDays[dayIndex] : day
   
-  // 날짜 기반 이벤트 (휴강/보강)가 있는지 체크
-  const dateBasedEvents = timetableStore.events.filter(event => {
+  console.log(`📑 셀(${day}, ${period}) 이벤트 검색 시작 (요일매핑: ${day}->${koreanDay})`)
+  
+  // No events check
+  if (!timetableStore.events || timetableStore.events.length === 0) {
+    console.log(`❓ 이벤트가 없음: ${timetableStore.events}`)
+    return []
+  }
+  
+  // First, check if there's a holiday for this day
+  const holidayForDay = timetableStore.events.filter(event => {
     if (!event) return false
+    // Only check for holiday type events
+    if (event.type !== 'holiday' && event.event_type !== 'holiday') return false
     
-    // 이벤트에 날짜 정보가 있는지 확인
-    const hasDateInfo = event.event_date || event.date
-    if (!hasDateInfo) return false
+    const eventDate = new Date(event.event_date || event.date)
+    if (isNaN(eventDate.getTime())) return false
     
-    // 타입이 휴강 또는 보강인지 확인
-    const isCancellationOrMakeup = 
-      (event.type === 'cancel' || event.event_type === 'cancel') || 
-      (event.type === 'makeup' || event.event_type === 'makeup')
-    
-    if (!isCancellationOrMakeup) return false
-    
-    // 이벤트 날짜가 현재 표시 중인 주에 포함되는지 확인
-    const isInCurrentWeek = isDateInCurrentWeek(hasDateInfo)
-    if (!isInCurrentWeek) return false
-    
-    // 요일 일치 확인
-    const eventDate = new Date(hasDateInfo)
     const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
     const eventDayName = dayNames[eventDate.getDay()]
     
-    // 해당 요일(열)과 교시(행)에 일치하는지
-    if (eventDayName !== day) return false
-    
-    const isInPeriodRange = period >= (event.start_period || 1) && period <= (event.end_period || 9)
-    if (!isInPeriodRange) return false
-    
-    // 모든 조건 충족
-    console.log(`🎯 날짜 기반 이벤트 매칭 성공! 타입: ${event.type || event.event_type}, 날짜: ${hasDateInfo}, 교시: ${event.start_period}-${event.end_period}`)
-    return true
+    // Check if the holiday matches this day and is in current week
+    return day === eventDayName && isDateInCurrentWeek(eventDate)
   })
   
-  // 날짜 기반 이벤트가 있다면 우선 표시 (우선순위 높음)
-  if (dateBasedEvents.length > 0) {
-    console.log(`📅 날짜 기반 이벤트 ${dateBasedEvents.length}개 발견 (${day}, ${period})`)
-    return dateBasedEvents
+  // If we found a holiday for this day, return only the holiday and ignore other events
+  if (holidayForDay.length > 0) {
+    console.log(`🏖️ 공휴일 발견: ${holidayForDay[0].title || holidayForDay[0].name || '공휴일'}, 다른 이벤트 무시됨`)
+    return holidayForDay
   }
   
-  // 일반 이벤트 필터링 (기존 로직 유지)
-  const cellEvents = timetableStore.events.filter(event => {
-    // 1. 공휴일 - 전체 요일에 적용
-    if (event.type === 'holiday' || event.event_type === 'holiday') {
-      const eventDate = new Date(event.event_date || event.date)
-      const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-      const eventDayName = dayNames[eventDate.getDay()]
-      const isHolidayMatch = day === eventDayName && isDateInCurrentWeek(eventDate)
-      
-      if (isHolidayMatch) {
-        console.log(`🏖️ 공휴일 매칭 (${day}, ${period}): ${event.title || event.name || '공휴일'}, 날짜: ${eventDate.toISOString().split('T')[0]}`)
-      }
-      
-      return isHolidayMatch
-    }
-
-    // 2. 이벤트 유형 판별
-    const isCancellation = event.type === 'cancel' || event.event_type === 'cancel'
-    const isMakeup = event.type === 'makeup' || event.event_type === 'makeup'
-    const isSpecialLecture = event.is_special_lecture === 1 || 
-                            event.is_special_lecture === true || 
-                            event.is_special_lecture === '1' ||
-                            event.type === 'special' || 
-                            event.event_type === 'special'
-    const isTopikClass = event.is_foreigner_target === 1 || 
-                        event.is_foreigner_target === true ||
-                        event.is_foreigner_target === '1' ||
-                        event.type === 'topik' ||
-                        event.event_type === 'topik' ||
-                        (event.level && event.level.includes('TOPIK'))
-    
-    // 3. 날짜 기반 이벤트 (보강/휴강) 
-    // - 앞에서 이미 처리했으므로 여기서는 제외
-    if ((isCancellation || isMakeup) && (event.event_date || event.date)) {
+  // Filter for specific day and period
+  let cellEvents = timetableStore.events.filter(event => {
+    // Basic validation
+    if (!event) {
+      console.log('🚨 유효하지 않은 이벤트 객체 발견 (null/undefined)')
       return false
     }
     
-    // 4. 요일 기반 이벤트 (정규 수업, 특강 등)
-    // 요일/교시 매칭 확인 (비날짜 기반 이벤트 전용)
-    const dayMap = { mon: '월', tue: '화', wed: '수', thu: '목', fri: '금' }
-    const dayMatches = (event.day === dayMap[day] || event.day === day)
-    const periodMatches = period >= (event.start_period || 1) && period <= (event.end_period || 9)
-    
-    // 요일/교시 조건이 일치하지 않으면 제외
-    if (!dayMatches || !periodMatches) return false
-
-    // 5. 특강 (모든 학년에 표시)
-    if (isSpecialLecture) {
-      console.log(`✨ 요일 기반 특강 포함 (${day}, ${period}): ${event.subject_name || event.title || '특강'}, 레벨: ${event.level || 'N/A'}`)
-      return true // 특강은 모든 학년에 표시
+    // Special handling for makeup (보강) events - they work by date, not by day of week
+    if (event.type === 'makeup' || event.event_type === 'makeup') {
+      const eventDate = new Date(event.event_date || event.date)
+      if (isNaN(eventDate.getTime())) return false
+      
+      const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+      const eventDayName = dayNames[eventDate.getDay()]
+      
+      // Check if the makeup day matches this cell's day and is in current week
+      const dayMatches = day === eventDayName && isDateInCurrentWeek(eventDate)
+      
+      // For numeric periods, ensure we're comparing numbers
+      const eventStartPeriod = typeof event.start_period === 'string'
+        ? parseInt(event.start_period, 10)
+        : event.start_period
+      
+      const eventEndPeriod = typeof event.end_period === 'string'
+        ? parseInt(event.end_period, 10)
+        : event.end_period
+      
+      const periodNum = typeof period === 'string'
+        ? parseInt(period, 10)
+        : period
+      
+      // Period check - must be between start and end periods inclusive
+      const periodMatches = periodNum >= eventStartPeriod && periodNum <= eventEndPeriod
+      
+      if (dayMatches && periodMatches) {
+        console.log(`🔄 보강 이벤트 매치됨: ID=${event.id}, 날짜=${eventDate.toISOString().split('T')[0]}, 교시=${eventStartPeriod}-${eventEndPeriod}`)
+      }
+      
+      return dayMatches && periodMatches
     }
     
-    // 6. TOPIK 수업 (외국인 대상 수업) - 모든 학년에 표시
-    if (isTopikClass) {
-      console.log(`🌏 요일 기반 TOPIK 수업 포함 (${day}, ${period}): ${event.subject_name || event.title || 'TOPIK'}, 레벨: ${event.level || 'N/A'}`)
-      return true // TOPIK 수업도 모든 학년에 표시 가능
+    // Admin users see all events with less strict filtering
+    if (isAdmin.value) {
+      // Admin still needs day and period matching, but more flexible with formats
+      const eventDay = typeof event.day === 'string' 
+        ? event.day.toLowerCase()
+        : event.day
+      
+      // Get normalized day value using various possible formats
+      let normalizedDay
+      
+      // 1. Try direct English day name (mon, tue, etc.)
+      if (typeof eventDay === 'string' && days.value.includes(eventDay.toLowerCase())) {
+        normalizedDay = eventDay.toLowerCase()
+      } 
+      // 2. Try Korean day name (월, 화, etc.)
+      else if (typeof eventDay === 'string' && koreanDayMap[eventDay]) {
+        normalizedDay = koreanDayMap[eventDay]
+        console.log(`🔄 한글 요일 변환: ${eventDay} -> ${normalizedDay}`)
+      }
+      // 3. Try numeric day (1-5)
+      else if (typeof eventDay === 'number' || !isNaN(Number(eventDay))) {
+        const numDay = Number(eventDay)
+        normalizedDay = numDayMap[numDay]
+        console.log(`🔢 숫자 요일 변환: ${eventDay} -> ${normalizedDay}`)
+      }
+      
+      // For numeric periods, ensure we're comparing numbers
+      const eventStartPeriod = typeof event.start_period === 'string' 
+        ? parseInt(event.start_period, 10)
+        : event.start_period
+      
+      const eventEndPeriod = typeof event.end_period === 'string'
+        ? parseInt(event.end_period, 10)
+        : event.end_period
+        
+      const periodNum = typeof period === 'string'
+        ? parseInt(period, 10)
+        : period
+      
+      // Check if day and period match, using all possible day formats
+      const dayMatches = 
+        normalizedDay === day ||                   // Normalized day matches
+        (eventDay && eventDay.toLowerCase() === day) ||  // Direct English day match
+        (eventDay && koreanDayMap[eventDay] === day) ||  // Korean day -> English match
+        (typeof event.day === 'number' && numDayMap[event.day] === day) // Numeric day match
+      
+      // For admin: log more details about the event to debug day matching
+      console.log(`🔍 [관리자 로그] 이벤트 검사: ID=${event.id}, 제목=${event.subject_name || event.title}, 일치여부=${dayMatches}`)
+      console.log(`  📆 요일 정보: event.day=${eventDay}, normalized=${normalizedDay}, 셀day=${day}`)
+      console.log(`  ⏱️ 교시 정보: start=${eventStartPeriod}, end=${eventEndPeriod}, 셀period=${periodNum}`)
+      
+      // Period check - must be between start and end periods inclusive
+      const periodMatches = periodNum >= eventStartPeriod && periodNum <= eventEndPeriod
+      
+      return dayMatches && periodMatches
     }
     
-    // 7. 정규 수업 (학년별 필터링)
-    const eventYear = event.year !== null && event.year !== undefined ? Number(event.year) : null
-    const currentGradeInt = Number(selectedGrade.value)
+    // For regular users - strict matching
+    const eventDay = event.day
     
-    if (eventYear === null) {
-      console.log(`⚠️ 정규 수업 누락된 학년 정보 (${day}, ${period}): ${event.subject_name || event.title || '제목 없음'}`)
-      return false // 학년 정보가 없으면 표시 안함
+    // Handle Korean day names
+    let normalizedDay = eventDay
+    if (typeof eventDay === 'string' && koreanDayMap[eventDay]) {
+      normalizedDay = koreanDayMap[eventDay]
+    } else if (typeof eventDay === 'number' || !isNaN(Number(eventDay))) {
+      normalizedDay = numDayMap[Number(eventDay)]
     }
     
-    const yearMatches = eventYear === currentGradeInt
+    // For numeric periods, ensure we're comparing numbers
+    const eventStartPeriod = typeof event.start_period === 'string' 
+      ? parseInt(event.start_period, 10)
+      : event.start_period
     
-    if (yearMatches) {
-      console.log(`📚 정규 수업 포함 (${day}, ${period}): ${event.subject_name || event.title || '정규'}, 학년: ${eventYear}`)
-    }
+    const eventEndPeriod = typeof event.end_period === 'string'
+      ? parseInt(event.end_period, 10)
+      : event.end_period
+      
+    const periodNum = typeof period === 'string'
+      ? parseInt(period, 10)
+      : period
     
-    return yearMatches
+    // Check if day and period match
+    return (normalizedDay === day || eventDay === day) && 
+           periodNum >= eventStartPeriod && periodNum <= eventEndPeriod
   })
   
-  // 이벤트 개수 및 유형별 로깅
-  const eventTypes = {
-    regular: 0,
-    special: 0,
-    cancel: 0,
-    makeup: 0,
-    holiday: 0,
-    topik: 0
+  console.log(`🧩 셀(${day}, ${period}) 이벤트 필터링 결과: ${cellEvents.length}개 발견`)
+  
+  if (cellEvents.length > 0) {
+    // 이벤트 ID 및 유형 간단 로깅
+    console.log(
+      cellEvents.map(e => `ID=${e.id} 유형=${e.type||e.event_type||'regular'} 제목=${e.subject_name||e.title}`)
+    )
   }
   
-  // 이벤트 분류 (일반 이벤트 + 날짜 기반 이벤트 합치기)
-  const allEvents = [...cellEvents]
-  
-  allEvents.forEach(event => {
-    if (event.type === 'holiday' || event.event_type === 'holiday') {
-      eventTypes.holiday++
-    } else if (event.type === 'cancel' || event.event_type === 'cancel') {
-      eventTypes.cancel++
-    } else if (event.type === 'makeup' || event.event_type === 'makeup') {
-      eventTypes.makeup++
-    } else if (event.is_special_lecture === 1 || event.type === 'special' || event.event_type === 'special') {
-      eventTypes.special++
-    } else if (event.is_foreigner_target === 1 || event.type === 'topik' || event.event_type === 'topik' || 
-               (event.level && event.level.includes('TOPIK'))) {
-      eventTypes.topik++
-    } else {
-      eventTypes.regular++
-    }
-  })
-  
-  // 이벤트 개수 로깅 추가
-  console.log(`📊 셀(${day}, ${period}) 이벤트 개수: ${allEvents.length} (정규: ${eventTypes.regular}, 특강: ${eventTypes.special}, 휴강: ${eventTypes.cancel}, 보강: ${eventTypes.makeup}, 공휴일: ${eventTypes.holiday}, TOPIK: ${eventTypes.topik})`)
-  
-  return allEvents
+  return cellEvents
 }
 
 // 공휴일 체크
 const isHoliday = (day) => {
   const holidayEvents = timetableStore.events.filter(event => {
-    if (event.type !== 'holiday' && event.event_type !== 'holiday') return false
+    if (!event) return false;
+    if (event.type !== 'holiday' && event.event_type !== 'holiday') return false;
     
-    const eventDate = new Date(event.event_date || event.date)
-    const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-    const eventDayName = dayNames[eventDate.getDay()]
-    const isMatch = day === eventDayName
+    const eventDate = new Date(event.event_date || event.date);
+    if (isNaN(eventDate.getTime())) return false;
+    
+    const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const eventDayName = dayNames[eventDate.getDay()];
+    const isMatch = day === eventDayName && isDateInCurrentWeek(eventDate);
     
     if (isMatch) {
-      console.log(`🏖️ 공휴일 확인: ${event.title || event.name || '공휴일'}, 날짜: ${eventDate.toISOString().split('T')[0]}, 요일: ${eventDayName}`)
+      console.log(`🏖️ 공휴일 확인: ${event.title || event.name || '공휴일'}, 날짜: ${eventDate.toISOString().split('T')[0]}`);
     }
     
-    return isMatch
-  })
+    return isMatch;
+  });
   
-  return holidayEvents.length > 0
-}
+  return holidayEvents.length > 0;
+};
 
 // 드래그 상태 체크
 const isDragging = (day, period) => {
@@ -567,13 +710,21 @@ const handleDragEnd = () => {
   const start = Math.min(startPeriod, endPeriod)
   const end = Math.max(startPeriod, endPeriod)
 
-  // Show makeup class modal for drag events
-  timetableStore.showMakeupClassModal({
-    day: startDay,
-    start_period: start,
-    end_period: end
-  })
+  // 요일 변환 (mon → 1, tue → 2, ...)
+  const dayMap = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5 };
+  const dayNumber = typeof startDay === 'string' ? dayMap[startDay] || 1 : startDay;
 
+  // 부모 컴포넌트에 보강 이벤트 추가 요청
+  emit('open-modal', 'makeup', {
+    type: 'makeup',
+    day: dayNumber,
+    start_period: start,
+    end_period: end,
+    date: formatDate(new Date()), // 오늘 날짜 기본값
+    grade: selectedGrade.value,
+  }, null, false);
+
+  // 드래그 상태 초기화
   dragState.value = {
     isDragging: false,
     startDay: null,
@@ -594,7 +745,7 @@ const handleCellClick = (data, periodArg) => {
   // 새로운 cell-click 이벤트 형식 처리
   if (typeof data === 'object' && data.hasOwnProperty('action')) {
     // 스토어의 통합 셀 액션 핸들러로 전달
-    timetableStore.handleCellAction(data);
+    handleCellAction(data);
     return;
   }
   
@@ -604,116 +755,93 @@ const handleCellClick = (data, periodArg) => {
   
   const events = getEventsForCell(day, period);
   if (events.length > 0) {
-    timetableStore.showDetailModal(events);
-  } else {
-    // Show cancel class modal for single cell clicks
-    timetableStore.showCancelClassModal(day, period);
-  }
-}
-
-// 이벤트 등록 핸들러
-const handleRegisterEvent = async (eventData) => {
-  try {
-    if (timetableStore.modalType === 'cancel') {
-      await timetableStore.registerCancellation(eventData)
-    } else if (timetableStore.modalType === 'makeup') {
-      await timetableStore.registerMakeup(eventData)
-    }
-    await fetchEvents()
-  } catch (error) {
-    console.error('Failed to register event:', error)
-  }
-}
-
-// 이벤트 취소 핸들러
-const handleCancelEvent = async (eventId) => {
-  try {
-    // 이벤트 ID 문자열 변환
-    const stringId = String(eventId);
-    console.log(`🗑️ 이벤트 취소 요청: ID ${stringId}`);
-    
-    // 이벤트 객체 찾기
-    const targetEvent = timetableStore.events.find(e => String(e.id) === stringId);
-    
-    if (!targetEvent) {
-      console.error(`❌ ID ${stringId}에 해당하는 이벤트를 찾을 수 없습니다.`);
-      alert('취소할 이벤트를 찾을 수 없습니다.');
-      return;
-    }
-    
-    console.log('🎯 취소할 이벤트 정보:', targetEvent);
-    
-    // 요청 준비 (이벤트 유형에 맞게 데이터 구성)
-    const payload = { 
-      id: stringId,
-      event_type: targetEvent.event_type || targetEvent.type || 'regular',
-      is_special_lecture: targetEvent.is_special_lecture
-    };
-    
-    // 특강 여부 체크
-    if (targetEvent.is_special_lecture === 1 || targetEvent.type === 'special' || targetEvent.event_type === 'special') {
-      payload.is_special_lecture = 1;
-    }
-    
-    console.log('📤 삭제 요청 데이터:', payload);
-    
-    // 이벤트 삭제 요청
-    await timetableStore.processScheduleAction(payload, 'delete');
-    
-    // 성공 메시지 출력
-    console.log('✅ 이벤트가 성공적으로 취소되었습니다.');
-    
-    // 이벤트 목록 다시 로드
-    await fetchEvents();
-  } catch (error) {
-    console.error('❌ 이벤트 취소 실패:', error);
-    
-    // 사용자에게 알림
-    if (error.response && error.response.status === 500) {
-      alert('서버 오류가 발생했습니다. 관리자에게 문의하세요.');
+    if (events.length === 1) {
+      // 단일 이벤트는 바로 수정 모드로
+      emit('edit-event', events[0]);
     } else {
-      alert('이벤트 취소 중 오류가 발생했습니다.');
+      // 여러 이벤트는 첫 번째 이벤트로 기본 설정
+      emit('edit-event', events[0]);
     }
+  } else {
+    // 빈 셀 클릭시 새 이벤트 등록
+    showRegisterModal({ day, period });
   }
+}
+
+// 추가: 통합 셀 액션 처리
+const handleCellAction = (data) => {
+  const { dayIndex, timeIndex, hasEvents, events, action, event, fromTooltip } = data;
+  
+  // 툴팁에서 특정 이벤트 클릭
+  if (fromTooltip && event) {
+    emit('edit-event', event);
+    return;
+  }
+  
+  // 수정 버튼 클릭 또는 특정 이벤트 선택
+  if (action === 'edit' && event) {
+    emit('edit-event', event);
+    return;
+  }
+  
+  // 일반 셀 클릭
+  const day = ['mon', 'tue', 'wed', 'thu', 'fri'][dayIndex];
+  
+  if (hasEvents && events.length > 0) {
+    if (events.length === 1) {
+      // 단일 이벤트
+      emit('edit-event', events[0]);
+    } else {
+      // 여러 이벤트 - 첫 번째 이벤트 기본 선택
+      emit('edit-event', events[0]);
+    }
+  } else {
+    // 빈 셀은 등록 모달
+    showRegisterModal({
+      day,
+      period: timeIndex
+    });
+  }
+}
+
+// 이벤트 등록 핸들러 (빈 셀 클릭)
+const showRegisterModal = (data) => {
+  const { day, period } = data;
+  
+  // 요일 변환 (mon → 1, tue → 2, ...)
+  const dayMap = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5 };
+  const dayNumber = typeof day === 'string' ? dayMap[day] || 1 : day;
+  
+  // 이벤트 발생
+  emit('open-modal', 'regular', {
+    type: 'regular',
+    day: dayNumber,
+    start_period: period,
+    end_period: period,
+    grade: selectedGrade.value,
+    professor_name: '',
+    room: '',
+    semester: timetableStore.getCurrentSemester()
+  }, null, false);
 }
 
 // 이벤트 수정 핸들러
-const handleEdit = async (event) => {
-  console.log('🟢 edit 이벤트 도착', event)
-  const eventType = event.type || event.event_type || 'regular'
-
-  // ✅ 수정 모드용 데이터 구성
-  const modalData = {
-    id: event.id,
-    timetable_id: event.timetable_id || event.id,
-    subject_id: event.subject_id,
-    title: event.title || event.subject_name,
-    day: event.day,
-    start_period: event.start_period,
-    end_period: event.end_period,
-    professor_name: event.professor_name || event.inherited_professor_name,
-    room: event.room || event.inherited_room,
-    type: eventType,
-    is_special_lecture: eventType === 'special' ? 1 : 0,
-    year: event.year || null,
-    level: event.level || null,
-    semester: event.semester,
-    isEdit: true
-  }
-
-  // ✅ 모달 열기
-  timetableStore.openUnifiedScheduleForm({
-    isEdit: true,
-    modalData,
-    eventType,
-    timetableData: event,
-    showTypeSelector: true,
-    allowCancel: true
-  })
-
-  // ⚠️ 기존 modalData.value 등은 제거 가능
+const handleEditEvent = (event) => {
+  console.log('🖊️ 이벤트 수정:', event);
+  
+  // 이벤트 타입 결정
+  const eventType = event.type || event.event_type || 
+    (event.is_special_lecture === 1 ? 'special' : 
+     event.is_foreigner_target === 1 ? 'topik' : 'regular');
+  
+  // 부모 컴포넌트에 이벤트 전달
+  emit('edit-event', event);
 }
 
+// 날짜를 YYYY-MM-DD 형식으로 변환
+const formatDate = (date) => {
+  return date.toISOString().split('T')[0];
+}
 
 // 학년/레벨 변경 감지
 watch([() => selectedGrade.value], () => {
