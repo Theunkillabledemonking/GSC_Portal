@@ -2,20 +2,21 @@
 <template>
   <div class="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex justify-center">
     <div class="glass-card mt-24 w-full max-w-sm text-center">
-      <img src="../assets/line-qr.png" alt="QR" class="w-32 h-32 mx-auto mb-2" />
+      <div class="flex flex-col items-center gap-2 relative">
+        <div class="qr-container">
+          <div class="qr-reflection"></div>
+          <img src="../assets/line-qr.png" alt="QR" class="qr-image" />
+        </div>
 
-      <div class="flex items-center justify-center gap-2 text-gray-700 mb-1 text-sm">
-        <img src="../assets/line_88.png" class="w-5 h-5" />
-        <span class="font-semibold">LINE 친구 추가 후</span>
-      </div>
-      <p class="text-sm text-gray-600 mb-4">아래 인증번호를 LINE으로 전송해주세요.</p>
+        <button @click="requestCode" class="btn-idol">인증번호 받기</button>
 
-      <!-- 인증번호 요청 버튼 -->
-      <button @click="requestCode" class="btn-idol mb-3">인증번호 받기</button>
+        <div v-if="lineStore.authCode" class="auth-code-text">
+          🔐 인증번호: <span class="font-bold text-pink-600">{{ lineStore.authCode }}</span>
+        </div>
 
-      <!-- 인증번호 표시 -->
-      <div class="text-sm mb-3 text-gray-800" v-if="lineStore.authCode">
-        🔐 인증번호: <span class="font-bold text-pink-600">{{ lineStore.authCode }}</span>
+        <p v-if="socketStore.message" class="text-green-600 font-semibold">
+          {{ socketStore.message }}
+        </p>
       </div>
 
       <!-- 실시간 인증 결과 -->
@@ -50,6 +51,37 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.qr-container {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.qr-image {
+  width: 8rem;
+  height: 8rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 0 20px rgba(156, 39, 176, 0.3),
+  0 0 40px rgba(103, 58, 183, 0.2);
+  z-index: 2;
+}
+
+.qr-reflection {
+  position: absolute;
+  width: 8rem;
+  height: 8rem;
+  border-radius: 0.75rem;
+  background: radial-gradient(circle, rgba(236, 72, 153, 0.3), transparent 70%);
+  filter: blur(12px);
+  z-index: 1;
+}
+
+.auth-code-text {
+  font-size: 0.95rem;
+  color: #4b5563;
+}
+
 .glass-card {
   background: rgba(255, 255, 255, 0.9);
   border-radius: 1rem;

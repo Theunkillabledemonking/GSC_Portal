@@ -53,8 +53,8 @@ import { storeToRefs } from 'pinia'
 import dayjs from 'dayjs'
 import { useTimetableStore } from '@/store/modules/timetable'
 import { GRADES } from '@/constants/timetable'
-import WeeklyTimetable from '@/components/schedule/WeeklyTimetable.vue'
-import UnifiedScheduleForm from '@/components/schedule/UnifiedScheduleForm.vue'
+import WeeklyTimetable from '@/components/schedule/core/WeeklyTimetable.vue'
+import UnifiedScheduleForm from '@/components/schedule/forms/UnifiedScheduleForm.vue'
 
 const timetableStore = useTimetableStore()
 const { currentWeek } = storeToRefs(timetableStore)
