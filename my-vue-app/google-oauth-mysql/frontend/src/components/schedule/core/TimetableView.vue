@@ -31,7 +31,7 @@
       <!-- 주차 네비게이션 -->
       <div class="week-navigator">
         <button class="nav-btn" @click="navigatePrevWeek">
-          <span class="arrow">←</span> 이전 주
+          <span class="arrow">←</span>
         </button>
         
         <div class="current-week">
@@ -39,7 +39,7 @@
         </div>
         
         <button class="nav-btn" @click="navigateNextWeek">
-          다음 주 <span class="arrow">→</span>
+          <span class="arrow">→</span>
         </button>
       </div>
     </div>
@@ -66,6 +66,8 @@
               <TimetableCell
                 :dayIndex="dayIndex"
                 :timeIndex="period"
+                :day="day"
+                :period="period"
                 :events="getEventsForCell(day, period)"
                 :is-holiday="isHoliday(day, period)"
                 :allow-drop="true"
@@ -84,30 +86,23 @@
       </div>
     </div>
     
-    <!-- 수업 등록/관리 모달 -->
-    <UnifiedScheduleForm
-      v-if="showScheduleModal"
-      :initial-data="modalData"
-      :event-type="modalType"
-      :timetable-data="selectedTimetable"
-      :show-type-selector="showTypeSelector"
-      :allow-makeup="true"
-      :allow-cancel="true"
-      @submit="handleScheduleSubmit"
-      @cancel="closeModal"
-      @error="handleFormError"
-    />
-    
-    <!-- 이벤트 상세 모달 -->
-    <DetailEventModal
-      v-if="showDetailModal"
-      :events="selectedEvents"
-      @cancel-class="handleCancelClass"
-      @makeup-class="handleMakeupClass"
-      @edit="handleEditEvent"
-      @delete="handleDeleteEvent"
-      @close="closeDetailModal"
-    />
+    <!-- Unified Modal Form -->
+    <Transition name="fade">
+      <div v-if="showForm" class="modal-backdrop" @click.self="closeForm">
+        <div class="modal-content">
+          <UnifiedScheduleForm
+            :event-type="selectedEventType"
+            :showTypeSelection="true"
+            :initial-data="formInitialData"
+            :timetable-data="selectedTimetable"
+            :is-edit="isEditMode"
+            @close="closeForm"
+            @submit="handleFormSubmit"
+            @cancel="closeForm"
+          />
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -116,8 +111,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useTimetableStore } from '@/store/modules/timetable'
 import { useToast } from '@/composables/useToast'
 import TimetableCell from './TimetableCell.vue'
-import UnifiedScheduleForm from './WeeklyTimetable/forms/UnifiedScheduleForm.vue'
-import DetailEventModal from './DetailEventModal.vue'
+import UnifiedScheduleForm from '../forms/UnifiedScheduleForm.vue'
 // import { getWeekRange, formatDateRange } from '@/utils/date'
 
 // Use the toast composable
@@ -149,13 +143,12 @@ const currentLevel = ref('beginner')
 const isLoading = ref(false)
 
 // 모달 관련 상태
-const showScheduleModal = ref(false)
-const showDetailModal = ref(false)
-const modalType = ref('regular') // 'regular', 'special', 'topik', 'cancel', 'makeup'
-const modalData = ref({})
+const showForm = ref(false)
+const selectedEventType = ref('regular')
+const formInitialData = ref({})
 const selectedTimetable = ref(null)
 const selectedEvents = ref([])
-const showTypeSelector = ref(true)
+const isEditMode = ref(false)
 
 // 드래그 상태 관리
 const dragState = ref({
@@ -169,46 +162,79 @@ const dragState = ref({
 
 // 계산된 속성
 const weekStart = computed(() => {
-  const startDate = new Date(currentWeek.value)
-  const day = startDate.getDay()
-  // 월요일로 설정 (일요일이면 6일 뺌, 다른 날은 해당 요일 수 - 1만큼 뺌)
-  startDate.setDate(startDate.getDate() - (day === 0 ? 6 : day - 1))
-  return startDate
+  try {
+    // 안전하게 Date 객체로 변환
+    const currentWeekDate = currentWeek.value instanceof Date 
+      ? currentWeek.value 
+      : new Date(currentWeek.value);
+    
+    if (isNaN(currentWeekDate.getTime())) {
+      console.error('Invalid date for currentWeek');
+      return new Date(); // 안전하게 현재 날짜 반환
+    }
+    
+    const startDate = new Date(currentWeekDate);
+    const day = startDate.getDay();
+    // 월요일로 설정 (일요일이면 6일 뺌, 다른 날은 해당 요일 수 - 1만큼 뺌)
+    startDate.setDate(startDate.getDate() - (day === 0 ? 6 : day - 1));
+    return startDate;
+  } catch (error) {
+    console.error('Error calculating weekStart:', error);
+    return new Date(); // 오류시 현재 날짜 반환
+  }
 })
 
 const weekEnd = computed(() => {
-  const endDate = new Date(weekStart.value)
-  // 금요일까지 (시작일로부터 4일 후)
-  endDate.setDate(endDate.getDate() + 4)
-  return endDate
+  try {
+    const endDate = new Date(weekStart.value);
+    // 금요일까지 (시작일로부터 4일 후)
+    endDate.setDate(endDate.getDate() + 4);
+    return endDate;
+  } catch (error) {
+    console.error('Error calculating weekEnd:', error);
+    const fallback = new Date();
+    fallback.setDate(fallback.getDate() + 4);
+    return fallback;
+  }
 })
 
 // 시간표 데이터 로드
 const loadTimetableData = async () => {
-  isLoading.value = true
+  isLoading.value = true;
   try {
+    // currentWeek 안전하게 처리
+    let weekDateStr;
+    
+    if (currentWeek.value instanceof Date) {
+      weekDateStr = formatDate(currentWeek.value);
+    } else if (typeof currentWeek.value === 'string') {
+      weekDateStr = currentWeek.value;
+    } else {
+      weekDateStr = formatDate(new Date());
+    }
+    
     console.log('🔄 시간표 데이터 로드 요청:', {
       grade: currentGrade.value,
-      week: formatDate(weekStart.value),
+      week: weekDateStr,
       semester: timetableStore.getCurrentSemester(),
       year: new Date().getFullYear()
-    })
+    });
     
     // 주간 이벤트 조회 (grade, level 고려)
     await timetableStore.fetchWeeklyEvents({
       grade: currentGrade.value,
       level: currentLevel.value,
-      week: formatDate(weekStart.value),
+      week: weekDateStr,
       group_level: 'ALL', // 모든 분반의 특강 데이터를 가져옴
       ignoreGradeFilter: 'true' // 특강은 학년 필터 무시
-    })
+    });
   } catch (error) {
-    console.error('시간표 데이터 로드 실패:', error)
-    toast.error('시간표를 불러오는데 실패했습니다.')
+    console.error('시간표 데이터 로드 실패:', error);
+    toast.error('시간표를 불러오는데 실패했습니다.');
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
 
 // 이벤트 필터링 - 특정 요일/교시 셀에 표시할 이벤트 목록
 const getEventsForCell = (day, period) => {
@@ -312,32 +338,52 @@ const navigateNextWeek = () => {
 
 // 셀 클릭 핸들러
 const handleCellClick = (cellData) => {
-  const { dayIndex, timeIndex, hasEvents, events } = cellData
+  const { dayIndex, timeIndex, hasEvents, events, fromTooltip, event } = cellData;
+  
+  // 툴크에서 특정 이벤트 클릭된 경우
+  if (fromTooltip && event) {
+    // 이벤트 하나만 선택하여 수정 모드로 열기
+    selectedEvents.value = [event];
+    handleEditEvent(event);
+    return;
+  }
   
   if (hasEvents && events.length > 0) {
-    // 이벤트가 있는 셀: 상세 모달 표시
-    selectedEvents.value = events
-    showDetailModal.value = true
+    // 이벤트가 있는 셀
+    if (events.length === 1) {
+      // 단일 이벤트: 바로 수정 모드
+      handleEditEvent(events[0]);
+    } else {
+      // 복수 이벤트: DetailEventModal을 사용하는 대신 통합 폼으로 전환
+      selectedEvents.value = events;
+      // 첫 번째 이벤트를 기본 선택으로 사용
+      handleEditEvent(events[0]);
+    }
   } else {
     // 이벤트가 없는 셀: 등록 모달 (기본: 빈 셀 클릭 = 정규 수업 등록)
-    const day = DAYS[dayIndex]
-    const dayNumber = dayIndex + 1 // 1(월요일)~5(금요일)
+    const day = DAYS[dayIndex];
+    const dayNumber = dayIndex + 1; // 1(월요일)~5(금요일)
     
-    modalData.value = {
+    // 이벤트 데이터 준비
+    formInitialData.value = {
       type: 'regular', // 기본값: 정규 수업
       day: dayNumber,
       start_period: timeIndex,
       end_period: timeIndex,
       grade: currentGrade.value,
-      level: currentLevel.value
-    }
+      level: currentLevel.value,
+      professor_name: '',
+      room: '',
+      semester: timetableStore.getCurrentSemester()
+    };
     
-    modalType.value = 'regular'
-    showTypeSelector.value = true
-    selectedTimetable.value = null
-    showScheduleModal.value = true
+    // 모달 상태 설정
+    selectedEventType.value = 'regular';
+    selectedTimetable.value = null;
+    isEditMode.value = false;
+    showForm.value = true;
   }
-}
+};
 
 // 셀 드래그 시작 핸들러
 const handleCellDragStart = (eventData) => {
@@ -347,7 +393,7 @@ const handleCellDragStart = (eventData) => {
   if (mainEvent) {
     selectedTimetable.value = mainEvent
     
-    modalData.value = {
+    formInitialData.value = {
       type: 'cancel',
       timetable_id: mainEvent.id || mainEvent.timetable_id,
       date: formatDate(new Date(weekStart.value.getTime() + dayIndex * 24 * 60 * 60 * 1000)),
@@ -358,9 +404,9 @@ const handleCellDragStart = (eventData) => {
       inherit_attributes: true
     }
     
-    modalType.value = 'cancel'
-    showTypeSelector.value = false
-    showScheduleModal.value = true
+    selectedEventType.value = 'cancel'
+    selectedTimetable.value = null
+    showForm.value = true
   } else {
     // 빈 셀: 보강 등록을 위한 드래그 시작
     const day = DAYS[dayIndex]
@@ -396,7 +442,7 @@ const handleDragEnd = () => {
     const start = Math.min(startPeriod, endPeriod)
     const end = Math.max(startPeriod, endPeriod)
     
-    modalData.value = {
+    formInitialData.value = {
       type: 'makeup',
       day: dayIndex + 1,
       start_period: start,
@@ -406,10 +452,9 @@ const handleDragEnd = () => {
       level: currentLevel.value
     }
     
-    modalType.value = 'makeup'
-    showTypeSelector.value = false
+    selectedEventType.value = 'makeup'
     selectedTimetable.value = null
-    showScheduleModal.value = true
+    showForm.value = true
   }
   
   // 드래그 상태 초기화
@@ -424,142 +469,97 @@ const handleDragEnd = () => {
 }
 
 // 모달 액션 핸들러
-const handleScheduleSubmit = async (formData) => {
+const handleFormSubmit = async (formData) => {
   try {
-    console.log('🔄 스케줄 폼 제출:', formData)
+    console.log('🔄 스케줄 폼 제출:', formData);
     
     // 캐시 즉시 갱신을 위해 타임아웃 없이 즉시 로드
-    await loadTimetableData()
+    await loadTimetableData();
     
     // 성공적으로 등록되면 모달 닫기
-    closeModal()
+    closeForm();
     
     // 성공 메시지 표시
-    toast.success('일정이 성공적으로 등록되었습니다.')
+    toast.success('일정이 성공적으로 등록되었습니다.');
   } catch (error) {
-    console.error('일정 등록 실패:', error)
-    toast.error('일정 등록에 실패했습니다.')
+    console.error('일정 등록 실패:', error);
+    toast.error('일정 등록에 실패했습니다.');
   }
-}
+};
 
-const handleFormError = (error) => {
-  toast.error(error.message || '입력 내용을 확인해주세요.')
-}
+const closeForm = () => {
+  showForm.value = false;
+  selectedTimetable.value = null;
+  selectedEvents.value = [];
+};
 
-const closeModal = () => {
-  showScheduleModal.value = false
-  modalData.value = {}
-  selectedTimetable.value = null
-  
-  // Force the UI to update
-  setTimeout(() => {
-    showScheduleModal.value = false
-  }, 100)
-}
-
-// 상세 모달 액션 핸들러
-const handleCancelClass = (event) => {
-  selectedTimetable.value = event
-  
-  modalData.value = {
-    type: 'cancel',
-    timetable_id: event.id || event.timetable_id,
-    date: event.date || formatDate(new Date()),
-    start_period: event.start_period,
-    end_period: event.end_period,
-    professor_name: event.professor_name,
-    room: event.room,
-    inherit_attributes: true
-  }
-  
-  modalType.value = 'cancel'
-  showTypeSelector.value = false
-  showDetailModal.value = false
-  showScheduleModal.value = true
-}
-
-const handleMakeupClass = (event) => {
-  selectedTimetable.value = event
-  
-  modalData.value = {
-    type: 'makeup',
-    timetable_id: event.id || event.timetable_id,
-    subject_id: event.subject_id,
-    date: formatDate(new Date()),
-    start_period: event.start_period,
-    end_period: event.end_period,
-    professor_name: event.professor_name,
-    room: event.room,
-    inherit_attributes: true
-  }
-  
-  modalType.value = 'makeup'
-  showTypeSelector.value = false
-  showDetailModal.value = false
-  showScheduleModal.value = true
-}
-
+// 이벤트 수정 핸들러
 const handleEditEvent = (event) => {
-  // 이벤트 유형에 따라 편집 모달 설정
-  const eventType = event.type || event.event_type || 'regular'
-  const isSpecial = event.is_special_lecture === 1 || event.is_special_lecture === true
+  console.log('🖊️ 이벤트 수정 시작:', event);
   
-  // 타입 결정
-  let type = eventType
-  if (isSpecial) {
-    type = 'special'
-  } else if (eventType === 'regular' && event.level) {
-    type = 'topik'
-  }
+  // 이벤트 타입 결정
+  const eventType = event.type || event.event_type || 
+    (event.is_special_lecture === 1 ? 'special' : 
+     event.is_foreigner_target === 1 ? 'topik' : 'regular');
   
-  modalData.value = {
-    ...event,
-    type
-  }
+  // 모달 데이터 준비
+  formInitialData.value = {
+    id: event.id,
+    type: eventType,
+    timetable_id: event.timetable_id || event.id,
+    subject_id: event.subject_id,
+    subject_name: event.subject_name || event.title,
+    day: event.day,
+    start_period: event.start_period,
+    end_period: event.end_period,
+    professor_name: event.professor_name || event.inherited_professor_name,
+    room: event.room || event.inherited_room,
+    grade: event.grade || event.year,
+    level: event.level,
+    is_special_lecture: event.is_special_lecture,
+    is_foreigner_target: event.is_foreigner_target,
+    semester: event.semester || timetableStore.getCurrentSemester(),
+    date: event.date || event.event_date
+  };
   
-  modalType.value = type
-  showTypeSelector.value = false
-  selectedTimetable.value = null
-  showDetailModal.value = false
-  showScheduleModal.value = true
-}
+  // 모달 상태 설정
+  selectedEventType.value = eventType;
+  selectedTimetable.value = event;
+  isEditMode.value = true;
+  showForm.value = true;
+};
 
+// 이벤트 삭제 핸들러
 const handleDeleteEvent = async (event) => {
-  if (!confirm('정말 삭제하시겠습니까?')) return
-  
   try {
-    // 삭제 요청
-    await timetableStore.processScheduleAction(event, 'delete')
+    if (!event || !event.id) {
+      console.error('삭제할 이벤트 ID가 없습니다');
+      return;
+    }
     
-    toast.success('삭제되었습니다.')
-    closeDetailModal()
-    loadTimetableData()
+    console.log('🗑️ 이벤트 삭제 시작:', event);
+    
+    // 이벤트 타입 결정
+    const eventType = event.type || event.event_type || 
+      (event.is_special_lecture === 1 ? 'special' : 
+       event.is_foreigner_target === 1 ? 'topik' : 'regular');
+    
+    // timetableStore를 통한 삭제 처리
+    await timetableStore.processScheduleAction({
+      id: event.id,
+      event_type: eventType,
+      is_special_lecture: event.is_special_lecture
+    }, 'delete');
+    
+    // 성공시 데이터 리로드 및 모달 닫기
+    toast.success('이벤트가 삭제되었습니다');
+    await loadTimetableData();
+    closeForm();
   } catch (error) {
-    console.error('삭제 실패:', error)
-    toast.error(error.message || '삭제 중 오류가 발생했습니다.')
+    console.error('이벤트 삭제 실패:', error);
+    toast.error('이벤트 삭제에 실패했습니다');
   }
-}
-
-const closeDetailModal = () => {
-  showDetailModal.value = false
-  selectedEvents.value = []
-  // Force the UI to update
-  setTimeout(() => {
-    showDetailModal.value = false
-  }, 100)
-}
-
-// 이벤트 타입 표시명 반환
-const getScheduleTypeName = (type) => {
-  switch (type) {
-    case 'regular': return '정규 수업'
-    case 'topik': return 'TOPIK 수업'
-    case 'special': return '특강'
-    case 'cancel': return '휴강'
-    case 'makeup': return '보강'
-    default: return '수업'
-  }
-}
+};
 
 // Lifecycle hooks
 onMounted(async () => {
@@ -749,6 +749,43 @@ setupGlobalMouseEvents()
   font-weight: 500;
 }
 
+/* Modal styles */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  z-index: 1000;
+  padding-top: 5vh;
+}
+
+.modal-content {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* Transitions */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
 @keyframes spin {
   from {
     transform: rotate(0deg);
@@ -773,6 +810,11 @@ setupGlobalMouseEvents()
   .week-navigator {
     width: 100%;
     justify-content: space-between;
+  }
+  
+  .modal-content {
+    width: 95%;
+    max-width: none;
   }
 }
 </style> 

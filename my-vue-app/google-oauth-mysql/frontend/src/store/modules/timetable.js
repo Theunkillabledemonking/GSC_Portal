@@ -1,3 +1,23 @@
+/**
+ * Timetable Store
+ * 
+ * 주요 업데이트 사항 (2023.05):
+ * 1. 렌더링 로직 개선:
+ *    - 정규 수업: 학년(grade) 기준 필터링
+ *    - 특강 수업: 레벨(level) 기준 필터링
+ *    - TOPIK 수업: is_special_lecture=2 또는 is_foreigner_target=1 인 경우 처리
+ *    - 휴강/보강/공휴일: 날짜 비교 로직 개선 (isDateInWeekRange 함수)
+ * 
+ * 2. 통합 UI 처리:
+ *    - openUnifiedScheduleForm: 모든 이벤트 타입 등록/수정 통합 처리
+ *    - handleCellAction: 셀 클릭 통합 처리
+ *    - determineEventType: 이벤트 객체에서 타입 추출 로직 개선
+ * 
+ * 3. 날짜 처리:
+ *    - formatDate: Date 객체를 YYYY-MM-DD 형식으로 변환
+ *    - isDateInWeekRange: 날짜가 특정 주 범위 내인지 확인
+ */
+
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useAuthStore } from '@/store'
@@ -8,6 +28,59 @@ import { applyFilters } from '@/utils/filters'
 import { isOverlapping, validateEventTimes } from '@/utils/events'
 import { getCache, setCache, getCacheKey } from '@/utils/cache'
 import { getSemesterRange } from '@/utils/semester'
+
+// Helper function to format dates as YYYY-MM-DD
+function formatDate(date) {
+  if (!(date instanceof Date)) return 'Invalid date';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// Helper function to check if a date is within the week range
+function isDateInWeekRange(date, weekRef) {
+  try {
+    if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
+      return false;
+    }
+    
+    // 기준일 (weekRef)로부터 해당 주의 월요일과 금요일 계산
+    const refDate = weekRef instanceof Date ? weekRef : new Date(weekRef);
+    if (isNaN(refDate.getTime())) {
+      console.error('Invalid reference date for week range check');
+      return false;
+    }
+    
+    // 기준일의 요일 (0: 일요일, 1: 월요일, ..., 6: 토요일)
+    const dayOfWeek = refDate.getDay();
+    
+    // 월요일로 조정 (일요일이면 -6, 월요일이면 0, 화요일이면 -1, ...)
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(refDate);
+    monday.setDate(refDate.getDate() + mondayOffset);
+    monday.setHours(0, 0, 0, 0); // 시작일은 00:00:00
+    
+    // 금요일로 조정 (월요일 + 4일)
+    const friday = new Date(monday);
+    friday.setDate(monday.getDate() + 4);
+    friday.setHours(23, 59, 59, 999); // 종료일은 23:59:59
+    
+    // 해당 날짜가 월요일과 금요일 사이인지 확인
+    const isInRange = date >= monday && date <= friday;
+    
+    if (isInRange) {
+      console.log(`✅ 날짜 ${formatDate(date)}는 현재 주 ${formatDate(monday)} ~ ${formatDate(friday)} 범위 내`);
+    } else {
+      console.log(`❌ 날짜 ${formatDate(date)}는 현재 주 ${formatDate(monday)} ~ ${formatDate(friday)} 범위 밖`);
+    }
+    
+    return isInRange;
+  } catch (error) {
+    console.error('주간 범위 체크 중 오류 발생:', error);
+    return false;
+  }
+}
 
 export const useTimetableStore = defineStore('timetable', () => {
   // State
@@ -48,9 +121,11 @@ export const useTimetableStore = defineStore('timetable', () => {
     showTypeSelector: true,
     allowCancel: true,
     eventType: 'regular',
-    timetableData: null
+    timetableData: null,
+    allEvents: null  // 여러 이벤트가 있는 경우 (선택 UI용)
   })
   // Getters
+  const authStore = useAuthStore()
   const filteredEvents = computed(() => {
     // 선택된 학년이 없으면 빈 배열 반환
     if (!currentGrade.value && !currentLevel.value) {
@@ -59,7 +134,7 @@ export const useTimetableStore = defineStore('timetable', () => {
     }
 
     // 필터링을 위한 환경 변수
-    const currentGradeInt = parseInt(currentGrade.value, 10) || 0;
+    const currentGradeInt = parseInt(typeof currentGrade.value === 'number' ? String(currentGrade.value) : currentGrade.value || '0', 10) || 0;
     const eventYearFilter = currentGradeInt > 0 ? currentGradeInt : null;
     
     // 현재 학기와 년도 가져오기
@@ -73,13 +148,16 @@ export const useTimetableStore = defineStore('timetable', () => {
     console.log(`  📆 현재 학기 범위: ${semesterRange.start_date} - ${semesterRange.end_date}`);
     console.log(`  👥 선택된 학년: ${currentGradeInt || 'ALL'}, 레벨: ${currentLevel.value || 'ALL'}`);
     
+    console.log(`🔍 이벤트 필터링 시작: ${events.value.length}개 이벤트, 현재 학년: ${currentGrade.value}, 현재 주: ${formatDate(currentWeek.value)}`)
+    console.log(`👤 사용자 권한: ${authStore.isAdmin ? '관리자' : '일반 사용자'}`)
+    
     // 필터링 결과를 위한 카운터 초기화
     let regularClassesCount = 0;
     let specialLecturesCount = 0;
-    let topikCount = 0;
     let canceledCount = 0;
     let makeupCount = 0;
     let holidaysCount = 0;
+    let topikCount = 0;
     
     // 이벤트 필터링
     const filtered = events.value.filter((event) => {
@@ -92,7 +170,12 @@ export const useTimetableStore = defineStore('timetable', () => {
         typeof event.year === 'number' ? event.year : 
         typeof event.year === 'string' ? parseInt(event.year, 10) : null;
       
-      // 특강 여부
+      // 이벤트 타입 명확히 결정
+      const isRegular = 
+        (!event.is_special_lecture || event.is_special_lecture === 0) && 
+        (!event.type || event.type === 'regular') &&
+        (!event.event_type || event.event_type === 'regular');
+        
       const isSpecialLecture = 
         event.is_special_lecture === 1 || 
         event.is_special_lecture === true || 
@@ -100,7 +183,6 @@ export const useTimetableStore = defineStore('timetable', () => {
         event.type === 'special' || 
         event.event_type === 'special';
       
-      // 공휴일 여부
       const isHoliday = 
         event.type === 'holiday' || 
         event.event_type === 'holiday';
@@ -115,6 +197,8 @@ export const useTimetableStore = defineStore('timetable', () => {
         event.event_type === 'makeup';
       
       const isTopikClass = 
+        event.is_special_lecture === 2 || 
+        event.is_special_lecture === '2' ||
         (event.is_foreigner_target === 1 || 
          event.is_foreigner_target === true || 
          event.is_foreigner_target === '1') ||
@@ -122,15 +206,40 @@ export const useTimetableStore = defineStore('timetable', () => {
         event.type === 'topik' || 
         event.event_type === 'topik';
       
-      // 1. 공휴일 - 모든 학년에 표시
+      // 1. 공휴일 - 모든 학년에 표시 (주간 범위 내 날짜만)
       if (isHoliday) {
+        const eventDate = event.date ? new Date(event.date) : event.event_date ? new Date(event.event_date) : null;
+        // 날짜가 없거나 유효하지 않으면 필터링
+        if (!eventDate || isNaN(eventDate.getTime())) {
+          return false;
+        }
+        
+        // 현재 주 범위 내 공휴일만 포함 - 나중에 구현할 isDateInWeekRange 함수 사용
+        const isInCurrentWeek = isDateInWeekRange(eventDate, currentWeek.value);
+        if (!isInCurrentWeek) {
+          return false;
+        }
+        
         holidaysCount++;
-        console.log(`🏖️ 공휴일 포함됨: ${event.title || event.name || '공휴일'}, 날짜: ${event.date || event.event_date}`);
+        console.log(`🏖️ 공휴일 포함됨: ${event.title || event.name || '공휴일'}, 날짜: ${formatDate(eventDate)}`);
         return true;
       }
       
-      // 2. 휴강 이벤트 
+      // 2. 휴강 이벤트 - 날짜 비교 및 원 수업의 학년과 일치하는지 확인
       if (isCancellation) {
+        const eventDate = event.date ? new Date(event.date) : event.event_date ? new Date(event.event_date) : null;
+        // 날짜가 없거나 유효하지 않으면 필터링
+        if (!eventDate || isNaN(eventDate.getTime())) {
+          return false;
+        }
+        
+        // 현재 주 범위 내 휴강만 포함
+        const isInCurrentWeek = isDateInWeekRange(eventDate, currentWeek.value);
+        if (!isInCurrentWeek) {
+          console.log(`📅 휴강 날짜 ${formatDate(eventDate)} 범위 밖 - 필터링됨`);
+          return false;
+        }
+        
         // 휴강 대상 수업의 학년 정보를 확인
         const relatedGrade = event.grade || (event.timetable_id ? event.timetable?.grade : null);
         
@@ -141,12 +250,25 @@ export const useTimetableStore = defineStore('timetable', () => {
         }
         
         canceledCount++;
-        console.log(`🛑 휴강 이벤트 포함됨: ${event.subject_name || event.title}, 날짜: ${event.date || event.event_date}, ID: ${event.id}, 학년: ${relatedGrade || '미지정'}`);
+        console.log(`🛑 휴강 이벤트 포함됨: ${event.subject_name || event.title}, 날짜: ${formatDate(eventDate)}, ID: ${event.id}, 학년: ${relatedGrade || '미지정'}`);
         return true;
       }
       
-      // 3. 보강 이벤트 
+      // 3. 보강 이벤트 - 날짜 비교 및 원 수업의 학년과 일치하는지 확인
       if (isMakeup) {
+        const eventDate = event.date ? new Date(event.date) : event.event_date ? new Date(event.event_date) : null;
+        // 날짜가 없거나 유효하지 않으면 필터링
+        if (!eventDate || isNaN(eventDate.getTime())) {
+          return false;
+        }
+        
+        // 현재 주 범위 내 보강만 포함
+        const isInCurrentWeek = isDateInWeekRange(eventDate, currentWeek.value);
+        if (!isInCurrentWeek) {
+          console.log(`📅 보강 날짜 ${formatDate(eventDate)} 범위 밖 - 필터링됨`);
+          return false;
+        }
+        
         // 보강 대상 수업의 학년 정보를 확인
         const relatedGrade = event.grade || (event.timetable_id ? event.timetable?.grade : null);
         
@@ -157,24 +279,14 @@ export const useTimetableStore = defineStore('timetable', () => {
         }
         
         makeupCount++;
-        console.log(`🔄 보강 이벤트 포함됨: ${event.subject_name || event.title}, 날짜: ${event.date || event.event_date}, ID: ${event.id}, 학년: ${relatedGrade || '미지정'}`);
+        console.log(`🔄 보강 이벤트 포함됨: ${event.subject_name || event.title}, 날짜: ${formatDate(eventDate)}, ID: ${event.id}, 학년: ${relatedGrade || '미지정'}`);
         return true;
       }
       
-      // 4. 특강 - 모든 학년에 표시 (학기 범위 및 레벨 필터링만 적용)
+      // 4. 특강 - 레벨 필터링 적용
       if (isSpecialLecture) {
-        // 학기 범위 내 확인
-        const eventDate = event.date ? new Date(event.date) : null;
-        const eventStartDate = event.start_date ? new Date(event.start_date) : null;
-        const effectiveDate = eventDate || eventStartDate;
-        
-        if (effectiveDate && (effectiveDate < new Date(semesterRange.start_date) || effectiveDate > new Date(semesterRange.end_date))) {
-          console.log(`⏱️ 특강 "${event.subject_name || event.title}" (${effectiveDate.toISOString().split('T')[0]})이(가) 현재 학기 범위를 벗어나 필터링됨`);
-          return false;
-        }
-        
-        // 레벨 필터링 확인
-        if (currentLevel.value && event.level) {
+        // 관리자는 레벨 필터링 우회
+        if (!authStore.isAdmin && currentLevel.value && event.level) {
           const eventLevel = String(event.level).toLowerCase();
           const userLevel = String(currentLevel.value).toLowerCase();
           
@@ -185,14 +297,14 @@ export const useTimetableStore = defineStore('timetable', () => {
         }
         
         specialLecturesCount++;
-        console.log(`✨ 특강 이벤트 포함됨: ${event.subject_name || event.title}, 레벨: ${event.level || 'N/A'}, ID: ${event.id}`);
+        console.log(`✨ 특강 이벤트 포함됨 ${authStore.isAdmin ? '(관리자 권한)' : '(날짜 기반)'}: ${event.subject_name || event.title}, 레벨: ${event.level || 'N/A'}, ID: ${event.id}`);
         return true;
       }
       
-      // 5. TOPIK 수업 - 모든 학년에 표시 (레벨 필터링만 적용)
+      // 5. TOPIK 수업 - 레벨 필터링 적용
       if (isTopikClass) {
-        // TOPIK은 레벨 필터링만 적용
-        if (currentLevel.value && event.level) {
+        // 관리자는 레벨 필터링 우회
+        if (!authStore.isAdmin && currentLevel.value && event.level) {
           const eventLevel = String(event.level).toLowerCase();
           const userLevel = String(currentLevel.value).toLowerCase();
           
@@ -202,22 +314,22 @@ export const useTimetableStore = defineStore('timetable', () => {
           }
         }
         
+        // 요일 기반 TOPIK 수업은 현재 주 표시에 항상 포함
         topikCount++;
-        console.log(`🌏 TOPIK 수업 포함됨: ${event.subject_name || event.title}, 레벨: ${event.level || 'N/A'}, ID: ${event.id}`);
+        console.log(`🌏 TOPIK 수업 포함됨 ${authStore.isAdmin ? '(관리자 권한)' : ''}: ${event.subject_name || event.title}, 레벨: ${event.level || 'N/A'}, ID: ${event.id}`);
         return true;
       }
       
       // 6. 정규 수업 - 학년(year) 기준으로 엄격하게 필터링
-      
-      // 이벤트에 학년 정보가 없거나 현재 선택된 학년과 일치하지 않으면 제외
-      if (eventYear === null || eventYear !== currentGradeInt) {
+      // 관리자는 학년 필터링 우회
+      if (!authStore.isAdmin && (eventYear === null || eventYear !== currentGradeInt)) {
         console.log(`🚫 학년 불일치로 제외: ${event.subject_name || event.title || '이름 없음'} (이벤트 학년: ${eventYear !== null ? eventYear : 'NULL'}, 현재 학년: ${currentGradeInt})`);
         return false;
       }
       
       // 정규 수업
       regularClassesCount++;
-      console.log(`📚 정규 수업 포함됨 (학년 일치): ${event.subject_name || event.title}, 학년: ${eventYear}, ID: ${event.id}`);
+      console.log(`📚 정규 수업 포함됨 ${authStore.isAdmin ? '(관리자 권한)' : '(학년 일치)'}: ${event.subject_name || event.title}, 학년: ${eventYear}, ID: ${event.id}`);
       return true;
     });
     
@@ -233,8 +345,9 @@ export const useTimetableStore = defineStore('timetable', () => {
         acc.makeup = (acc.makeup || 0) + 1;
       } else if (event.is_special_lecture === 1 || event.type === 'special' || event.event_type === 'special') {
         acc.special = (acc.special || 0) + 1;
-      } else if (event.is_foreigner_target === 1 || event.type === 'topik' || event.event_type === 'topik' || 
-                 (event.level && event.level.includes('TOPIK'))) {
+      } else if (event.is_special_lecture === 2 || 
+                event.is_foreigner_target === 1 || event.type === 'topik' || event.event_type === 'topik' || 
+                (event.level && String(event.level).includes('TOPIK'))) {
         acc.topik = (acc.topik || 0) + 1;
       } else {
         acc.regular = (acc.regular || 0) + 1;
@@ -332,8 +445,32 @@ export const useTimetableStore = defineStore('timetable', () => {
   }
 
   function setCurrentWeek(week) {
-    currentWeek.value = week
-    console.log(`🔄 현재 주 설정: ${week}`)
+    try {
+      // Handle Date objects
+      if (week instanceof Date) {
+        if (!isNaN(week.getTime())) {
+          currentWeek.value = week;
+          console.log(`🔄 현재 주 설정: ${formatDate(week)}`);
+          return;
+        }
+      } 
+      // Handle string values
+      else if (typeof week === 'string') {
+        const dateObj = new Date(week);
+        if (!isNaN(dateObj.getTime())) {
+          currentWeek.value = dateObj;
+          console.log(`🔄 현재 주 설정: ${week} (문자열에서 변환)`);
+          return;
+        }
+      }
+      
+      // Fallback to current date if the provided value is invalid
+      console.warn(`Invalid week value: ${week}, using current date instead`);
+      currentWeek.value = new Date();
+    } catch (error) {
+      console.error('Error setting current week:', error);
+      currentWeek.value = new Date(); 
+    }
   }
 
   function setLevel(level) {
@@ -507,7 +644,6 @@ export const useTimetableStore = defineStore('timetable', () => {
       }
 
       // API 요청 실행
-      const authStore = useAuthStore();
       let response;
       
       if (actionType === 'delete') {
@@ -756,11 +892,27 @@ export const useTimetableStore = defineStore('timetable', () => {
 
   // 현재 날짜에서 해당 주의 시작일(월요일) 구하기
   function getWeekDate(date) {
-    const d = new Date(date)
-    const day = d.getDay()
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1) // 일요일이면 전 주 월요일로
-    const monday = new Date(d.setDate(diff))
-    return monday.toISOString().split('T')[0]
+    try {
+      const d = new Date(date)
+      if (isNaN(d.getTime())) {
+        console.error('Invalid date provided to getWeekDate:', date)
+        return formatDate(new Date()) // 현재 날짜 반환
+      }
+      
+      // 요일 (0: 일요일, 1: 월요일, ..., 6: 토요일)
+      const day = d.getDay()
+      
+      // 월요일로 조정 (일요일이면 -6, 월요일이면 0, 화요일이면 -1, ...)
+      const mondayOffset = day === 0 ? -6 : 1 - day
+      const monday = new Date(d)
+      monday.setDate(d.getDate() + mondayOffset)
+      monday.setHours(0, 0, 0, 0) // 시작 시간은 00:00:00으로 설정
+      
+      return formatDate(monday)
+    } catch (error) {
+      console.error('getWeekDate 처리 중 오류 발생:', error)
+      return formatDate(new Date())
+    }
   }
 
   // 현재 학기 가져오기
@@ -833,7 +985,8 @@ export const useTimetableStore = defineStore('timetable', () => {
       showTypeSelector: true,
       allowCancel: true,
       eventType: 'regular',
-      timetableData: null
+      timetableData: null,
+      allEvents: null  // 여러 이벤트가 있는 경우 (선택 UI용)
     }
   }
 
@@ -991,6 +1144,12 @@ export const useTimetableStore = defineStore('timetable', () => {
         
         // 사용자 타입에 따른 필터링
         is_foreigner: String(isForeigner)
+      }
+      
+      // 관리자 권한 확인 및 플래그 추가
+      if (authStore.isAdmin) {
+        requestParams.is_admin = 'true'
+        console.log('👑 관리자 권한으로 요청을 보냅니다. 필터링 제한이 적용되지 않습니다.')
       }
       
       // 정규 수업은 grade(year)로 필터링 (학년별로 구분)
@@ -1365,70 +1524,137 @@ export const useTimetableStore = defineStore('timetable', () => {
   }
 
   // 통합 일정 등록 폼 열기
-  function openUnifiedScheduleForm(options) {
-    console.log('📝 통합 일정 등록 폼 열기:', options)
+  function openUnifiedScheduleForm(options = {}) {
+    const {
+      isEdit = false,
+      modalData = null,
+      showTypeSelector = true,
+      allowCancel = true,
+      eventType = 'regular',
+      timetableData = null,
+      allEvents = null  // 여러 이벤트가 있는 경우 전체 목록
+    } = options;
     
-    // Close any open modals first
-    showModal.value = false
-    showingDetailModal.value = false
-    showingRegisterModal.value = false
+    console.log(`🔄 통합 스케줄 폼 열기: ${isEdit ? '수정' : '등록'} 모드, 타입: ${eventType}`);
     
-    // Set up options
+    // 모달 데이터 설정
     unifiedModalData.value = {
-      isEdit: options.isEdit || false,
-      modalData: options.modalData || {},
-      showTypeSelector: options.showTypeSelector !== undefined ? options.showTypeSelector : true,
-      allowCancel: options.allowCancel !== undefined ? options.allowCancel : true,
-      eventType: options.eventType || 'regular',
-      timetableData: options.timetableData || null
-    }
+      isEdit,
+      modalData,
+      showTypeSelector,
+      allowCancel,
+      eventType,
+      timetableData,
+      allEvents
+    };
     
-    // Set modal state
-    modalType.value = 'unified'
+    // 모달 표시
+    showUnifiedModal.value = true;
     
-    // Open the unified modal
-    showUnifiedModal.value = true
-    
-    // Log the state for debugging
-    console.log('📊 Modal state after opening:', { 
-      showUnifiedModal: showUnifiedModal.value,
-      modalType: modalType.value,
-      data: unifiedModalData.value
-    })
+    // 모달 타입 설정 (이전 모달 처리 방식과의 호환성 유지)
+    modalType.value = 'unified';
+    showModal.value = true;
   }
 
-  // 추가: 셀 액션 통합 처리 함수
+  // 통합 셀 액션 핸들러
   function handleCellAction(data) {
-    console.log('🔄 셀 액션 처리:', data)
+    const { dayIndex, timeIndex, hasEvents, events, action, event } = data;
     
-    const { dayIndex, timeIndex, hasEvents, events, action, event } = data
-    const day = ['mon', 'tue', 'wed', 'thu', 'fri'][dayIndex]
+    // 날짜 문자열로 변환 (1: 월요일, 2: 화요일, ...)
+    const dayNumber = dayIndex + 1;
+    const dayName = ['mon', 'tue', 'wed', 'thu', 'fri'][dayIndex];
     
+    console.log(`🖱️ 셀 액션: ${dayName} ${timeIndex}교시 (${action || 'click'}), 이벤트 ${hasEvents ? events.length : 0}개`);
+    
+    // 1. 이벤트 수정 (특정 이벤트 선택 시)
     if (action === 'edit' && event) {
-      // 수정 버튼 클릭시 처리
       openUnifiedScheduleForm({
         isEdit: true,
-        modalData: {
-          ...event,
-          type: event.type || event.event_type || 'regular',
-          timetable_id: event.timetable_id || event.id,
-          professor_name: event.professor_name || event.inherited_professor_name,
-          room: event.room || event.inherited_room,
-          subject_id: event.subject_id
-        },
-        showTypeSelector: false,
-        allowCancel: true,
-        eventType: event.type || event.event_type || 'regular',
-        timetableData: event
-      })
-    } else if (hasEvents && events.length > 0) {
-      // 일반 셀 클릭시 이벤트가 있으면 상세 보기
-      showDetailModal(events)
-    } else {
-      // 빈 셀 클릭시 새 이벤트 등록
-      const dayCode = day || `day${dayIndex+1}`
-      showCancelClassModal(dayCode, timeIndex)
+        modalData: event,
+        eventType: determineEventType(event),
+        showTypeSelector: false
+      });
+      return;
     }
+    
+    // 2. 이벤트가 있는 셀 일반 클릭
+    if (hasEvents && events.length > 0) {
+      if (events.length === 1) {
+        // 단일 이벤트 - 바로 수정 모드
+        openUnifiedScheduleForm({
+          isEdit: true,
+          modalData: events[0],
+          eventType: determineEventType(events[0]),
+          showTypeSelector: false
+        });
+      } else {
+        // 복수 이벤트 - 첫 번째 이벤트로 수정 모드 (향후: 이벤트 선택 UI 구현 가능)
+        openUnifiedScheduleForm({
+          isEdit: true,
+          modalData: events[0],
+          eventType: determineEventType(events[0]),
+          showTypeSelector: false,
+          allEvents: events // 필요시 전체 이벤트 목록 전달
+        });
+      }
+      return;
+    }
+    
+    // 3. 빈 셀 클릭 - 새 이벤트 등록
+    // 기본값: 학년 필터링, 정규 수업으로 초기화
+    openUnifiedScheduleForm({
+      isEdit: false,
+      modalData: {
+        type: 'regular',
+        day: dayNumber,
+        start_period: timeIndex,
+        end_period: timeIndex,
+        grade: currentGrade.value,
+        level: currentLevel.value,
+        professor_name: '',
+        room: '',
+        semester: getCurrentSemester()
+      },
+      eventType: 'regular',
+      showTypeSelector: true
+    });
+  }
+  
+  // 이벤트 타입 결정 (이벤트 객체에서 type 추출)
+  function determineEventType(event) {
+    if (!event) return 'regular';
+    
+    if (event.type === 'holiday' || event.event_type === 'holiday') {
+      return 'holiday';
+    }
+    
+    if (event.type === 'cancel' || event.event_type === 'cancel') {
+      return 'cancel';
+    }
+    
+    if (event.type === 'makeup' || event.event_type === 'makeup') {
+      return 'makeup';
+    }
+    
+    if (event.is_special_lecture === 1 || 
+        event.is_special_lecture === '1' ||
+        event.type === 'special' || 
+        event.event_type === 'special') {
+      return 'special';
+    }
+    
+    if (event.is_special_lecture === 2 || 
+        event.is_special_lecture === '2' ||
+        event.is_foreigner_target === 1 || 
+        event.is_foreigner_target === true || 
+        event.is_foreigner_target === '1' ||
+        event.type === 'topik' || 
+        event.event_type === 'topik' ||
+        (event.level && String(event.level).includes('TOPIK'))) {
+      return 'topik';
+    }
+    
+    return 'regular';
   }
 
   return {
@@ -1491,6 +1717,9 @@ export const useTimetableStore = defineStore('timetable', () => {
     invalidateEventCache,
     sendLineNotification,
     openUnifiedScheduleForm,
-    handleCellAction
+    handleCellAction,
+    determineEventType,
+    formatDate,
+    isDateInWeekRange
   }
 }) 

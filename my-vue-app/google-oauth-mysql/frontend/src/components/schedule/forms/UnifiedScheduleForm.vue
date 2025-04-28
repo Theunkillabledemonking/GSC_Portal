@@ -285,7 +285,7 @@
         class="cancel-button"
         @click="handleCancel"
       >
-        {{ i18n.t('common.cancel') }}
+        취소
       </button>
       <button
         type="submit"
@@ -293,19 +293,15 @@
         :disabled="isSubmitting"
         @click.prevent="handleSubmit"
       >
-        {{ isSubmitting ? i18n.t('common.submitting') : i18n.t('common.submit') }}
+        {{ isSubmitting ? '처리 중...' : '확인' }}
       </button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, reactive, onMounted, watch } from 'vue'
-// import { useSubjectStore } from '@/store/modules/subject'
-// import { useTimetableStore } from '@/store/modules/timetable'
-// import { useI18n } from 'vue-i18n'
-// import { useStore } from 'vuex'
-import DetailEventModal from '../modals/DetailEventModal.vue'
+import { ref, computed, reactive, onMounted, watch, toRaw } from 'vue'
+import { useTimetableStore } from '@/store/modules/timetable'
 import { getSemesterRange } from '@/utils/semester.js'
 
 // Simple toast replacement
@@ -320,134 +316,104 @@ const simpleToast = {
   }
 }
 
-// Mock timetableStore until the proper store is available
-const timetableStore = {
-  getCurrentSemester: () => 'spring',
-  // Add other needed methods
-}
-
-// Props
 const props = defineProps({
-  eventType: {
-    type: String,
-    default: 'regular' // 'regular', 'topik', 'special', 'makeup', 'cancel'
-  },
-  showTypeSelection: {
-    type: Boolean,
-    default: true
-  },
-  allowCancel: {
-    type: Boolean,
-    default: true
-  },
-  allowMakeup: {
-    type: Boolean,
-    default: true
-  },
-  initialData: {
-    type: Object,
-    default: () => ({})
-  },
-  timetableData: {
-    type: Object,
-    default: () => ({})
-  },
-  isEdit: {
-    type: Boolean,
-    default: false
-  }
+  eventType: { type: String, default: 'regular' },
+  showTypeSelection: { type: Boolean, default: true },
+  allowCancel: { type: Boolean, default: true },
+  allowMakeup: { type: Boolean, default: true },
+  initialData: { type: Object, default: () => ({}) },
+  timetableData: { type: Object, default: () => ({}) },
+  isEdit: { type: Boolean, default: false }
 })
 
-// Emit events
 const emit = defineEmits(['close', 'submit', 'cancel', 'error'])
+const timetableStore = useTimetableStore()
 
-// Mock stores for missing imports
-const subjectStore = {
-  filteredSubjects: ref([]),
-  fetchSubjects() {
-    console.log('Mock: Fetching subjects');
-    return Promise.resolve([]);
-  }
-}
-
-// Mock i18n implementation
-const i18n = {
-  t: (key) => key // Simply return the key as the translation
-}
-
-// Mock store implementation
-const store = {
-  state: {
-    user: {
-      role: 'student',
-      grade: '1'
-    }
-  },
-  dispatch: (action, payload) => {
-    console.log(`Mock dispatch: ${action}`, payload);
-    return Promise.resolve({});
-  }
-}
-
-// Form state
 const isSubmitting = ref(false)
 const formData = reactive({
+  ...toRaw(props.initialData),
+  id: props.initialData?.id || null,
+  timetable_id: props.initialData?.timetable_id || null,
   type: props.eventType || 'regular',
-  grade: '1',
-  level: 'beginner',
-  day: '1',
-  start_period: 1,
-  end_period: 1,
-  professor_name: '',
-  room: '',
-  subject_id: '',
-  semester: timetableStore.getCurrentSemester(),
-  date: new Date().toISOString().split('T')[0],
-  reason: '',
-  inherit_attributes: true,
-  year: new Date().getFullYear(),
-  timetable_id: null,
-  is_special_lecture: 0,
-  group_levels: [],
-  is_foreigner_target: 0 // 추가: 외국인 대상 여부 (TOPIK 수업용)
+  grade: props.initialData?.grade || '1',
+  level: props.initialData?.level || 'beginner',
+  day: props.initialData?.day || '1',
+  start_period: props.initialData?.start_period || 1,
+  end_period: props.initialData?.end_period || 1,
+  professor_name: props.initialData?.professor_name || '',
+  room: props.initialData?.room || '',
+  subject_id: props.initialData?.subject_id || '',
+  subject_name: props.initialData?.subject_name || '',
+  semester: props.initialData?.semester || getCurrentSemesterObject(),
+  date: props.initialData?.date || new Date().toISOString().split('T')[0],
+  reason: props.initialData?.reason || '',
+  inherit_attributes: props.initialData?.inherit_attributes !== false,
+  year: props.initialData?.year || new Date().getFullYear(),
+  is_special_lecture: determineSpecialLectureValue(props.initialData),
+  group_levels: props.initialData?.group_levels || [],
+  is_foreigner_target: props.initialData?.is_foreigner_target || 0
 })
 
-// For special lectures group levels UI
-const groupLevels = ref({
-  beginner: false,
-  intermediate: false,
-  advanced: false
-})
+// Helper function to get current semester and year
+function getCurrentSemesterObject() {
+  const now = new Date();
+  const month = now.getMonth() + 1; // JavaScript months are 0-based
+  const currentYear = now.getFullYear();
+  
+  // First half: March to August, Second half: September to February
+  const half = month >= 3 && month <= 8 ? 1 : 2;
+  
+  return {
+    year: currentYear,
+    half: half
+  };
+}
 
-// Type-based computed properties
+// Helper function to determine is_special_lecture value
+function determineSpecialLectureValue(data) {
+  if (!data) return 0;
+  
+  // For TOPIK classes
+  if (data.type === 'topik' || data.event_type === 'topik' || 
+      (data.level && String(data.level).includes('TOPIK')) ||
+      data.is_foreigner_target === 1) {
+    return 2; // TOPIK is represented as is_special_lecture = 2
+  }
+  
+  // For special lectures
+  if (data.type === 'special' || data.event_type === 'special' ||
+      (data.level && String(data.level).startsWith('N'))) {
+    return 1; // Special lectures are represented as is_special_lecture = 1
+  }
+  
+  // Return the original value if present, otherwise 0
+  return data.is_special_lecture !== undefined ? data.is_special_lecture : 0;
+}
+
+const groupLevels = ref({ beginner: false, intermediate: false, advanced: false })
+
 const isRegularClass = computed(() => formData.type === 'regular')
 const isSpecialClass = computed(() => formData.type === 'special')
 const isTopikClass = computed(() => formData.type === 'topik')
 const isCancelClass = computed(() => formData.type === 'cancel')
 const isMakeupClass = computed(() => formData.type === 'makeup')
 
-// Form title based on type
 const formTitle = computed(() => {
-  switch (formData.type) {
-    case 'regular': return '정규 수업 등록'
-    case 'topik': return 'TOPIK 수업 등록'
-    case 'special': return '특강 등록'
-    case 'makeup': return '보강 등록'
-    case 'cancel': return '휴강 등록'
-    default: return '수업 등록'
-  }
+  const action = props.isEdit ? '수정' : '등록';
+  return {
+    regular: `정규 수업 ${action}`,
+    special: `특강 ${action}`,
+    topik: `TOPIK 수업 ${action}`,
+    makeup: `보강 ${action}`,
+    cancel: `휴강 ${action}`
+  }[formData.type] || `일정 ${action}`
 })
 
-// Convenience accessor for selected timetable
 const selectedTimetable = computed(() => props.timetableData)
-
-// Filtered subjects based on class type
 const subjects = ref([])
 const loading = ref(false)
 const error = ref(null)
-
-// Current semester
-const currentSemester = ref(timetableStore.getCurrentSemester() || 'spring')
+const currentSemester = ref(getCurrentSemesterObject())
 
 // For debug purposes
 watch(() => formData.type, (newType) => {
@@ -477,8 +443,8 @@ const fetchSubjects = async () => {
     let url = '/api/subjects/filter?'
     const params = new URLSearchParams()
     
-    // Semester is required
-    params.append('semester', currentSemester.value)
+    // Semester is required - convert to string format
+    params.append('semester', JSON.stringify(currentSemester.value))
     
     if (formData.type === 'regular') {
       // Regular class: subjects by grade
@@ -566,50 +532,24 @@ const filteredSubjects = computed(() => {
 
 // Handle form type change
 const handleTypeChange = () => {
-  // Reset form fields based on type
-  if (isSpecialClass.value) {
-    formData.is_special_lecture = 1
-    formData.grade = null
-    formData.level = 'N3' // 기본값 N3으로 설정
-    formData.year = null  // 특강은 year 필드를 null로 설정
-    formData.is_foreigner_target = 0 // 특강은 외국인 대상 아님
-    // 분반값 기본 설정
-    formData.group_levels = ["A", "B", "C"]
-  } else if (isRegularClass.value) {
-    formData.is_special_lecture = 0
-    formData.level = null
-    formData.year = new Date().getFullYear() // 정규 수업은 year 필드 설정
-    formData.group_levels = [] // 정규 수업은 그룹 레벨 초기화
-    formData.is_foreigner_target = 0 // 정규 수업은 외국인 대상 아님
-  } else if (isTopikClass.value) {
-    formData.is_special_lecture = 0
-    formData.grade = null
-    formData.level = 'TOPIK4' // 기본값 TOPIK4로 설정
-    formData.year = null // TOPIK 수업은 year 필드를 null로 설정
-    formData.group_levels = [] // TOPIK 수업은 그룹 레벨 초기화
-    formData.is_foreigner_target = 1 // TOPIK 수업은 외국인 대상임
+  console.log(`타입 변경: ${formData.type}`);
+  
+  // 이전 유형의 값 임시 저장
+  const previousData = {
+    professor_name: formData.professor_name,
+    room: formData.room
+  };
+  
+  // 유형별 기본값 설정
+  setupDefaultsByType();
+  
+  // 이전 값 중 교수명과 강의실 등 공통 정보는 보존
+  if (previousData.professor_name) {
+    formData.professor_name = previousData.professor_name;
   }
   
-  // 그룹 레벨 UI 업데이트
-  updateGroupLevelsUI()
-}
-
-// 그룹 레벨 UI 업데이트 함수
-const updateGroupLevelsUI = () => {
-  if (isSpecialClass.value) {
-    // 기본적으로 모든 그룹 레벨 활성화
-    groupLevels.value = {
-      beginner: true,
-      intermediate: true,
-      advanced: true
-    }
-  } else {
-    // 특강이 아닌 경우 초기화
-    groupLevels.value = {
-      beginner: false,
-      intermediate: false,
-      advanced: false
-    }
+  if (previousData.room) {
+    formData.room = previousData.room;
   }
 }
 
@@ -699,63 +639,107 @@ function setupDefaultsByType() {
       
     case 'cancel':
     case 'makeup':
-      // Default date is today
+      // 휴강 또는 보강
       formData.date = new Date().toISOString().split('T')[0];
+      
+      // 선택된 시간표 데이터가 있으면 정보 상속
+      if (props.timetableData) {
+        formData.timetable_id = props.timetableData.id;
+        formData.subject_id = props.timetableData.subject_id;
+        if (props.timetableData.subject_name) {
+          formData.subject_name = props.timetableData.subject_name;
+        }
+        
+        // 휴강은 원본 정보 그대로, 보강은 날짜만 변경
+        if (type === 'cancel') {
+          formData.day = props.timetableData.day;
+          formData.start_period = props.timetableData.start_period;
+          formData.end_period = props.timetableData.end_period;
+        }
+        
+        // 이 값들은 inherit_attributes 플래그에 따라 상속 여부 결정
+        formData.grade = props.timetableData.grade;
+        formData.professor_name = props.timetableData.professor_name;
+        formData.room = props.timetableData.room;
+        formData.is_special_lecture = props.timetableData.is_special_lecture;
+        formData.is_foreigner_target = props.timetableData.is_foreigner_target;
+        formData.level = props.timetableData.level;
+      }
       break;
   }
   
-  // 그룹 레벨 UI 업데이트
-  updateGroupLevelsUI();
+  if (type !== 'special') {
+    updateGroupLevelsUI(false);
+  }
 }
 
-// Watch for selected type changes
-watch(() => formData.type, (newType) => {
-  console.log(`Type changed: ${newType}`);
-  setupDefaultsByType();
-  fetchSubjects();
-});
-
-// Watch for grade or level changes
-watch([() => formData.grade, () => formData.level], () => {
-  fetchSubjects();
-});
+// 특강 분반 UI 업데이트
+function updateGroupLevelsUI(isSpecial = false) {
+  if (isSpecial) {
+    groupLevels.value = { beginner: true, intermediate: true, advanced: true };
+  } else {
+    groupLevels.value = { beginner: false, intermediate: false, advanced: false };
+  }
+}
 
 // Handle form submission
 const handleSubmit = async () => {
   if (isSubmitting.value) return
   
-  isSubmitting.value = true
+  console.log('폼 제출:', formData.type, formData);
   
   try {
-    // Prepare form data for submission
-    const payload = { ...formData }
+    isSubmitting.value = true
     
-    // Set fields based on class type before submitting
-    if (isRegularClass.value) {
-      // Regular class: set level to null and ensure year is set
-      payload.level = null
-      payload.group_levels = []
-      payload.year = payload.year || new Date().getFullYear()
-      payload.is_foreigner_target = 0
-    } else if (isSpecialClass.value) {
-      // Special class: set year to null and ensure level is set
-      payload.year = null
-      payload.grade = null
-      payload.level = payload.level || 'N3'
-      payload.group_levels = payload.group_levels || ["A", "B", "C"]
-      payload.is_foreigner_target = 0
-    } else if (isTopikClass.value) {
-      // TOPIK class: set year to null and ensure level is set
-      payload.year = null
-      payload.grade = null
-      payload.level = payload.level || 'TOPIK4'
-      payload.group_levels = []
-      payload.is_foreigner_target = 1
-      payload.is_special_lecture = 0
+    // 1. 폼 유효성 검사 - 필수 필드 확인
+    const requiredFields = {
+      regular: ['grade', 'subject_id', 'day', 'start_period', 'end_period'],
+      special: ['level', 'subject_id', 'day', 'start_period', 'end_period'],
+      topik: ['level', 'subject_id', 'day', 'start_period', 'end_period'],
+      cancel: ['date', 'timetable_id'],
+      makeup: ['date', 'day', 'start_period', 'end_period']
+    };
+    
+    const missingFields = (requiredFields[formData.type] || []).filter(field => 
+      !formData[field] && formData[field] !== 0
+    );
+    
+    if (missingFields.length > 0) {
+      const fieldNames = {
+        grade: '학년',
+        level: '레벨',
+        subject_id: '과목',
+        day: '요일',
+        start_period: '시작 교시',
+        end_period: '종료 교시',
+        date: '날짜',
+        timetable_id: '수업 정보'
+      };
+      
+      const missingFieldNames = missingFields.map(field => fieldNames[field] || field).join(', ');
+      simpleToast.error(`필수 입력 필드를 확인해주세요: ${missingFieldNames}`);
+      return;
     }
     
-    // For debugging - log what we're about to submit
-    console.log('Submitting form data:', payload)
+    // 2. 특수 필드 처리 - 타입별 플래그 설정
+    if (formData.type === 'topik') {
+      formData.is_special_lecture = 2;
+      formData.is_foreigner_target = 1;
+    } else if (formData.type === 'special') {
+      formData.is_special_lecture = 1;
+      formData.is_foreigner_target = 0;
+    } else {
+      formData.is_special_lecture = 0;
+      formData.is_foreigner_target = 0;
+    }
+    
+    // 3. 분반 데이터 변환 (특강인 경우)
+    if (isSpecialClass.value) {
+      formData.group_levels = [];
+      if (groupLevels.value.beginner) formData.group_levels.push('A');
+      if (groupLevels.value.intermediate) formData.group_levels.push('B');
+      if (groupLevels.value.advanced) formData.group_levels.push('C');
+    }
     
     // 요일 변환 (숫자 → 한글)
     const dayMap = {
@@ -767,45 +751,61 @@ const handleSubmit = async () => {
     }
     
     // 요일 필드가 숫자인 경우 한글로 변환
-    if (payload.day && dayMap[payload.day]) {
-      payload.day = dayMap[payload.day]
+    if (formData.day && dayMap[formData.day]) {
+      formData.day = dayMap[formData.day]
     }
     
-    // API 호출 및 서버 응답 확인
-    const response = await fetch('/api/timetable', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    })
+    // 4. API 호출 - 타입별로 분기 처리
+    let result;
     
-    const responseText = await response.text()
-    console.log('🔍 서버 응답 원본 텍스트:', responseText)
-    
-    let data
-    try {
-      data = JSON.parse(responseText)
-      console.log('🔍 서버 응답 파싱 결과:', data)
-    } catch (parseErr) {
-      console.error('서버 응답 파싱 오류:', parseErr)
-      throw new Error('서버 응답을 파싱할 수 없습니다: ' + responseText)
-    }
-    
-    if (response.ok) {
-      console.log('✅ 이벤트 등록 성공:', data)
-      simpleToast.success('Event registered successfully')
-      emit('submit', payload)
+    if (isCancelClass.value) {
+      // 휴강 처리
+      result = await timetableStore.registerCancellation({
+        ...formData,
+        timetable_id: formData.timetable_id || (props.timetableData ? props.timetableData.id : null),
+        event_type: 'cancel',
+        event_date: formData.date,
+        inherit_attributes: formData.inherit_attributes ? 1 : 0
+      });
+    } else if (isMakeupClass.value) {
+      // 보강 처리
+      result = await timetableStore.registerMakeup({
+        ...formData,
+        timetable_id: formData.timetable_id || (props.timetableData ? props.timetableData.id : null),
+        event_type: 'makeup',
+        event_date: formData.date,
+        inherit_attributes: formData.inherit_attributes ? 1 : 0
+      });
     } else {
-      console.error('❌ 이벤트 등록 실패:', data)
-      throw new Error(data.message || 'Failed to register event')
+      // 정규 수업, 특강, TOPIK 수업 등록/수정
+      const payload = {
+        ...formData,
+        type: formData.type,
+        event_type: formData.type,
+        is_special_lecture: formData.is_special_lecture,
+        is_foreigner_target: formData.is_foreigner_target
+      };
+      
+      if (props.isEdit && formData.id) {
+        // 수정 - use registerScheduleItem for both create and update
+        result = await timetableStore.registerScheduleItem(payload);
+      } else {
+        // 신규 등록
+        result = await timetableStore.registerScheduleItem(payload);
+      }
     }
+    
+    // 결과 처리
+    console.log('API 응답:', result);
+    simpleToast.success(props.isEdit ? '수업이 수정되었습니다.' : '수업이 등록되었습니다.');
+    emit('submit', result);
+    emit('close');
   } catch (err) {
-    console.error('🚨 Submit error:', err)
-    emit('error', err.message || 'An error occurred')
-    simpleToast.error(err.message || 'An error occurred')
+    console.error('🚨 Submit error:', err);
+    emit('error', err?.response?.data?.message || err.message || 'An error occurred');
+    simpleToast.error(err?.response?.data?.message || err.message || 'An error occurred');
   } finally {
-    isSubmitting.value = false
+    isSubmitting.value = false;
   }
 }
 

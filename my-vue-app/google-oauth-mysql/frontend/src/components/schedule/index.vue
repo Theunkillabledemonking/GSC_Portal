@@ -8,7 +8,7 @@
           <h3 class="text-sm font-semibold mb-2">학년</h3>
           <div class="flex flex-wrap gap-2">
             <button 
-              v-for="grade in [1, 2, 3, 4]" 
+              v-for="grade in [1, 2, 3]"
               :key="`grade-${grade}`"
               class="px-3 py-1 rounded text-sm transition-colors duration-200" 
               :class="selectedGrade === grade ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
@@ -178,9 +178,9 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useTimetableStore } from '@/store/modules/timetable'
 import { useAuthStore } from '@/store/modules/auth'
 import { useSubjectStore } from '@/store/modules/subject'
-import TimetableCell from '../TimetableCell.vue'
+//import TimetableCell from '../TimetableCell.vue'
 import RegisterEventModal from './forms/RegisterEventModal.vue'
-import DetailEventModal from '../modals/DetailEventModal.vue'
+//import DetailEventModal from '../modals/DetailEventModal.vue'
 import UnifiedScheduleForm from './forms/UnifiedScheduleForm.vue'
 import { CLASS_TYPES } from '@/constants/timetable'
 

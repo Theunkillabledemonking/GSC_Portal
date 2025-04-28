@@ -661,7 +661,8 @@ exports.getWeeklyTimetable = async (req, res) => {
     semester,
     week,
     ignoreGradeFilter = 'false', // 특강의 학년 필터링 무시 여부
-    ignoreLevelFilter = 'false'  // 특강의 레벨 필터링 무시 여부 (추가)
+    ignoreLevelFilter = 'false',  // 특강의 레벨 필터링 무시 여부 (추가)
+    is_admin = 'false'  // 관리자 권한 여부 (추가)
   } = req.query;
 
   if (!week || !semester) {
@@ -674,12 +675,18 @@ exports.getWeeklyTimetable = async (req, res) => {
     const weekEnd = dayjs(week).startOf('week').add(7, 'day').format('YYYY-MM-DD');   // 일요일
     
     console.log(`📅 주간 조회: ${weekStart} ~ ${weekEnd}`);
-    console.log(`🔍 조회 파라미터: grade=${grade}, level=${level}, group=${group_level}, is_foreigner=${is_foreigner}, semester=${semester}, ignoreGradeFilter=${ignoreGradeFilter}, ignoreLevelFilter=${ignoreLevelFilter}`);
+    console.log(`🔍 조회 파라미터: grade=${grade}, level=${level}, group=${group_level}, is_foreigner=${is_foreigner}, semester=${semester}, ignoreGradeFilter=${ignoreGradeFilter}, ignoreLevelFilter=${ignoreLevelFilter}, is_admin=${is_admin}`);
+
+    // 관리자 권한 체크
+    const isAdminUser = is_admin === 'true' || is_admin === '1';
+    if (isAdminUser) {
+      console.log('👑 관리자 권한 요청 감지: 모든 학년/레벨 필터링 무시합니다.');
+    }
 
     // 2. 필터 옵션 처리
-    const skipGradeFilter = ignoreGradeFilter === 'true' || !grade;
-    const skipLevelFilter = ignoreLevelFilter === 'true' || !level || level === 'ALL';
-    const ignoreGroupFilter = group_level === 'ALL' || !group_level;
+    const skipGradeFilter = isAdminUser || ignoreGradeFilter === 'true' || !grade;
+    const skipLevelFilter = isAdminUser || ignoreLevelFilter === 'true' || !level || level === 'ALL';
+    const ignoreGroupFilter = isAdminUser || group_level === 'ALL' || !group_level;
     const isForeigner = is_foreigner === 'true' || is_foreigner === '1';
     
     // 레벨 값을 DB에서 사용되는 값으로 매핑
@@ -697,10 +704,12 @@ exports.getWeeklyTimetable = async (req, res) => {
     
     const regularParams = [semester];
     
-    // 학년 필터 적용 (정규 수업)
+    // 학년 필터 적용 (정규 수업) - 관리자는 무시
     if (!skipGradeFilter) {
       regularQuery += ` AND t.year = ?`;
       regularParams.push(grade);
+    } else if (isAdminUser) {
+      console.log('👑 관리자 권한: 정규 수업 학년 필터링 무시');
     }
 
     // 외국인 필터링을 위한 쿼리 추가 (한국인/외국인용 수업 구분)
@@ -730,7 +739,7 @@ exports.getWeeklyTimetable = async (req, res) => {
     
     const specialParams = [semester];
     
-    // 레벨 필터 적용 (특강) - 더 유연한 조건 추가
+    // 레벨 필터 적용 (특강) - 관리자는 무시
     if (!skipLevelFilter && dbLevels.length > 0) {
       const placeholders = dbLevels.map(() => '?').join(', ');
       specialQuery += ` AND (t.level IS NULL OR t.level = '' OR t.level IN (${placeholders}))`;
@@ -738,7 +747,11 @@ exports.getWeeklyTimetable = async (req, res) => {
       console.log(`🔍 특강 레벨 필터 적용: ${dbLevels.join(', ')} (${dbLevels.length}개 값)`);
       console.log(`🔹 생성된 SQL 조건: t.level IN (${placeholders})`);
     } else {
-      console.log(`🔍 특강 레벨 필터 미적용 (모든 특강 조회)`);
+      if (isAdminUser) {
+        console.log(`👑 관리자 권한: 특강 레벨 필터링 무시`);
+      } else {
+        console.log(`🔍 특강 레벨 필터 미적용 (모든 특강 조회)`);
+      }
     }
     
     // 분반 필터 적용 (특강)
@@ -818,6 +831,8 @@ exports.getWeeklyTimetable = async (req, res) => {
         (t.is_special_lecture IS NULL AND (e.year = ? OR e.year IS NULL))
       )`;
       eventsParams.push(grade, grade, grade);
+    } else if (isAdminUser) {
+      console.log('👑 관리자 권한: 이벤트 학년 필터링 무시');
     }
 
     // 레벨 필터링 (특강 대상)
@@ -831,6 +846,8 @@ exports.getWeeklyTimetable = async (req, res) => {
       eventsParams.push(...dbLevels);
       console.log(`🔍 이벤트 레벨 필터 적용: ${dbLevels.join(', ')} (${dbLevels.length}개 값)`);
       console.log(`🔹 이벤트 SQL 조건: t.level IN (${placeholders})`);
+    } else if (isAdminUser) {
+      console.log('👑 관리자 권한: 이벤트 레벨 필터링 무시');
     }
 
     // Query 실행 - 이벤트 검색
@@ -1717,6 +1734,7 @@ exports.createEvent = async (req, res) => {
         end_period,
         description || null,
         year || null,
+        inherit_attributes === true || inherit_attributes === 1 ? 1 : 0, // 기본값은 1(true)
         inherit_attributes === true || inherit_attributes === 1 ? 1 : 0 // 기본값은 1(true)
       ]
     );

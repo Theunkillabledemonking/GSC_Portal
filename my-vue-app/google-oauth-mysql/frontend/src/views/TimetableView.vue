@@ -34,16 +34,27 @@
     </div>
 
     <!-- 시간표 -->
-    <WeeklyTimetable />
-
-    <!-- 모달 -->
-    <UnifiedScheduleForm
-      v-if="timetableStore.showModal"
-      :type="timetableStore.modalType"
-      :data="timetableStore.modalData"
-      @close="timetableStore.closeModal"
-      @submit="handleModalSubmit"
+    <WeeklyTimetable 
+      @open-modal="openModal" 
+      @edit-event="handleEditEvent" 
     />
+
+    <!-- 통합 일정 폼 모달 -->
+    <Transition name="fade">
+      <div v-if="showModal" class="modal-backdrop" @click.self="closeModal">
+        <div class="modal-content">
+          <UnifiedScheduleForm
+            :event-type="modalType"
+            :initial-data="modalData"
+            :timetable-data="selectedTimetable"
+            :is-edit="isEditMode"
+            @close="closeModal"
+            @submit="handleModalSubmit"
+            @cancel="closeModal"
+          />
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -60,6 +71,11 @@ const timetableStore = useTimetableStore()
 const { currentWeek } = storeToRefs(timetableStore)
 
 const selectedGrade = ref(1)
+const showModal = ref(false)
+const modalType = ref('regular')
+const modalData = ref({})
+const selectedTimetable = ref(null)
+const isEditMode = ref(false)
 
 // 시간표 데이터 로드 함수
 async function loadTimetableData() {
@@ -108,19 +124,75 @@ function moveNextWeek() {
   loadTimetableData()
 }
 
+// 모달 관련 함수
+function openModal(type, data = {}, timetable = null, edit = false) {
+  modalType.value = type
+  modalData.value = data
+  selectedTimetable.value = timetable
+  isEditMode.value = edit
+  showModal.value = true
+}
+
+function closeModal() {
+  showModal.value = false
+  modalData.value = {}
+  selectedTimetable.value = null
+}
+
+// 이벤트 수정 핸들러
+function handleEditEvent(event) {
+  console.log('이벤트 수정:', event);
+  
+  // 이벤트 타입 결정
+  const eventType = event.type || event.event_type || 
+    (event.is_special_lecture === 1 ? 'special' : 
+     event.is_foreigner_target === 1 ? 'topik' : 'regular');
+  
+  // 모달 데이터 준비
+  const data = {
+    id: event.id,
+    type: eventType,
+    timetable_id: event.timetable_id || event.id,
+    subject_id: event.subject_id,
+    subject_name: event.subject_name || event.title,
+    day: event.day,
+    start_period: event.start_period,
+    end_period: event.end_period,
+    professor_name: event.professor_name || event.inherited_professor_name,
+    room: event.room || event.inherited_room,
+    grade: event.grade || event.year,
+    level: event.level,
+    is_special_lecture: event.is_special_lecture,
+    is_foreigner_target: event.is_foreigner_target,
+    semester: event.semester || timetableStore.getCurrentSemester(),
+    date: event.date || event.event_date
+  };
+  
+  // 모달 열기
+  openModal(eventType, data, event, true);
+}
+
 // 모달 핸들러
 async function handleModalSubmit(data) {
   try {
-    if (timetableStore.modalType === 'cancel') {
-      await timetableStore.registerCancellation(data)
-    } else if (timetableStore.modalType === 'makeup') {
-      await timetableStore.registerMakeup(data)
+    console.log('모달 제출 데이터:', data);
+    
+    // 처리 유형에 따라 분기
+    if (data.type === 'cancel') {
+      await timetableStore.registerCancellation(data);
+    } else if (data.type === 'makeup') {
+      await timetableStore.registerMakeup(data);
+    } else {
+      // 정규/특강/TOPIK 등록
+      await timetableStore.registerScheduleItem(data);
     }
     
     // 데이터 변경 후 시간표 갱신
-    loadTimetableData()
+    await loadTimetableData();
+    closeModal();
   } catch (error) {
-    console.error('Failed to submit:', error)
+    console.error('일정 등록 실패:', error);
+    alert(error?.message || '등록 중 오류가 발생했습니다.');
   }
 }
 
@@ -180,5 +252,25 @@ onMounted(() => {
 
 .icon {
   @apply inline-block;
+}
+
+/* Modal styles */
+.modal-backdrop {
+  @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-sm;
+}
+
+.modal-content {
+  @apply bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto;
+}
+
+/* Transitions */
+.fade-enter-active,
+.fade-leave-active {
+  @apply transition-opacity duration-300;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  @apply opacity-0;
 }
 </style>
