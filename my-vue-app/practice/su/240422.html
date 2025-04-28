@@ -1,33 +1,162 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Title</title>
-    <style>
-        #bar {
-          background-color: green;
-        }
-
-        #foo {
-          background-color: red;
-        }
-
-        #kin {
-          background-color: skyblue;
-        }
-
-        #pos {
-          background-color: yellow;
-        }
-    </style>
+    <title>성관의 웹페이지</title>
 </head>
 <body>
-      나마비루~~
-      <div id="bar">안녕하세요</div>
-      <div id="foo">반갑습니다.</div>
+<header>
+    <h1>김성관 -> 성관의 웹페이지</h1>
+</header>
 
-      <span id="kin">GG!</span>
-      <span id="pos">EZ!</span>
+<nav>
+    메뉴 : 자기소개 | 취미 | 추천 콘텐츠 | 링크 | 연락처 <br>
+</nav>
+
+<main>
+    <section id="intro">
+        <p>
+            김성관, 25, 일본어 및 IT 입니다.
+        </p>
+        <img src="./sg.jpeg" width=400 height=500>
+    </section>
+
+    <section id="hobby">
+        <h3>나의 취미는?</h3>
+        <ul>
+            <li>고양이 보기</li>
+            <li>러닝하기</li>
+            <li>게임 경기보기</li>
+        </ul>
+    </section>
+
+    <article id="media">
+        <h3>추천 콘텐츠: 음악과 나무의 풍경</h3>
+        <!-- 베이스 느낌 음악 샘플 (mp3) -->
+        <audio controls>
+            <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
+            브라우저가 오디오를 지원하지 않습니다.
+        </audio>
+
+        <br><br>
+
+        <!-- 간단한 기타 사운드 샘플 (mp4) -->
+        <video width="320" height="240" controls>
+            <source src="https://samplelib.com/lib/preview/mp4/sample-5s.mp4" type="video/mp4">
+            브라우저가 동영상을 지원하지 않습니다.
+        </video>
+    </article>
+
+    <aside id="links">
+        <h3>추천 사이트!</h3>
+        <a href="https://www.musinsa.com/main/musinsa/recommend?gf=A" target="_blank">무신사 새창으로</a>
+        <a href="https://fastcampus.co.kr/" rel="noopener">패스트 캠퍼스 추천 </a>
+    </aside>
+
+    <h3>저의 시간표입니다.</h3>
+    <table border="1">
+        <thead>
+        <tr>
+            <td>교시</td>
+            <td>월</td>
+            <td>화</td>
+            <td>수</td>
+            <td>목</td>
+            <td>금</td>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+            <td>1교시</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>2교시</td>
+            <td></td>
+            <td></td>
+            <td>기계학습이론과실습</td>
+            <td>제어공학기초</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>3교시</td>
+            <td></td>
+            <td></td>
+            <td>기계학습이론과실습</td>
+            <td>제어공학기초</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>4교시</td>
+            <td></td>
+            <td>제어공학기초</td>
+            <td></td>
+            <td></td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>5교시</td>
+            <td></td>
+            <td>제어공학기초</td>
+            <td></td>
+            <td></td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>6교시</td>
+            <td>데이터구조및알고리즘</td>
+            <td>일본어문법(III)</td>
+            <td>데이터구조및알고리즘</td>
+            <td>일본어회화(III)</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>7교시</td>
+            <td>데이터구조및알고리즘</td>
+            <td>일본어문법(III)</td>
+            <td>데이터구조및알고리즘</td>
+            <td>일본어회화(III)</td>
+            <td>일본어회화(III)</td>
+        </tr>
+        <tr>
+            <td>8교시</td>
+            <td>특강 N2회화 B</td>
+            <td>특강 JLPT N2</td>
+            <td>특강 N2회화 B</td>
+            <td></td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>9교시</td>
+            <td>특강 N2회화 B</td>
+            <td>특강 JLPT N2</td>
+            <td>특강 N2회화 B</td>
+            <td>특강 JLPT N2</td>
+            <td></td>
+        </tr>
+        </tbody>
+    </table>
+</main>
+
+<nav>
+    <ul>
+        <li><a href="#intro">자기소개</a></li>
+        <li><a href="#hobby">취미</a></li>
+        <li><a href="#media">추천 콘첸츠</a></li>
+        <li><a href="#links">좋아하는 사이트</a></li>
+        <li><a href="#content">연락처</a></li>
+    </ul>
+</nav>
+
+<footer id="content">
+
+    abcqkdnxm@g.yju.ac.kr <br>
+    どうぞよろしくお願いします！
+</footer>
 </body>
 </html>
