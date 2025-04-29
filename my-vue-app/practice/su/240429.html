@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+<body>
+    <h1 id="bar">hello</h1>
+    <p id="foo">world</p>
+
+    <ul id="fruit-list">
+      <li>바나나</li>
+      <li>사과</li>
+    </ul>
+    <input type="text" id="input_fruit" placeholder="과일 입력">
+    <input type="button" value="추가" id="add_fruit">
+    <script>
+      // 파인애플이 리스트에 추가
+      const fruit_list = document.getElementById("fruit-list");
+      const button = document.getElementById("add_fruit");
+
+
+      button.onclick = () => {
+        const new_item = document.createElement("li")
+        const fruit_input = document.getElementById("input_fruit")
+
+        if(fruit_input.value !== "") {
+          new_item.textContent = fruit_input.value.trim();
+          fruit_input.value = ""
+          fruit_list.appendChild(new_item)
+        } else {
+           alert("과일명을 입력하세요");
+           fruit_input.focus();
+        }
+      };
+    </script>
+</body>
+</html>
