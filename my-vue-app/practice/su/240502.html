@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>입력값 추가 및 삭제</title>
+  <style>
+    #output {
+      margin-top: 20px;
+      padding: 10px;
+      border: 1px solid #aaa;
+    }
+
+    .entry {
+      margin-bottom: 15px;
+      padding: 10px;
+      background-color: #f4f4f4;
+      position: relative;
+    }
+
+    .delete-btn {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background-color: crimson;
+      color: white;
+      border: none;
+      padding: 3px 6px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+<h2>정보 입력</h2>
+
+<form id="infoForm">
+  <label>
+    이름:
+    <input type="text" id="name" required>
+  </label><br><br>
+
+  <label>
+    나이:
+    <input type="number" id="age" required>
+  </label><br><br>
+
+  <label>
+    전화번호:
+    <input type="tel" id="phone" required>
+  </label><br><br>
+
+  <button type="submit">제출</button>
+</form>
+
+<div id="output"></div>
+
+<script>
+  const form = document.getElementById("infoForm");
+  const output = document.getElementById("output");
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+
+    const name = document.getElementById("name").value;
+    const age = document.getElementById("age").value;
+    const phone = document.getElementById("phone").value;
+
+    const entry = document.createElement("div");
+    entry.classList.add("entry");
+
+    entry.innerHTML = `
+        <button class="delete-btn">삭제</button>
+        <p><strong>이름:</strong> ${name}</p>
+        <p><strong>나이:</strong> ${age}</p>
+        <p><strong>전화번호:</strong> ${phone}</p>
+      `;
+
+    // 삭제 버튼 이벤트 연결
+    const deleteBtn = entry.querySelector(".delete-btn");
+    deleteBtn.addEventListener("click", () => {
+      entry.remove(); // 해당 div 삭제
+    });
+
+    output.appendChild(entry);
+    form.reset();
+  });
+</script>
+</body>
+
+</html>
