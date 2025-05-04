@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>요소 조회 및 설정</title>
+</head>
+
+<body>
+    <h1 id="title" data-topic="dom">안녕하세요</h1>
+    <p id="desc">DOM 조작 예제입니다.</p>
+
+    <script>
+        // 요소 조회
+        const heading = document.getElementById("title"); //ID로 <h1> 요소 선택
+        const desc = document.querySelector("#desc"); // CSS 선택자로 <p> 요소 선택
+
+        // 속성 값 조회
+        console.log("ID:", heading.getAttribute("id")); // "title"
+        console.log("data-topic", heading.getAttribute("data-topic")); // "dom"
+
+        // 새로운 속성 추가
+        heading.setAttribute("data-role", "heading"); // data-role 속성 추가
+        desc.setAttribute("title", "마우스를 올리면 나옵니다"); // 마우스 오버 시 tooltip
+
+        // 기존 속성 값 변경
+        heading.setAttribute('id', 'title-2'); // id 값을 'title-2'로 수정
+
+        // 속성 제거
+        heading.removeAttribute('data-topic');
+    </script>
+</body>
+</html>
