@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>입력값 추가 및 삭제</title>
+<style>
+    #output {
+    margin-top: 20px;
+    padding: 10px;
+    border: 1px solid #aaa;
+    }
+
+    .entry {
+    border: 1px solid #aaa;
+    margin-bottom: 15px;
+    padding: 10px;
+    background-color: #f4f4f4;
+    position: relative;
+    }
+
+    .delete-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background-color: crimson;
+    color: white;
+    border: none;
+    padding: 3px 6px;
+    cursor: pointer;
+    }
+</style>
+</head>
+
+<body>
+    <h2>정보 입력</h2>
+    <form id="infoForm">
+        <label>이름: <input type="text" id="name" required></label><br><br>
+        <label>나이: <input type="number" id="age" required></label><br><br>
+        <label>전화번호: <input type="tel" id="phone" required></label><br><br>
+        <button type="submit">추가</button>
+    </form>
+
+    <div id="output"></div>
+
+    <form id="editForm" style="display: none;">
+        <h3>정보 수정</h3>
+        <label>이름: <input type="text" id="editName" required></label><br><br>
+        <label>나이: <input type="number" id="editAge" required></label><br><br>
+        <label>전화번호: <input type="tel" id="editPhone" required></label><br><br>
+        <button type="button" id="editSubmit">수정 저장</button>
+    </form>
+
+    <script>
+        // 1. HTML 요소 선택
+        const form = document.getElementById("infoForm");      // 사용자 입력 폼
+        const output = document.getElementById("output");      // 입력된 정보를 표시할 영역
+        const editForm = document.getElementById("editForm");  // 수정욤 폼 (처음엔 숨겨져 있음)
+
+        let editTarget = null; // 수정 대상이 될 entry div를 저장하는 전역 변수
+        
+        // 2. 정보 입력 (추가) 이벤트 처리
+        form.addEventListener('submit', function (event) {
+            event.preventDefault(); // 기본 폼 제출 동작 막기 (페이지 새로고침 방지)
+
+            // 사용자 입력 값 읽어오기
+            const name = document.getElementById("name").value;
+            const age = document.getElementById("age").value;
+            const phone = document.getElementById("phone").value;
+            
+            // 새 div 요소(entry) 생성해서 사용자 정보를 담음
+            const entry = document.createElement("div");
+            entry.classList.add("entry"); // 스타일 적용용 클래스 추가
+
+            // div 내부에 HTML 구조 삽입
+            entry.innerHTML = `
+                <p><strong>이름:</strong> <span class="name">${name}</span></p>
+                <p><strong>나이:</strong> <span class="age">${age}</span></p>
+                <p><strong>전화번호:</strong> <span class="phone">${phone}</span></p>
+                <button class="edit-btn">수정</button>
+                <button class="delete-btn">삭제</button>
+            `;
+
+            // 3. 삭제 버튼 이벤트 연결
+            const deleteBtn = entry.querySelector('.delete-btn');
+            deleteBtn.addEventListener('click', function (event) {
+                entry.remove();
+            } )
+
+            // 4. 수정 버튼 이벤트 연결
+            const editBtn = entry.querySelector('.edit-btn');
+            editBtn.addEventListener('click', function (event) {
+                // entry 내부의 기존 텍스트 값 가져오기
+                const nameVal = entry.querySelector(".name").textContent;
+                const ageVal = entry.querySelector(".age").textContent;
+                const phoneVal = entry.querySelector(".phone").textContent;
+                
+                // 수정 폼에 기존 값 미리 채워 놓기
+                document.getElementById("editName").value = nameVal;
+                document.getElementById("editAge").value = ageVal;
+                document.getElementById("editPhone").value = phoneVal;
+                
+                // 현재 수정 대상 entry를 전역 변수에 저장 (클로저처럼 기억됨)
+                editTarget = entry;
+
+                // 숨겨져 있던 수정 폼 보이게 하기
+                editForm.style.display = "block";
+            })
+            
+
+            // 5. 완성된 entry(div)를 출력 영역에 추가
+            output.appendChild(entry);
+
+            // 6. 입력 폼 초기화
+            form.reset();
+        });
+
+        // 7. 수정 저장 버튼 클릭시
+        const editSubmit = document.getElementById("editSubmit");
+        editSubmit.addEventListener('click', function (event) {
+            if (!editTarget) return; // 수정 대상이 없으면 중단
+            
+            // 수정 폼에서 새로 입력된 값 가져오기
+            const name = document.getElementById("editName").value;
+            const age = document.getElementById("editAge").value;
+            const phone = document.getElementById("editPhone").value;
+
+            // 저장된 entry(div)의 자식 요소 내용 수정
+            editTarget.querySelector(".name").textContent = name;
+            editTarget.querySelector(".age").textContent = age;
+            editTarget.querySelector(".phone").textContent = phone;
+
+            // 수정 폼 다시 숨기고, editTarget 초기화
+            editForm.style.display = "none";
+            editTarget = null;
+        })
+    </script>
+</body>
+
+</html>
