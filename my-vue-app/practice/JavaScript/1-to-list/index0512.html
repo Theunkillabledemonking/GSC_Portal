@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<script>
+    /**
+     * ✅ 전체 레이아웃 구성도
+     * <body>
+     * └── <div id="app">
+     *      ├── <div id="header">
+     *      │     ├── <h1>To-do- list</h1>
+     *      │     └── <div id="counter">
+     *      │           ├── <span>Total :</span>
+     *      │           ├── <span>0</span>
+     *      │           ├── <span>Completed</span>
+     *      │           └── <span>0</span>
+     *      ├── <div id="input-filed">
+     *      │     ├── <input placeholder=...>
+     *      │     └── <button>Add</button>
+     *      └── <div id="item-list-container">
+     */
+
+        // 앱 전체를 감싸는 컨테이너 div 생성
+    const app = createElement({
+            tagName: 'div',
+            properties: {id: 'app'}, // 고유 ID
+            parent: document.body, // body에 부착
+
+        });
+
+    // 헤더 영역 구성 (타이틀 + 카운터)
+    const header = createElement({
+        tagName: 'div',
+        properties: {id: 'header'},
+        parent: app, // app div 아래에 붙음
+        children: [
+            {tagName: 'h1', properties: {innerText: 'To-do- list'}}, // 제목 출력
+            {
+                tagName: 'div', properties: {id: 'counter'},
+                children: [
+                    {tagName: 'span', properties: {innerText: 'Total :'}},
+                    {tagName: 'span', properties: {innerText: '0'}},
+                    {tagName: 'span', properties: {innerText: 'Completed'}},
+                    {tagName: 'span', properties: {innerText: '0'}},
+                ]
+            },
+        ]
+    });
+
+    // 입력 필드 영역 (할 일 입력 + 추가 버튼)
+    const inputFiled = createElement(
+        {
+            tagName: 'div',
+            properties: {id: 'input-filed'},
+            parent: app,
+            children: [
+                {tagName: 'input', properties: {placeholder: '할일을 입력해주세요....'}},
+                {tagName: 'button', properties: {innerText: 'Add'}},
+            ]
+        }
+    );
+
+    // 할 일 항목을 보여줄 컨테이너 (나중에 ul/li로 구현할 예정)
+    const itemListContainer = createElement(
+        {
+            tagName: 'div',
+            properties: {id: 'item-list-container'},
+            parent: app
+        }
+    )
+
+
+    /**
+     * 유틸리티 함수: createElement
+     * DOM Element 생성하고 속성 할당, 부모 노드 연결, 자식 노드 재귀 생성까지 담당.
+     * @param tagName
+     * @param properties
+     * @param parent
+     * @param children
+     * @param count
+     */
+    function createElement({
+                               tagName,     // 생성할 태그명 ('div', 'span', 'button' 등)
+                               properties,  // Element 부여할 속성들 (id, className, innerText 등)
+                               parent,      // 부모 요소 (appendChild 대상)
+                               children,    // 자식 요소들 (객체 배열 형태)
+                               count = 1,   // 같은 요소를 몇 개 만들지 (기본 1개)
+                           }) {
+        // 내부 생성기 (실제 DOM 생성 및 연결을 담당)
+        const create = () => {
+            const element = document.createElement(tagName); // ex: <div>
+            Object.assign(element, properties);              // 속성 할당
+            parent?.appendChild(element);                    // 부모에 붙이기 (옵셔널 체이닝)
+
+            // 자식이 잇다면 각각 자식의 parent를 설정하고 재귀 호출
+            children?.map(child => {
+                child.parent = element;     // 자식의 부모 설정
+                createElement(child);       // 재귀 호출로 자식 DOM 생성
+            });
+
+            return element; // 생성된 element 반환
+        }
+
+        // 반복 생성이 필요한 경우 배열로 반환
+        if (count > 1) {
+            const result = [];
+            for (let i = 0; i < count; i++) {
+                result.push(create());
+            }
+            return result;
+        } else {
+            return create(); // 기본은 단일 객체 반환
+        }
+    }
+
+</script>
+</body>
+</html>
