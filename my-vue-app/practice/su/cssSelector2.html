@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CSS 결합 선택자 실습</title>
+    <style>
+      /* 1. 부모 - 공백 (후손 선택자) */
+      .parent p {
+        color: steelblue;
+      }
+
+      /* 1. 부모 - 직계 자식 (>) */
+      .parent > p {
+        font-weight: bold;
+        background-color: #f0f0f0;
+      }
+
+      /* 2. 인접 형제(+) */
+      h3 + p {
+        color: crimson;
+      }
+
+      /* 2. 일반 형제(~) */
+      h3 ~ p {
+        text-decoration: underline;
+      }
+    </style>
+</head>
+<body>
+  <section class="container">
+    <h2>1. 부모 (공백, > 기호)</h2>
+    <div class="parent">
+      <p>이 문장은 직계 자식입니다.</p>
+      <div>
+        <p>이 문장은 손자입니다.</p>
+      </div>
+    </div>
+  </section>
+  <section class="container">
+    <h2>2. 인접, 일반 형제 선택자 (+, ~ 기호)</h2>
+    <h3>제목</h3>
+    <p>이 문장은 제목 바로 뒤 문장입니다.</p>
+    <p>이 문장은 두 번째 문장입니다.</p>
+  </section>
+</body>
+</html>
