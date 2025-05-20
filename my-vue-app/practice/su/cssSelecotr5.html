@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>가상 요소 실무 예제</title>
+    <style>
+      /* 전체 카드 스타일 */
+      .alert-card {
+        position: relative;
+        width: 320px;
+        margin: 80px auto;
+        padding: 20px 20px 20px 50px;
+        background-color: #fff4e5;
+        color: #5c3b00;
+        border: 1px solid #f0c36d;
+        border-radius: 8px;
+        font-family: sans-serif;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        overflow: visible; /* 꼬리가 잘리지 않게*/
+      }
+
+      /* 왼쪽에 경고 아이콘 추가 */
+      .alert-card::before {
+        content: "⚠️";
+        position: absolute;
+        top: 18px;
+        left: 16px;
+        font-size: 1.2em;
+      }
+
+      /* 아래쪽에 꼬리 삼각형 추가 */
+      .alert-card::after {
+        content: "";
+        position: absolute;
+        bottom: -20px;
+        left: 40px;
+        border: 10px solid transparent;
+        border-top-color: rgb(223, 79, 71);
+      }
+    </style>
+</head>
+<body>
+    <div class="alert-card">
+      시스템에 중요한 업데이트가 있습니다.
+    </div>
+</body>
+</html>
