@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>가상 클래스 실무 예제</title>
+    <style>
+      /* 카드 전체 스타일 */
+      .card {
+        width: 300px;
+        margin: 50px auto;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-family: sans-serif;
+      }
+
+      /* 입력창 포커스 시 */
+      input:focus {
+        border: 2px solid royalblue;
+        outline: none;
+      }
+
+      /* 버튼 hover 시 반응 */
+      button:hover {
+        background-color: black;
+        color: #fff;
+        cursor: pointer;
+      }
+
+      /* 리스트 첫 번째 항목 강조 */
+      .notice-list li:first-child {
+        font-weight: bold;
+        color: crimson;
+      }
+    </style>
+</head>
+<body>
+  <section class="card">
+    <h2>회원가입</h2>
+    <input type="text" placeholder="이름 입력" />
+    <button>가입하기</button>
+    <ul class="notice-list">
+      <li>약관에 동의해주세요</li>
+      <li>비밀번호는 8자 이상</li>
+      <li>이메일은 필수 입력입니다.</li>
+    </ul>
+  </section>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>나의 하루 일과</title>
+    <style>
+      /* 1. 태그 선택자 */
+      ul {
+        background-color: #f9f9f9;
+        padding: 20px;
+        border-radius: 10px;
+      }
+
+      /* 2. 클래스 선택자 */
+      .item {
+        font-size: 18px;
+        color: #333;
+      }
+
+      /* 3. ID 선택자 */
+      #highlight {
+        color: crimson;
+        font-weight: bold;
+      }
+
+      /* 4. 전체 선택자 */
+      * {
+        font-family: "Segoe UI", sans-serif;
+        margin: 0;
+        padding: 0;
+      }
+
+      /* 5. 그룹 선택자 */
+      h1,
+      .summary {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+    </style>
+</head>
+<body>
+  <h1 id="main-title">나의 하루 일과</h1>
+  <p class="summary">오늘도 알차게 보내야지!</p>
+  <ul>
+    <li class="item">아침 운동</li>
+    <li class="item">연구</li>
+    <li class="item">점심 식사</li>
+    <li class="item">프로젝트 작업</li>
+    <li id="highlight">잠깐 코딩</li>
+    <li class="item">독서 후 취침</li>
+  </ul>
+</body>
+</html>
