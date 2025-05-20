@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Document</title>
+    <link rel="stylesheet" href=" https://necolas.github.io/normalize.css/">
+    <style>
+        html {
+            font-size: 20px;
+        }
+
+        .container {
+            justify-content: center;
+            width: 200px;
+            display: flex;
+            background-color: beige;
+        }
+        .container .item {
+            margin: 5px;
+            width: 50px;
+            height: 50px;
+            background-color: aqua;
+            border: 0.5 solid black;
+        }
+
+
+        .container .item:nth-child(3) {
+            background-color: blue;
+        }
+
+        .container .item:hover {
+            background-color: violet;
+            font-size: 30px;
+        }
+
+        .password:focus {
+            background-color: burlywood;
+            text-decoration: line-through;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div id="test" class="item">1</div>
+    <div class="item">
+        <div class="subitem">2</div>
+    </div>
+    <div class="item">3</div>
+</div>
+
+</body>
+</html>
