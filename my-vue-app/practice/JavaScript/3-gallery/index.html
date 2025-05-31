@@ -5,21 +5,6 @@
     <title>Title</title>
 </head>
 <body>
-  <script>
-      const canvas = document.createElement('canvas');
-      const size = 720;
-      canvas.width = size * window.devicePixelRatio;
-      canvas.height = size * window.devicePixelRatio;
-      canvas.style.width = size + 'px';
-      canvas.style.height = size + 'px';
-      document.body.appendChild(canvas);
-      const ctx = canvas.getContext('2d');
-      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-
-      // image
-      const image = document.createElement('img');
-      document.body.appendChild(image);
-      image.src = `./images/01.jpg`;
-  </script>
+  <script type="module" src="./main.js"></script>
 </body>
 </html>
