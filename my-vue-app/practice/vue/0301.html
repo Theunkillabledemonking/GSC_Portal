@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    <div id="app">
+      <h2 v-html="message"></h2>
+    </div>
+    <script type="text/javascript" src="https://unpkg.com/vue"></script>
+    <script type="text/javascript">
+    var model = { message: "ho! "};
+    var vm = Vue.createApp({
+      name: "App",
+      data() {
+        return model;
+      }
+    }).mount("#app");
+    </script>
+</body>
+</html>
