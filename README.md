@@ -5,9 +5,7 @@
 **学科専用の学務ポータルシステム**です。
 ---
 
-<p align="left">
-  🇰🇷 [한국어](./README.ko.md) | 🇯🇵 [日本語](./README.md)
-</p>
+🇰🇷 [한국어](README.ko.md) ｜ 🇯🇵 [日本語](README.md)
 
 ---
 
